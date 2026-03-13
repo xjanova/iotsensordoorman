@@ -7,6 +7,14 @@ require_once __DIR__ . '/../config.php';
 $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'OPTIONS') jsonResponse(['ok' => true]);
 
+// Require login for write operations
+if ($method === 'POST') {
+    session_start();
+    if (empty($_SESSION['admin_id'])) {
+        jsonResponse(['error' => 'กรุณาเข้าสู่ระบบ'], 401);
+    }
+}
+
 try {
     $db = getDB();
 

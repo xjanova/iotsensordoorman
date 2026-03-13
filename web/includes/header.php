@@ -1,4 +1,4 @@
-<?php require_once __DIR__ . '/../config.php'; ?>
+<?php require_once __DIR__ . '/auth.php'; ?>
 <!DOCTYPE html>
 <html lang="th">
 <head>
@@ -65,6 +65,7 @@
                 ['icon' => 'fa-clock-rotate-left', 'label' => 'ประวัติเข้า-ออก', 'href' => 'logs.php', 'page' => 'logs'],
                 ['icon' => 'fa-triangle-exclamation', 'label' => 'การแจ้งเตือน', 'href' => 'alerts.php', 'page' => 'alerts'],
                 ['icon' => 'fa-gear', 'label' => 'ตั้งค่าระบบ', 'href' => 'settings.php', 'page' => 'settings'],
+                ['icon' => 'fa-book', 'label' => 'คู่มือระบบ', 'href' => 'guide.php', 'page' => 'guide'],
             ];
             foreach ($menuItems as $item):
                 $active = ($currentPage === $item['page']) ? 'active bg-blue-500/15 text-blue-400' : 'text-gray-400';
@@ -75,7 +76,21 @@
             </a>
             <?php endforeach; ?>
         </nav>
-        <div class="p-4 border-t border-white/10">
+        <div class="p-4 border-t border-white/10 space-y-3">
+            <?php if ($currentAdmin): ?>
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400 text-sm font-bold">
+                    <?= mb_strtoupper(mb_substr($currentAdmin['display_name'] ?: $currentAdmin['username'], 0, 1)) ?>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-white truncate"><?= htmlspecialchars($currentAdmin['display_name'] ?: $currentAdmin['username']) ?></p>
+                    <p class="text-xs text-gray-500">ผู้ดูแลระบบ</p>
+                </div>
+                <a href="logout.php" class="text-gray-500 hover:text-red-400 transition" title="ออกจากระบบ">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+            <?php endif; ?>
             <div class="flex items-center gap-2 text-xs text-gray-500">
                 <span class="pulse-dot w-2 h-2 bg-green-400 rounded-full" id="serverStatus"></span>
                 <span id="serverStatusText">System Online</span>

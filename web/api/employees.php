@@ -10,6 +10,14 @@ if ($method === 'OPTIONS') {
     jsonResponse(['ok' => true]);
 }
 
+// Require login for write operations
+if ($method !== 'GET') {
+    session_start();
+    if (empty($_SESSION['admin_id'])) {
+        jsonResponse(['error' => 'กรุณาเข้าสู่ระบบ'], 401);
+    }
+}
+
 try {
     $db = getDB();
 

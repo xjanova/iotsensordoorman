@@ -175,17 +175,24 @@ async function saveEmployee(e) {
     const result = await postAPI('api/employees.php', data);
     if (result?.success) {
         closeModal();
+        showToast(id ? 'แก้ไขข้อมูลพนักงานสำเร็จ' : 'เพิ่มพนักงานสำเร็จ', 'success');
         loadEmployees();
     } else {
-        alert(result?.error || 'เกิดข้อผิดพลาด');
+        showToast(result?.error || 'เกิดข้อผิดพลาด', 'error');
     }
 }
 
-async function deleteEmployee(id) {
-    if (!confirm('ต้องการลบพนักงานนี้?')) return;
-    const res = await fetch('api/employees.php?id=' + id, { method: 'DELETE' });
-    const result = await res.json();
-    if (result?.success) loadEmployees();
+function deleteEmployee(id) {
+    showConfirm('ลบพนักงาน', 'ต้องการลบพนักงานนี้หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้', async () => {
+        const res = await fetch('api/employees.php?id=' + id, { method: 'DELETE' });
+        const result = await res.json();
+        if (result?.success) {
+            showToast('ลบพนักงานสำเร็จ', 'success');
+            loadEmployees();
+        } else {
+            showToast(result?.error || 'เกิดข้อผิดพลาด', 'error');
+        }
+    });
 }
 
 // Search

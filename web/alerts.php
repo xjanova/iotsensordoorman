@@ -87,7 +87,10 @@ async function loadAlerts(filter = 'unresolved') {
 }
 
 async function resolveAlert(id) {
-    await postAPI('api/alerts.php', { resolve_id: id });
+    const res = await postAPI('api/alerts.php', { resolve_id: id });
+    if (res?.success) {
+        showToast('ดำเนินการแจ้งเตือนสำเร็จ', 'success');
+    }
     loadAlerts('unresolved');
 }
 

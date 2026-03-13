@@ -86,6 +86,17 @@ CREATE TABLE IF NOT EXISTS system_status (
 ) ENGINE=InnoDB COMMENT='สถานะอุปกรณ์ในระบบ';
 
 -- ============================================================
+-- ตาราง: ผู้ดูแลระบบ (Admin Users)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS admin_users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE COMMENT 'ชื่อผู้ใช้',
+    password_hash VARCHAR(255) NOT NULL COMMENT 'รหัสผ่าน (bcrypt)',
+    display_name VARCHAR(100) COMMENT 'ชื่อที่แสดง',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB COMMENT='ผู้ดูแลระบบ';
+
+-- ============================================================
 -- ตาราง: ตั้งค่าระบบ (Settings)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS settings (
