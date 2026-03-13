@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bunny Door System - คู่มือติดตั้ง Raspberry Pi</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --border: #334155;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --accent: #38bdf8;
+            --green: #4ade80;
+            --yellow: #facc15;
+            --red: #f87171;
+            --purple: #c084fc;
+            --orange: #fb923c;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Sarabun', 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            padding: 2rem;
+        }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 {
+            font-size: 2.2rem;
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+        .subtitle { color: var(--muted); margin-bottom: 2rem; font-size: 1.1rem; }
+        h2 {
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin: 2.5rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        h2 .step {
+            background: var(--accent);
+            color: var(--bg);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        h3 { color: var(--green); margin: 1.5rem 0 0.5rem; font-size: 1.1rem; }
+        h4 { color: var(--orange); margin: 1rem 0 0.3rem; font-size: 1rem; }
+        p { margin: 0.5rem 0; }
+        code {
+            background: #0d1117;
+            color: var(--green);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        pre {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem 1.2rem;
+            overflow-x: auto;
+            margin: 0.8rem 0;
+            position: relative;
+        }
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: var(--text);
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+        pre .comment { color: #6a737d; }
+        pre .cmd { color: var(--green); }
+        pre .output { color: var(--muted); font-style: italic; }
+        pre .important { color: var(--yellow); font-weight: bold; }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+        .warning {
+            background: rgba(250, 204, 21, 0.1);
+            border-left: 4px solid var(--yellow);
+            padding: 1rem 1.2rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+        .warning::before { content: "⚠️ "; }
+        .success {
+            background: rgba(74, 222, 128, 0.1);
+            border-left: 4px solid var(--green);
+            padding: 1rem 1.2rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+        .success::before { content: "✅ "; }
+        .info {
+            background: rgba(56, 189, 248, 0.1);
+            border-left: 4px solid var(--accent);
+            padding: 1rem 1.2rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+        .info::before { content: "ℹ️ "; }
+        .error {
+            background: rgba(248, 113, 113, 0.1);
+            border-left: 4px solid var(--red);
+            padding: 1rem 1.2rem;
+            border-radius: 0 8px 8px 0;
+            margin: 1rem 0;
+        }
+        .error::before { content: "❌ "; }
+        ul, ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+        li { margin: 0.3rem 0; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 0.6rem 1rem;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+        th { background: rgba(56, 189, 248, 0.1); color: var(--accent); }
+        .toc {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .toc a { color: var(--accent); text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+        .toc ol { padding-left: 1.2rem; }
+        .toc li { margin: 0.4rem 0; }
+        .diagram {
+            background: #0d1117;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            font-family: 'Consolas', monospace;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            white-space: pre;
+            overflow-x: auto;
+            color: var(--muted);
+        }
+        .file-tree {
+            font-family: 'Consolas', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: var(--muted);
+        }
+        .file-tree .dir { color: var(--accent); font-weight: bold; }
+        .file-tree .file { color: var(--text); }
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .badge-required { background: rgba(248, 113, 113, 0.2); color: var(--red); }
+        .badge-optional { background: rgba(74, 222, 128, 0.2); color: var(--green); }
+        .badge-time { background: rgba(192, 132, 252, 0.2); color: var(--purple); }
+        hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        @media (max-width: 768px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            body { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<h1>Bunny Door System</h1>
+<p class="subtitle">คู่มือติดตั้งระบบบน Raspberry Pi แบบละเอียดทุกขั้นตอน</p>
+
+<div class="card">
+    <strong>สิ่งที่ต้องเตรียม:</strong>
+    <ul>
+        <li>Raspberry Pi 4 Model B (แนะนำ RAM 4GB ขึ้นไป)</li>
+        <li>MicroSD 32GB ขึ้นไป (แนะนำ 64GB)</li>
+        <li>กล้อง USB 2 ตัว</li>
+        <li>สาย Ethernet หรือ WiFi</li>
+        <li>Power Supply 5V 3A (USB-C)</li>
+        <li>จอ HDMI + คีย์บอร์ด (สำหรับตั้งค่าครั้งแรก) หรือเข้า SSH</li>
+    </ul>
+</div>
+
+<div class="toc">
+    <strong>สารบัญ</strong>
+    <ol>
+        <li><a href="#step1">เตรียม Raspberry Pi OS</a></li>
+        <li><a href="#step2">อัปเดตระบบ</a></li>
+        <li><a href="#step3">ติดตั้ง Dependencies ระดับ OS</a></li>
+        <li><a href="#step4">ติดตั้ง MySQL Server</a></li>
+        <li><a href="#step5">สร้าง Python Virtual Environment</a></li>
+        <li><a href="#step6">ติดตั้ง dlib + face_recognition (ขั้นตอนสำคัญ)</a></li>
+        <li><a href="#step7">ติดตั้ง Python Packages ที่เหลือ</a></li>
+        <li><a href="#step8">โคลนโปรเจค + ตั้งค่า</a></li>
+        <li><a href="#step9">นำเข้าฐานข้อมูล</a></li>
+        <li><a href="#step10">เตรียมรูปใบหน้า</a></li>
+        <li><a href="#step11">ทดสอบกล้อง USB</a></li>
+        <li><a href="#step12">รันระบบ</a></li>
+        <li><a href="#step13">ตั้งค่าให้รันอัตโนมัติ (systemd)</a></li>
+        <li><a href="#step14">เชื่อมต่อ ESP32</a></li>
+        <li><a href="#step15">เชื่อมต่อ Web Dashboard (PC)</a></li>
+        <li><a href="#troubleshoot">แก้ปัญหาที่พบบ่อย</a></li>
+    </ol>
+</div>
+
+<!-- ================================================== -->
+<h2 id="step1"><span class="step">1</span> เตรียม Raspberry Pi OS</h2>
+<span class="badge badge-time">~15 นาที</span>
+
+<h3>1.1 ดาวน์โหลด Raspberry Pi Imager</h3>
+<p>ดาวน์โหลดจาก <code>https://www.raspberrypi.com/software/</code> แล้วติดตั้งบน PC</p>
+
+<h3>1.2 เขียน OS ลง MicroSD</h3>
+<ol>
+    <li>เปิด Raspberry Pi Imager</li>
+    <li>เลือก <strong>Raspberry Pi OS (64-bit)</strong> - ต้องเป็น 64-bit เท่านั้น</li>
+    <li>เลือก MicroSD Card</li>
+    <li>กดปุ่มเกียร์ (Settings) เพื่อตั้งค่า:
+        <ul>
+            <li>ตั้งชื่อเครื่อง: <code>bunnydoor</code></li>
+            <li>เปิด SSH</li>
+            <li>ตั้ง Username/Password: <code>pi</code> / <code>รหัสผ่านที่ต้องการ</code></li>
+            <li>ตั้งค่า WiFi (ถ้าไม่ได้ต่อ Ethernet)</li>
+            <li>Timezone: <code>Asia/Bangkok</code></li>
+        </ul>
+    </li>
+    <li>กด Write</li>
+</ol>
+
+<div class="warning">
+    ต้องใช้ <strong>64-bit OS</strong> เท่านั้น เพราะ dlib/face_recognition ทำงานได้ดีกว่ามากบน 64-bit
+    และ library บางตัวไม่รองรับ 32-bit แล้ว
+</div>
+
+<h3>1.3 บูตเครื่อง</h3>
+<p>ใส่ MicroSD เข้า Raspberry Pi แล้วเปิดเครื่อง รอสักครู่แล้ว SSH เข้า:</p>
+<pre><code><span class="cmd">ssh pi@bunnydoor.local</span>
+<span class="comment"># หรือถ้ารู้ IP:</span>
+<span class="cmd">ssh pi@192.168.1.xxx</span></code></pre>
+
+<!-- ================================================== -->
+<h2 id="step2"><span class="step">2</span> อัปเดตระบบ</h2>
+<span class="badge badge-time">~10 นาที</span>
+
+<pre><code><span class="cmd">sudo apt update && sudo apt upgrade -y</span>
+<span class="cmd">sudo reboot</span></code></pre>
+
+<p>รอ reboot แล้ว SSH เข้ามาใหม่:</p>
+<pre><code><span class="cmd">ssh pi@bunnydoor.local</span></code></pre>
+
+<!-- ================================================== -->
+<h2 id="step3"><span class="step">3</span> ติดตั้ง Dependencies ระดับ OS</h2>
+<span class="badge badge-time">~15 นาที</span>
+
+<p>Library ที่ต้องติดตั้งก่อน (สำหรับ OpenCV, dlib, face_recognition):</p>
+
+<pre><code><span class="comment"># Build tools</span>
+<span class="cmd">sudo apt install -y build-essential cmake gfortran</span>
+
+<span class="comment"># Python development headers</span>
+<span class="cmd">sudo apt install -y python3-dev python3-pip python3-venv</span>
+
+<span class="comment"># Image processing libraries</span>
+<span class="cmd">sudo apt install -y libjpeg-dev libpng-dev libtiff-dev</span>
+<span class="cmd">sudo apt install -y libavcodec-dev libavformat-dev libswscale-dev</span>
+<span class="cmd">sudo apt install -y libv4l-dev v4l-utils</span>
+
+<span class="comment"># Math/BLAS (สำคัญมากสำหรับ dlib)</span>
+<span class="cmd">sudo apt install -y libatlas-base-dev liblapack-dev libblas-dev</span>
+
+<span class="comment"># Boost (ต้องใช้สำหรับ dlib)</span>
+<span class="cmd">sudo apt install -y libboost-all-dev</span>
+
+<span class="comment"># X11 (สำหรับ OpenCV GUI - ถ้าต้องการแสดงผลบนจอ)</span>
+<span class="cmd">sudo apt install -y libgtk-3-dev libxvidcore-dev libx264-dev</span>
+
+<span class="comment"># HDF5</span>
+<span class="cmd">sudo apt install -y libhdf5-dev libhdf5-serial-dev</span>
+
+<span class="comment"># Git</span>
+<span class="cmd">sudo apt install -y git</span></code></pre>
+
+<div class="info">
+    ขั้นตอนนี้จะดาวน์โหลดประมาณ 500MB-1GB ใช้เวลาขึ้นกับความเร็วอินเทอร์เน็ต
+</div>
+
+<!-- ================================================== -->
+<h2 id="step4"><span class="step">4</span> ติดตั้ง MySQL Server (MariaDB)</h2>
+<span class="badge badge-time">~5 นาที</span>
+
+<p>บน Raspberry Pi ใช้ MariaDB ซึ่งเข้ากันได้กับ MySQL 100%:</p>
+
+<pre><code><span class="cmd">sudo apt install -y mariadb-server mariadb-client</span>
+
+<span class="comment"># เริ่มต้น MySQL</span>
+<span class="cmd">sudo systemctl enable mariadb</span>
+<span class="cmd">sudo systemctl start mariadb</span>
+
+<span class="comment"># ตั้งค่าความปลอดภัย</span>
+<span class="cmd">sudo mysql_secure_installation</span></code></pre>
+
+<p>เมื่อรัน <code>mysql_secure_installation</code> จะถามคำถาม ตอบดังนี้:</p>
+<table>
+    <tr><th>คำถาม</th><th>ตอบ</th></tr>
+    <tr><td>Enter current password for root</td><td>กด Enter (ว่าง)</td></tr>
+    <tr><td>Switch to unix_socket authentication</td><td>N</td></tr>
+    <tr><td>Change the root password?</td><td>Y แล้วใส่รหัสผ่านที่ต้องการ</td></tr>
+    <tr><td>Remove anonymous users?</td><td>Y</td></tr>
+    <tr><td>Disallow root login remotely?</td><td>N (เพื่อให้ PC เชื่อมต่อได้)</td></tr>
+    <tr><td>Remove test database?</td><td>Y</td></tr>
+    <tr><td>Reload privilege tables?</td><td>Y</td></tr>
+</table>
+
+<h3>4.1 สร้าง User สำหรับระบบ</h3>
+<pre><code><span class="cmd">sudo mysql -u root -p</span>
+
+<span class="comment">-- ใน MySQL prompt:</span>
+CREATE USER 'bunny'@'localhost' IDENTIFIED BY 'รหัสผ่านที่ต้องการ';
+CREATE USER 'bunny'@'%' IDENTIFIED BY 'รหัสผ่านที่ต้องการ';
+GRANT ALL PRIVILEGES ON bunny_door.* TO 'bunny'@'localhost';
+GRANT ALL PRIVILEGES ON bunny_door.* TO 'bunny'@'%';
+FLUSH PRIVILEGES;
+EXIT;</code></pre>
+
+<h3>4.2 เปิดให้ PC เข้าถึง MySQL ได้ (Remote Access)</h3>
+<pre><code><span class="cmd">sudo nano /etc/mysql/mariadb.conf.d/50-server.cnf</span>
+
+<span class="comment"># หาบรรทัด bind-address แล้วแก้เป็น:</span>
+<span class="important">bind-address = 0.0.0.0</span>
+
+<span class="comment"># บันทึก (Ctrl+O, Enter, Ctrl+X) แล้ว restart:</span>
+<span class="cmd">sudo systemctl restart mariadb</span></code></pre>
+
+<!-- ================================================== -->
+<h2 id="step5"><span class="step">5</span> สร้าง Python Virtual Environment</h2>
+<span class="badge badge-time">~2 นาที</span>
+
+<pre><code><span class="comment"># สร้างโฟลเดอร์โปรเจค</span>
+<span class="cmd">mkdir -p ~/bunny-door</span>
+<span class="cmd">cd ~/bunny-door</span>
+
+<span class="comment"># สร้าง virtual environment</span>
+<span class="cmd">python3 -m venv venv</span>
+
+<span class="comment"># เปิดใช้งาน venv</span>
+<span class="cmd">source venv/bin/activate</span>
+
+<span class="comment"># อัปเดต pip</span>
+<span class="cmd">pip install --upgrade pip setuptools wheel</span></code></pre>
+
+<div class="warning">
+    ทุกครั้งที่เปิด Terminal ใหม่ ต้องรัน <code>source ~/bunny-door/venv/bin/activate</code> ก่อนเสมอ
+    หรือตั้งค่าใน systemd service (จะอธิบายในขั้นตอนที่ 13)
+</div>
+
+<!-- ================================================== -->
+<h2 id="step6"><span class="step">6</span> ติดตั้ง dlib + face_recognition</h2>
+<span class="badge badge-required">สำคัญมาก</span>
+<span class="badge badge-time">~45-90 นาที</span>
+
+<div class="warning">
+    ขั้นตอนนี้ใช้เวลานานที่สุดเพราะต้อง compile dlib จาก source บน Raspberry Pi
+    <strong>ห้ามปิดเครื่องระหว่าง compile!</strong>
+</div>
+
+<h3>6.1 เพิ่ม Swap (สำคัญมาก!)</h3>
+<p>dlib ต้องใช้ RAM มากตอน compile ต้องเพิ่ม swap ก่อน:</p>
+
+<pre><code><span class="comment"># เช็ค swap ปัจจุบัน</span>
+<span class="cmd">free -h</span>
+
+<span class="comment"># เพิ่ม swap เป็น 2GB</span>
+<span class="cmd">sudo dphys-swapfile swapoff</span>
+<span class="cmd">sudo nano /etc/dphys-swapfile</span>
+
+<span class="comment"># หาบรรทัด CONF_SWAPSIZE แล้วแก้เป็น:</span>
+<span class="important">CONF_SWAPSIZE=2048</span>
+
+<span class="comment"># บันทึก แล้วเปิดใช้งาน swap ใหม่</span>
+<span class="cmd">sudo dphys-swapfile setup</span>
+<span class="cmd">sudo dphys-swapfile swapon</span>
+
+<span class="comment"># ตรวจสอบ</span>
+<span class="cmd">free -h</span>
+<span class="output"># ควรเห็น Swap: 2.0Gi</span></code></pre>
+
+<h3>6.2 ติดตั้ง dlib</h3>
+<pre><code><span class="cmd">cd ~/bunny-door</span>
+<span class="cmd">source venv/bin/activate</span>
+
+<span class="comment"># วิธีที่ 1: ติดตั้งจาก pip (อาจใช้เวลา 30-60 นาที)</span>
+<span class="cmd">pip install dlib</span>
+
+<span class="comment"># ถ้าวิธีที่ 1 ล้มเหลว ใช้วิธีที่ 2: compile จาก source</span>
+<span class="cmd">git clone https://github.com/davisking/dlib.git</span>
+<span class="cmd">cd dlib</span>
+<span class="cmd">mkdir build && cd build</span>
+<span class="cmd">cmake ..</span>
+<span class="cmd">cmake --build . --config Release</span>
+<span class="cmd">cd ..</span>
+<span class="cmd">python setup.py install</span>
+<span class="cmd">cd ~/bunny-door</span></code></pre>
+
+<div class="info">
+    ระหว่าง compile จะเห็น output มากมาย นี่เป็นเรื่องปกติ
+    รอจนเสร็จ ถ้า CPU ร้อนมากเกินไปจะ throttle แต่ไม่เป็นอันตราย
+</div>
+
+<h3>6.3 ติดตั้ง face_recognition</h3>
+<pre><code><span class="cmd">pip install face_recognition</span></code></pre>
+
+<h3>6.4 ทดสอบว่าติดตั้งสำเร็จ</h3>
+<pre><code><span class="cmd">python3 -c "import dlib; print('dlib version:', dlib.__version__)"</span>
+<span class="output"># ควรเห็น: dlib version: 19.24.x</span>
+
+<span class="cmd">python3 -c "import face_recognition; print('face_recognition OK')"</span>
+<span class="output"># ควรเห็น: face_recognition OK</span></code></pre>
+
+<h3>6.5 คืนค่า Swap (หลัง compile เสร็จ)</h3>
+<pre><code><span class="comment"># ลด swap กลับเป็น 100MB เพื่อยืดอายุ SD Card</span>
+<span class="cmd">sudo dphys-swapfile swapoff</span>
+<span class="cmd">sudo nano /etc/dphys-swapfile</span>
+
+<span class="comment"># แก้กลับเป็น:</span>
+<span class="important">CONF_SWAPSIZE=512</span>
+
+<span class="cmd">sudo dphys-swapfile setup</span>
+<span class="cmd">sudo dphys-swapfile swapon</span></code></pre>
+
+<div class="success">
+    ถ้าผ่านขั้นตอนนี้แล้ว ส่วนที่ยากที่สุดเสร็จแล้ว!
+</div>
+
+<!-- ================================================== -->
+<h2 id="step7"><span class="step">7</span> ติดตั้ง Python Packages ที่เหลือ</h2>
+<span class="badge badge-time">~5 นาที</span>
+
+<pre><code><span class="cmd">cd ~/bunny-door</span>
+<span class="cmd">source venv/bin/activate</span>
+
+<span class="comment"># NumPy</span>
+<span class="cmd">pip install numpy</span>
+
+<span class="comment"># OpenCV</span>
+<span class="cmd">pip install opencv-python-headless</span>
+<span class="comment"># ใช้ headless เพราะ Pi มักไม่ต้องแสดงผล GUI</span>
+
+<span class="comment"># Flask</span>
+<span class="cmd">pip install flask flask-cors</span>
+
+<span class="comment"># MySQL connector</span>
+<span class="cmd">pip install mysql-connector-python</span>
+
+<span class="comment"># HTTP client + image processing</span>
+<span class="cmd">pip install requests Pillow</span></code></pre>
+
+<div class="info">
+    ใช้ <code>opencv-python-headless</code> แทน <code>opencv-python</code>
+    เพราะไม่ต้องใช้ GUI ช่วยลดขนาดการติดตั้ง
+</div>
+
+<!-- ================================================== -->
+<h2 id="step8"><span class="step">8</span> โคลนโปรเจค + ตั้งค่า</h2>
+<span class="badge badge-time">~5 นาที</span>
+
+<pre><code><span class="cmd">cd ~/bunny-door</span>
+
+<span class="comment"># โคลนจาก GitHub</span>
+<span class="cmd">git clone https://github.com/xjanova/iotsensordoorman.git src</span>
+
+<span class="comment"># สร้าง symlink ให้เข้าถึงง่าย</span>
+<span class="cmd">ln -s src/python/face_server.py .</span>
+<span class="cmd">ln -s src/python/simple_facerec.py .</span>
+<span class="cmd">ln -s src/python/config.py .</span></code></pre>
+
+<h3>8.1 สร้างไฟล์ .env</h3>
+<pre><code><span class="cmd">nano ~/bunny-door/src/python/.env</span></code></pre>
+
+<p>ใส่เนื้อหา:</p>
+<pre><code><span class="comment"># Database (MariaDB on Raspberry Pi)</span>
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=bunny
+DB_PASSWORD=<span class="important">รหัสผ่านที่ตั้งไว้ในขั้นตอน 4</span>
+DB_NAME=bunny_door</code></pre>
+
+<p>บันทึก: <code>Ctrl+O</code>, <code>Enter</code>, <code>Ctrl+X</code></p>
+
+<h3>8.2 สร้างโฟลเดอร์ที่จำเป็น</h3>
+<pre><code><span class="cmd">mkdir -p ~/bunny-door/src/python/images</span>
+<span class="cmd">mkdir -p ~/bunny-door/src/python/snapshots</span></code></pre>
+
+<!-- ================================================== -->
+<h2 id="step9"><span class="step">9</span> นำเข้าฐานข้อมูล</h2>
+<span class="badge badge-time">~2 นาที</span>
+
+<pre><code><span class="cmd">cd ~/bunny-door/src</span>
+
+<span class="comment"># นำเข้า schema</span>
+<span class="cmd">mysql -u bunny -p < database/schema.sql</span>
+<span class="comment"># ใส่รหัสผ่านที่ตั้งไว้</span>
+
+<span class="comment"># ตรวจสอบ</span>
+<span class="cmd">mysql -u bunny -p -e "USE bunny_door; SHOW TABLES;"</span>
+<span class="output">+----------------------+
+| Tables_in_bunny_door |
++----------------------+
+| access_logs          |
+| anomaly_alerts       |
+| employees            |
+| settings             |
+| system_status        |
++----------------------+</span>
+
+<span class="comment"># ดูข้อมูลพนักงาน</span>
+<span class="cmd">mysql -u bunny -p -e "USE bunny_door; SELECT emp_code, first_name, last_name FROM employees;"</span></code></pre>
+
+<!-- ================================================== -->
+<h2 id="step10"><span class="step">10</span> เตรียมรูปใบหน้า</h2>
+<span class="badge badge-required">สำคัญ</span>
+<span class="badge badge-time">~10 นาที</span>
+
+<p>ระบบจะจดจำใบหน้าจากไฟล์รูปในโฟลเดอร์ <code>python/images/</code></p>
+
+<h3>กฎการตั้งชื่อไฟล์</h3>
+<div class="card">
+    <ul>
+        <li>ชื่อไฟล์ = ชื่อของคนนั้น (ไม่มีนามสกุลไฟล์ในชื่อ)</li>
+        <li>ไฟล์ต้องเป็น <code>.jpg</code> หรือ <code>.png</code></li>
+        <li>รูปต้องเห็นใบหน้าชัดเจน 1 หน้าต่อ 1 รูป</li>
+        <li>ชื่อไฟล์ต้องตรงกับ <code>face_image</code> ในตาราง <code>employees</code></li>
+    </ul>
+</div>
+
+<p>ตัวอย่าง:</p>
+<pre><code>~/bunny-door/src/python/images/
+    kulthida.jpg       <span class="comment"># ตรงกับ face_image = 'kulthida.jpg'</span>
+    nattanun.jpg       <span class="comment"># ตรงกับ face_image = 'nattanun.jpg'</span>
+    nattapol.jpg
+    sarayut.jpg</code></pre>
+
+<h3>วิธีคัดลอกรูปจาก PC ไปยัง Raspberry Pi</h3>
+<pre><code><span class="comment"># บน PC (Windows) ใช้ scp:</span>
+<span class="cmd">scp C:\path\to\photos\*.jpg pi@bunnydoor.local:~/bunny-door/src/python/images/</span>
+
+<span class="comment"># หรือใช้ WinSCP (GUI) ลากไฟล์ไปวาง</span></code></pre>
+
+<h3>ถ่ายรูปจากกล้อง USB โดยตรง</h3>
+<pre><code><span class="cmd">cd ~/bunny-door</span>
+<span class="cmd">source venv/bin/activate</span>
+
+<span class="comment"># สคริปต์ถ่ายรูป (สร้างไฟล์ capture_face.py)</span>
+<span class="cmd">python3 -c "
+import cv2
+name = input('ชื่อ (ภาษาอังกฤษ): ')
+cap = cv2.VideoCapture(0)
+print('กด SPACE เพื่อถ่ายรูป, กด Q เพื่อยกเลิก')
+while True:
+    ret, frame = cap.read()
+    if not ret: break
+    cv2.imshow('Capture Face', frame)
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord(' '):
+        path = f'src/python/images/{name}.jpg'
+        cv2.imwrite(path, frame)
+        print(f'บันทึกที่: {path}')
+        break
+    elif key == ord('q'):
+        break
+cap.release()
+cv2.destroyAllWindows()
+"</span></code></pre>
+
+<div class="warning">
+    สคริปต์ถ่ายรูปข้างบนต้องมีจอแสดงผลต่อกับ Pi ถ้าใช้ SSH อย่างเดียว
+    ให้ถ่ายรูปจาก PC แล้ว scp ไปแทน
+</div>
+
+<!-- ================================================== -->
+<h2 id="step11"><span class="step">11</span> ทดสอบกล้อง USB</h2>
+<span class="badge badge-time">~5 นาที</span>
+
+<pre><code><span class="comment"># ดูกล้องที่เชื่อมต่ออยู่</span>
+<span class="cmd">ls -la /dev/video*</span>
+<span class="output"># ควรเห็น /dev/video0 และ /dev/video2 (หรือ video1)</span>
+
+<span class="comment"># ดูรายละเอียดกล้อง</span>
+<span class="cmd">v4l2-ctl --list-devices</span>
+<span class="output">
+# USB Camera 1 (usb-0000:01:00.0-1.1):
+#     /dev/video0
+#     /dev/video1
+#
+# USB Camera 2 (usb-0000:01:00.0-1.2):
+#     /dev/video2
+#     /dev/video3
+</span></code></pre>
+
+<div class="info">
+    กล้อง USB แต่ละตัวจะสร้าง 2 device nodes (video0+video1, video2+video3)
+    ใช้ตัวเลขคู่ (video0, video2) สำหรับ capture
+</div>
+
+<h3>ทดสอบจับภาพ</h3>
+<pre><code><span class="cmd">cd ~/bunny-door && source venv/bin/activate</span>
+
+<span class="cmd">python3 -c "
+import cv2
+# ทดสอบกล้องตัวที่ 1
+cap = cv2.VideoCapture(0)
+ret, frame = cap.read()
+if ret:
+    print(f'Camera 0 OK: {frame.shape}')
+    cv2.imwrite('/tmp/test_cam0.jpg', frame)
+else:
+    print('Camera 0 FAILED')
+cap.release()
+
+# ทดสอบกล้องตัวที่ 2
+cap = cv2.VideoCapture(2)
+ret, frame = cap.read()
+if ret:
+    print(f'Camera 2 OK: {frame.shape}')
+    cv2.imwrite('/tmp/test_cam2.jpg', frame)
+else:
+    print('Camera 2 FAILED - ลอง ID อื่น')
+cap.release()
+"</span></code></pre>
+
+<h3>แก้ config ถ้า Camera ID ไม่ตรง</h3>
+<p>ถ้ากล้องตัวที่ 2 ไม่ใช่ ID 1 แต่เป็น ID 2 (หรืออื่น) ให้แก้ไฟล์ <code>.env</code>:</p>
+<pre><code><span class="cmd">nano ~/bunny-door/src/python/.env</span>
+
+<span class="comment"># เพิ่มบรรทัด:</span>
+CAMERA_OUTSIDE_ID=0
+CAMERA_INSIDE_ID=2</code></pre>
+
+<p>แล้วแก้ <code>config.py</code> ให้อ่านค่าจาก .env:</p>
+<pre><code><span class="comment"># ในไฟล์ config.py แก้:</span>
+CAMERA_OUTSIDE_ID = int(os.environ.get("CAMERA_OUTSIDE_ID", "0"))
+CAMERA_INSIDE_ID = int(os.environ.get("CAMERA_INSIDE_ID", "1"))</code></pre>
+
+<!-- ================================================== -->
+<h2 id="step12"><span class="step">12</span> รันระบบ</h2>
+<span class="badge badge-time">~2 นาที</span>
+
+<pre><code><span class="cmd">cd ~/bunny-door/src/python</span>
+<span class="cmd">source ~/bunny-door/venv/bin/activate</span>
+
+<span class="comment"># รันระบบ</span>
+<span class="cmd">python face_server.py</span>
+
+<span class="output">
+==================================================
+  Bunny Door System - Face Recognition Server
+==================================================
+[FaceRec] พบ 4 ไฟล์รูปภาพ
+[FaceRec] โหลดสำเร็จ: kulthida
+[FaceRec] โหลดสำเร็จ: nattanun
+[FaceRec] โหลดสำเร็จ: nattapol
+[FaceRec] โหลดสำเร็จ: sarayut
+[FaceRec] โหลดเสร็จ: 4/4 ใบหน้า
+[Camera] Starting camera_outside (ID: 0)
+[Camera] Starting camera_inside (ID: 2)
+[Server] Starting Flask API on 0.0.0.0:5000
+</span></code></pre>
+
+<h3>ทดสอบจาก PC</h3>
+<pre><code><span class="comment"># เปิด browser บน PC แล้วเข้า:</span>
+http://bunnydoor.local:5000/
+http://bunnydoor.local:5000/api/status
+http://bunnydoor.local:5000/api/stream/outside</code></pre>
+
+<div class="success">
+    ถ้าเห็นหน้า JSON หรือภาพจากกล้อง แสดงว่าระบบทำงานแล้ว!
+</div>
+
+<!-- ================================================== -->
+<h2 id="step13"><span class="step">13</span> ตั้งค่าให้รันอัตโนมัติ (systemd)</h2>
+<span class="badge badge-time">~5 นาที</span>
+
+<p>สร้าง service file เพื่อให้ระบบเปิดทำงานอัตโนมัติเมื่อ boot:</p>
+
+<pre><code><span class="cmd">sudo nano /etc/systemd/system/bunny-door.service</span></code></pre>
+
+<p>ใส่เนื้อหา:</p>
+<pre><code>[Unit]
+Description=Bunny Door Face Recognition Server
+After=network.target mariadb.service
+Wants=mariadb.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/bunny-door/src/python
+Environment=PATH=/home/pi/bunny-door/venv/bin:/usr/bin:/bin
+ExecStart=/home/pi/bunny-door/venv/bin/python face_server.py
+Restart=on-failure
+RestartSec=10
+
+<span class="comment"># Logging</span>
+StandardOutput=journal
+StandardError=journal
+
+<span class="comment"># Security</span>
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target</code></pre>
+
+<h3>เปิดใช้งาน</h3>
+<pre><code><span class="comment"># โหลด service ใหม่</span>
+<span class="cmd">sudo systemctl daemon-reload</span>
+
+<span class="comment"># เปิดให้ทำงานตอน boot</span>
+<span class="cmd">sudo systemctl enable bunny-door</span>
+
+<span class="comment"># เริ่มทำงานทันที</span>
+<span class="cmd">sudo systemctl start bunny-door</span>
+
+<span class="comment"># ตรวจสอบสถานะ</span>
+<span class="cmd">sudo systemctl status bunny-door</span>
+
+<span class="comment"># ดู logs</span>
+<span class="cmd">journalctl -u bunny-door -f</span>
+<span class="comment"># กด Ctrl+C เพื่อหยุดดู</span></code></pre>
+
+<h3>คำสั่งที่ใช้บ่อย</h3>
+<table>
+    <tr><th>คำสั่ง</th><th>ความหมาย</th></tr>
+    <tr><td><code>sudo systemctl start bunny-door</code></td><td>เริ่มระบบ</td></tr>
+    <tr><td><code>sudo systemctl stop bunny-door</code></td><td>หยุดระบบ</td></tr>
+    <tr><td><code>sudo systemctl restart bunny-door</code></td><td>รีสตาร์ท</td></tr>
+    <tr><td><code>sudo systemctl status bunny-door</code></td><td>ดูสถานะ</td></tr>
+    <tr><td><code>journalctl -u bunny-door -f</code></td><td>ดู logs แบบ real-time</td></tr>
+    <tr><td><code>journalctl -u bunny-door --since today</code></td><td>ดู logs วันนี้</td></tr>
+</table>
+
+<!-- ================================================== -->
+<h2 id="step14"><span class="step">14</span> เชื่อมต่อ ESP32</h2>
+<span class="badge badge-time">~10 นาที</span>
+
+<h3>14.1 ตั้งค่า WiFi บน ESP32</h3>
+<p>แก้ไฟล์ <code>esp32/door_controller/door_controller.ino</code> ใน Arduino IDE:</p>
+
+<pre><code><span class="comment">// แก้ค่าเหล่านี้:</span>
+const char* WIFI_SSID = "<span class="important">ชื่อ WiFi ของคุณ</span>";
+const char* WIFI_PASSWORD = "<span class="important">รหัส WiFi</span>";
+const char* SERVER_URL = "<span class="important">http://IP-ของ-RaspberryPi:5000</span>";
+
+<span class="comment">// ตัวอย่าง:</span>
+const char* SERVER_URL = "http://192.168.1.50:5000";</code></pre>
+
+<h3>14.2 หา IP ของ Raspberry Pi</h3>
+<pre><code><span class="cmd">hostname -I</span>
+<span class="output">192.168.1.50</span></code></pre>
+
+<h3>14.3 อัปโหลดโค้ดไปยัง ESP32</h3>
+<ol>
+    <li>เปิด Arduino IDE บน PC</li>
+    <li>ติดตั้ง Board: ESP32 (จาก Board Manager)</li>
+    <li>เปิดไฟล์ <code>esp32/door_controller/door_controller.ino</code></li>
+    <li>เลือก Board: <strong>ESP32 Dev Module</strong></li>
+    <li>เลือก Port: COM port ที่ ESP32 ต่ออยู่</li>
+    <li>กด Upload</li>
+</ol>
+
+<h3>14.4 แก้ config.py บน Raspberry Pi</h3>
+<pre><code><span class="cmd">nano ~/bunny-door/src/python/.env</span>
+
+<span class="comment"># เพิ่ม IP ของ ESP32:</span>
+ESP32_IP=<span class="important">IP-ของ-ESP32</span>
+
+<span class="comment"># ดู IP ของ ESP32 ได้จาก Serial Monitor ของ Arduino IDE</span></code></pre>
+
+<h3>14.5 ทดสอบการเชื่อมต่อ</h3>
+<pre><code><span class="comment"># จาก Raspberry Pi ping ไปยัง ESP32:</span>
+<span class="cmd">ping 192.168.1.100</span>
+
+<span class="comment"># ทดสอบ API ของ ESP32:</span>
+<span class="cmd">curl http://192.168.1.100/ping</span>
+<span class="output">{"status":"alive","uptime":12345}</span>
+
+<span class="comment"># ทดสอบปลดล็อกประตู:</span>
+<span class="cmd">curl -X POST http://192.168.1.100/api/door/unlock</span>
+<span class="output">{"success":true,"status":"unlocked"}</span></code></pre>
+
+<!-- ================================================== -->
+<h2 id="step15"><span class="step">15</span> เชื่อมต่อ Web Dashboard (PC)</h2>
+<span class="badge badge-time">~5 นาที</span>
+
+<p>Web Dashboard (PHP) รันบน PC ที่มี Laragon ผ่านทาง Apache
+    ต้องแก้ให้ชี้ไปยัง Raspberry Pi แทน localhost:</p>
+
+<h3>15.1 แก้ .env บน PC (Laragon)</h3>
+<pre><code><span class="comment"># แก้ไฟล์ C:\laragon\www\bunny-door\.env</span>
+DB_HOST=<span class="important">IP-ของ-RaspberryPi</span>
+DB_PORT=3306
+DB_USER=bunny
+DB_PASS=<span class="important">รหัสผ่านที่ตั้งไว้</span>
+DB_NAME=bunny_door
+FACE_SERVER_URL=http://<span class="important">IP-ของ-RaspberryPi</span>:5000</code></pre>
+
+<h3>15.2 ทดสอบ</h3>
+<p>เปิด browser แล้วเข้า <code>http://localhost/bunny-door/</code></p>
+
+<div class="card">
+    <strong>สิ่งที่ต้องเห็น:</strong>
+    <ul>
+        <li>Dashboard แสดงข้อมูลสถิติ</li>
+        <li>ภาพจากกล้องทั้ง 2 ตัว (MJPEG stream)</li>
+        <li>สถานะประตู (ล็อก/ปลดล็อก)</li>
+        <li>ข้อมูลพนักงาน 4 คน</li>
+    </ul>
+</div>
+
+<!-- ================================================== -->
+<h2 id="troubleshoot"><span class="step">?</span> แก้ปัญหาที่พบบ่อย</h2>
+
+<h3>กล้องไม่ทำงาน</h3>
+<div class="card">
+<pre><code><span class="comment"># ตรวจสอบว่ากล้องเชื่อมต่ออยู่</span>
+<span class="cmd">lsusb</span>
+<span class="comment"># ควรเห็นกล้อง 2 ตัว</span>
+
+<span class="comment"># ตรวจสอบ /dev/video</span>
+<span class="cmd">ls /dev/video*</span>
+
+<span class="comment"># ถ้าไม่เห็น video device:</span>
+<span class="cmd">sudo modprobe uvcvideo</span>
+
+<span class="comment"># ตรวจสอบ permissions</span>
+<span class="cmd">groups pi</span>
+<span class="comment"># ต้องมี "video" ในรายการ ถ้าไม่มี:</span>
+<span class="cmd">sudo usermod -aG video pi</span>
+<span class="cmd">sudo reboot</span></code></pre>
+</div>
+
+<h3>dlib compile ล้มเหลว</h3>
+<div class="card">
+<pre><code><span class="comment"># ตรวจสอบว่ามี swap พอ</span>
+<span class="cmd">free -h</span>
+<span class="comment"># ต้องมี Swap อย่างน้อย 2GB</span>
+
+<span class="comment"># ตรวจสอบ cmake version</span>
+<span class="cmd">cmake --version</span>
+<span class="comment"># ต้อง >= 3.5</span>
+
+<span class="comment"># ถ้า error เรื่อง boost:</span>
+<span class="cmd">sudo apt install -y libboost-python-dev</span>
+
+<span class="comment"># ถ้า error เรื่อง X11:</span>
+<span class="cmd">sudo apt install -y libx11-dev</span></code></pre>
+</div>
+
+<h3>face_recognition ช้ามาก</h3>
+<div class="card">
+    <p>บน Raspberry Pi 4 ใช้ model <code>"hog"</code> จะได้ ~1-3 FPS
+    ถ้าใช้ <code>"cnn"</code> จะช้ามาก (~0.1 FPS)</p>
+    <p>ตรวจสอบการตั้งค่าใน <code>.env</code> หรือ <code>config.py</code>:</p>
+<pre><code>FACE_MODEL = "hog"              <span class="comment"># ใช้ hog เท่านั้นบน Pi</span>
+FRAME_RESIZING = 0.25           <span class="comment"># ลดขนาดภาพเป็น 25%</span>
+PROCESS_EVERY_X_FRAMES = 5     <span class="comment"># ประมวลผลทุก 5 เฟรม</span></code></pre>
+</div>
+
+<h3>MySQL เชื่อมต่อไม่ได้</h3>
+<div class="card">
+<pre><code><span class="comment"># ตรวจสอบว่า MariaDB ทำงานอยู่</span>
+<span class="cmd">sudo systemctl status mariadb</span>
+
+<span class="comment"># ทดสอบเชื่อมต่อ</span>
+<span class="cmd">mysql -u bunny -p -e "SELECT 1"</span>
+
+<span class="comment"># ถ้า PC เชื่อมต่อไม่ได้ ตรวจสอบ:</span>
+<span class="comment"># 1. bind-address ต้องเป็น 0.0.0.0</span>
+<span class="cmd">grep bind-address /etc/mysql/mariadb.conf.d/50-server.cnf</span>
+
+<span class="comment"># 2. Firewall</span>
+<span class="cmd">sudo ufw status</span>
+<span class="comment"># ถ้าเปิดอยู่:</span>
+<span class="cmd">sudo ufw allow 3306</span>
+<span class="cmd">sudo ufw allow 5000</span></code></pre>
+</div>
+
+<h3>ESP32 เชื่อมต่อไม่ได้</h3>
+<div class="card">
+<pre><code><span class="comment"># ตรวจสอบว่าอยู่วง WiFi เดียวกัน</span>
+<span class="cmd">ping IP-ของ-ESP32</span>
+
+<span class="comment"># ตรวจสอบ port 5000</span>
+<span class="cmd">ss -tlnp | grep 5000</span>
+<span class="comment"># ต้องเห็น: LISTEN 0.0.0.0:5000</span>
+
+<span class="comment"># Firewall</span>
+<span class="cmd">sudo ufw allow 5000</span></code></pre>
+</div>
+
+<h3>ระบบ crash / ค้าง</h3>
+<div class="card">
+<pre><code><span class="comment"># ดู logs</span>
+<span class="cmd">journalctl -u bunny-door --since "10 min ago"</span>
+
+<span class="comment"># ดู CPU/RAM</span>
+<span class="cmd">htop</span>
+
+<span class="comment"># ดูอุณหภูมิ</span>
+<span class="cmd">vcgencmd measure_temp</span>
+<span class="comment"># ถ้าเกิน 80°C ต้องมีพัดลมระบายความร้อน</span>
+
+<span class="comment"># Restart service</span>
+<span class="cmd">sudo systemctl restart bunny-door</span></code></pre>
+</div>
+
+<hr>
+
+<div class="card" style="text-align: center; margin-top: 2rem;">
+    <h3 style="color: var(--accent); margin-top: 0;">สรุปสถาปัตยกรรมระบบ</h3>
+    <div class="diagram" style="text-align: left;">
+  PC (Laragon)                 Raspberry Pi 4               ESP32
+  ┌──────────────┐         ┌──────────────────┐      ┌──────────────┐
+  │ Apache       │         │ face_server.py   │      │ WiFi HTTP    │
+  │ PHP 8.3     │ ──HTTP──▶│ Flask :5000      │◀─HTTP─│ Server :80   │
+  │ Dashboard    │         │                  │      │              │
+  │              │         │ ┌──────────────┐ │      │ PIR Outside  │
+  │ MySQL Client │──MySQL──▶│ │ MariaDB      │ │      │ PIR Inside   │
+  │              │         │ │ :3306        │ │      │ Relay+Lock   │
+  └──────────────┘         │ └──────────────┘ │      │ Buzzer+LEDs  │
+                           │                  │      │ Emergency Btn│
+                           │ USB Camera 1  ◀──│──USB─┘              │
+                           │ USB Camera 2  ◀──│──USB                │
+                           └──────────────────┘      └──────────────┘
+    </div>
+    <p style="color: var(--muted); font-size: 0.9rem; margin-top: 1rem;">
+        Bunny Door System v2.0 - มหาวิทยาลัยราชภัฏวไลยอลงกรณ์
+    </p>
+</div>
+
+</div>
+</body>
+</html>
