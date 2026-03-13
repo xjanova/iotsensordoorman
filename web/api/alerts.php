@@ -12,7 +12,7 @@ try {
 
     switch ($method) {
         case 'GET':
-            $limit = intval($_GET['limit'] ?? 50);
+            $limit = min(max(intval($_GET['limit'] ?? 50), 1), 500);
             $resolved = $_GET['resolved'] ?? null;
 
             $sql = "SELECT * FROM anomaly_alerts";
@@ -33,9 +33,14 @@ try {
 
         case 'POST':
             $data = json_decode(file_get_contents('php://input'), true);
+            if (!$data) jsonResponse(['error' => 'Invalid data'], 400);
+
             if (!empty($data['resolve_id'])) {
+                $resolveId = intval($data['resolve_id']);
+                if ($resolveId <= 0) jsonResponse(['error' => 'Invalid ID'], 400);
+
                 $stmt = $db->prepare("UPDATE anomaly_alerts SET is_resolved = 1, resolved_at = NOW() WHERE id = ?");
-                $stmt->execute([$data['resolve_id']]);
+                $stmt->execute([$resolveId]);
                 jsonResponse(['success' => true]);
             } else {
                 jsonResponse(['error' => 'Invalid action'], 400);
@@ -46,5 +51,6 @@ try {
             jsonResponse(['error' => 'Method not allowed'], 405);
     }
 } catch (PDOException $e) {
-    jsonResponse(['error' => $e->getMessage()], 500);
+    error_log("[API alerts] " . $e->getMessage());
+    jsonResponse(['error' => 'เกิดข้อผิดพลาดของฐานข้อมูล'], 500);
 }

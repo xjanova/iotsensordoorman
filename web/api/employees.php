@@ -23,30 +23,52 @@ try {
             $data = json_decode(file_get_contents('php://input'), true);
             if (!$data) jsonResponse(['error' => 'Invalid data'], 400);
 
+            // Input validation
+            $empCode = trim($data['emp_code'] ?? '');
+            $firstName = trim($data['first_name'] ?? '');
+            $lastName = trim($data['last_name'] ?? '');
+            $department = trim($data['department'] ?? '') ?: null;
+            $position = trim($data['position'] ?? '') ?: null;
+            $faceImage = trim($data['face_image'] ?? '') ?: null;
+            $isAuthorized = intval($data['is_authorized'] ?? 1);
+
+            if ($empCode === '' || $firstName === '' || $lastName === '') {
+                jsonResponse(['error' => 'กรุณากรอก รหัสพนักงาน, ชื่อ และนามสกุล'], 400);
+            }
+
+            // Validate emp_code format (alphanumeric + dash, max 20 chars)
+            if (!preg_match('/^[A-Za-z0-9\-]{1,20}$/', $empCode)) {
+                jsonResponse(['error' => 'รหัสพนักงานต้องเป็นตัวอักษรภาษาอังกฤษ ตัวเลข หรือ - เท่านั้น (สูงสุด 20 ตัว)'], 400);
+            }
+
+            // Validate face_image filename (prevent path traversal)
+            if ($faceImage !== null && !preg_match('/^[A-Za-z0-9_\-\.]+$/', $faceImage)) {
+                jsonResponse(['error' => 'ชื่อไฟล์รูปไม่ถูกต้อง'], 400);
+            }
+
             if (!empty($data['id'])) {
                 // Update
+                $id = intval($data['id']);
                 $stmt = $db->prepare("UPDATE employees SET emp_code=?, first_name=?, last_name=?, department=?, position=?, face_image=?, is_authorized=? WHERE id=?");
-                $stmt->execute([
-                    $data['emp_code'], $data['first_name'], $data['last_name'],
-                    $data['department'] ?? null, $data['position'] ?? null,
-                    $data['face_image'] ?? null, $data['is_authorized'] ?? 1,
-                    $data['id']
-                ]);
+                $stmt->execute([$empCode, $firstName, $lastName, $department, $position, $faceImage, $isAuthorized, $id]);
             } else {
+                // Check duplicate emp_code
+                $check = $db->prepare("SELECT id FROM employees WHERE emp_code = ?");
+                $check->execute([$empCode]);
+                if ($check->fetch()) {
+                    jsonResponse(['error' => 'รหัสพนักงานนี้มีอยู่แล้ว'], 400);
+                }
+
                 // Insert
                 $stmt = $db->prepare("INSERT INTO employees (emp_code, first_name, last_name, department, position, face_image, is_authorized) VALUES (?,?,?,?,?,?,?)");
-                $stmt->execute([
-                    $data['emp_code'], $data['first_name'], $data['last_name'],
-                    $data['department'] ?? null, $data['position'] ?? null,
-                    $data['face_image'] ?? null, $data['is_authorized'] ?? 1
-                ]);
+                $stmt->execute([$empCode, $firstName, $lastName, $department, $position, $faceImage, $isAuthorized]);
             }
             jsonResponse(['success' => true]);
             break;
 
         case 'DELETE':
-            $id = $_GET['id'] ?? null;
-            if (!$id) jsonResponse(['error' => 'ID required'], 400);
+            $id = intval($_GET['id'] ?? 0);
+            if ($id <= 0) jsonResponse(['error' => 'ID required'], 400);
             $stmt = $db->prepare("DELETE FROM employees WHERE id = ?");
             $stmt->execute([$id]);
             jsonResponse(['success' => true]);
@@ -56,5 +78,6 @@ try {
             jsonResponse(['error' => 'Method not allowed'], 405);
     }
 } catch (PDOException $e) {
-    jsonResponse(['error' => $e->getMessage()], 500);
+    error_log("[API employees] " . $e->getMessage());
+    jsonResponse(['error' => 'เกิดข้อผิดพลาดของฐานข้อมูล'], 500);
 }

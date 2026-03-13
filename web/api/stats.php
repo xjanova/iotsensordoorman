@@ -36,5 +36,6 @@ try {
 
     jsonResponse($stats);
 } catch (PDOException $e) {
-    jsonResponse(['error' => $e->getMessage()], 500);
+    error_log("[API stats] " . $e->getMessage());
+    jsonResponse(['error' => 'เกิดข้อผิดพลาดของฐานข้อมูล'], 500);
 }

@@ -21,6 +21,7 @@ import mysql.connector
 from datetime import datetime
 from collections import Counter
 from flask import Flask, Response, jsonify, request
+from flask_cors import CORS
 from simple_facerec import SimpleFaceRec
 import config
 
@@ -28,6 +29,7 @@ import config
 # Initialize
 # ============================================================
 app = Flask(__name__)
+CORS(app, origins=["http://localhost", "http://127.0.0.1"])
 
 # Face Recognition
 sfr = SimpleFaceRec(
