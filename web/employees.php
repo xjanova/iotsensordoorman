@@ -109,13 +109,13 @@ function renderTable(employees) {
     }
     tbody.innerHTML = employees.map(emp => `
         <tr class="border-b border-white/5 hover:bg-white/5">
-            <td class="py-3 px-4 font-mono text-blue-400">${emp.emp_code}</td>
-            <td class="py-3 px-4">${emp.first_name} ${emp.last_name}</td>
-            <td class="py-3 px-4 text-gray-400">${emp.department || '-'}</td>
-            <td class="py-3 px-4 text-gray-400">${emp.position || '-'}</td>
+            <td class="py-3 px-4 font-mono text-blue-400">${esc(emp.emp_code)}</td>
+            <td class="py-3 px-4">${esc(emp.first_name)} ${esc(emp.last_name)}</td>
+            <td class="py-3 px-4 text-gray-400">${esc(emp.department) || '-'}</td>
+            <td class="py-3 px-4 text-gray-400">${esc(emp.position) || '-'}</td>
             <td class="py-3 px-4">
                 ${emp.face_image
-                    ? '<span class="text-green-400 text-xs"><i class="fas fa-image mr-1"></i>' + emp.face_image + '</span>'
+                    ? '<span class="text-green-400 text-xs"><i class="fas fa-image mr-1"></i>' + esc(emp.face_image) + '</span>'
                     : '<span class="text-gray-500 text-xs">ไม่มีรูป</span>'}
             </td>
             <td class="py-3 px-4 text-center">
@@ -124,8 +124,8 @@ function renderTable(employees) {
                     : '<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded text-xs">ระงับ</span>'}
             </td>
             <td class="py-3 px-4 text-center">
-                <button onclick="editEmployee(${emp.id})" class="text-blue-400 hover:text-blue-300 mr-2"><i class="fas fa-edit"></i></button>
-                <button onclick="deleteEmployee(${emp.id})" class="text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>
+                <button onclick="editEmployee(${parseInt(emp.id)})" class="text-blue-400 hover:text-blue-300 mr-2"><i class="fas fa-edit"></i></button>
+                <button onclick="deleteEmployee(${parseInt(emp.id)})" class="text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>
             </td>
         </tr>
     `).join('');

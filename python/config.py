@@ -1,16 +1,28 @@
 """
 Bunny Door System - Configuration
-ค่าตั้งระบบทั้งหมด
+ค่าตั้งระบบทั้งหมด (อ่านจาก .env file)
 """
 
+import os
+from pathlib import Path
+
+# Load .env file
+_env_path = Path(__file__).parent / ".env"
+if _env_path.exists():
+    for line in _env_path.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+
 # ============================================================
-# Database (MySQL on Laragon)
+# Database (MySQL on Laragon) - loaded from .env
 # ============================================================
-DB_HOST = "localhost"
-DB_PORT = 3306
-DB_USER = "root"
-DB_PASSWORD = "Theking222"
-DB_NAME = "bunny_door"
+DB_HOST = os.environ.get("DB_HOST", "localhost")
+DB_PORT = int(os.environ.get("DB_PORT", "3306"))
+DB_USER = os.environ.get("DB_USER", "root")
+DB_PASSWORD = os.environ.get("DB_PASSWORD", "")
+DB_NAME = os.environ.get("DB_NAME", "bunny_door")
 
 # ============================================================
 # Camera Settings (USB Cameras on Raspberry Pi)

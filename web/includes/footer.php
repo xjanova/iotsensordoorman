@@ -52,6 +52,14 @@ async function checkServerStatus() {
 setInterval(checkServerStatus, 10000);
 checkServerStatus();
 
+// XSS protection - escape HTML in user data
+function esc(str) {
+    if (str == null) return '';
+    const d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
+}
+
 // Format datetime
 function formatDateTime(iso) {
     if (!iso) return '-';

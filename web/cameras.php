@@ -170,9 +170,9 @@ async function updateCameraStatus() {
             <div class="flex items-center justify-between p-2 bg-white/5 rounded-lg">
                 <div class="flex items-center gap-2">
                     <i class="fas ${name === 'Unknown' ? 'fa-user-xmark text-red-400' : 'fa-user-check text-green-400'}"></i>
-                    <span class="text-sm">${name}</span>
+                    <span class="text-sm">${esc(name)}</span>
                 </div>
-                <span class="text-xs text-gray-400">${conf}%</span>
+                <span class="text-xs text-gray-400">${parseFloat(conf) || 0}%</span>
             </div>
         `).join('');
     }

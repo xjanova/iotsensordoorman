@@ -60,7 +60,7 @@ async function loadLogs() {
             <td class="py-3 px-4 text-gray-300">${formatDateTime(log.created_at)}</td>
             <td class="py-3 px-4">
                 ${log.first_name
-                    ? '<span class="text-white">' + log.first_name + ' ' + log.last_name + '</span><br><span class="text-xs text-gray-500">' + (log.emp_code || '') + '</span>'
+                    ? '<span class="text-white">' + esc(log.first_name) + ' ' + esc(log.last_name) + '</span><br><span class="text-xs text-gray-500">' + esc(log.emp_code || '') + '</span>'
                     : '<span class="text-red-400">ไม่รู้จัก</span>'}
             </td>
             <td class="py-3 px-4">
@@ -68,17 +68,17 @@ async function loadLogs() {
                     ? '<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs"><i class="fas fa-arrow-right mr-1"></i>เข้า</span>'
                     : '<span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs"><i class="fas fa-arrow-left mr-1"></i>ออก</span>'}
             </td>
-            <td class="py-3 px-4 text-gray-400">${log.method || '-'}</td>
+            <td class="py-3 px-4 text-gray-400">${esc(log.method) || '-'}</td>
             <td class="py-3 px-4">
                 <div class="flex items-center gap-2">
                     <div class="w-20 bg-gray-700 rounded-full h-2">
                         <div class="h-2 rounded-full ${parseFloat(log.confidence) > 70 ? 'bg-green-400' : parseFloat(log.confidence) > 40 ? 'bg-yellow-400' : 'bg-red-400'}"
-                             style="width: ${log.confidence || 0}%"></div>
+                             style="width: ${parseFloat(log.confidence) || 0}%"></div>
                     </div>
-                    <span class="text-xs">${log.confidence || 0}%</span>
+                    <span class="text-xs">${parseFloat(log.confidence) || 0}%</span>
                 </div>
             </td>
-            <td class="py-3 px-4 text-gray-400">Cam ${log.camera_id || '-'}</td>
+            <td class="py-3 px-4 text-gray-400">Cam ${esc(log.camera_id) || '-'}</td>
             <td class="py-3 px-4 text-center">
                 ${log.is_authorized == 1
                     ? '<span class="text-green-400"><i class="fas fa-check-circle"></i> อนุญาต</span>'

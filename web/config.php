@@ -4,15 +4,27 @@
  * ค่าตั้งระบบฝั่ง Web
  */
 
-// Database
-define('DB_HOST', 'localhost');
-define('DB_PORT', 3306);
-define('DB_USER', 'root');
-define('DB_PASS', 'Theking222');
-define('DB_NAME', 'bunny_door');
+// Load .env file
+$envFile = __DIR__ . '/.env';
+if (file_exists($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        if (strpos(trim($line), '#') === 0) continue;
+        if (strpos($line, '=') !== false) {
+            [$k, $v] = explode('=', $line, 2);
+            putenv(trim($k) . '=' . trim($v));
+        }
+    }
+}
+
+// Database (loaded from .env)
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+define('DB_PORT', intval(getenv('DB_PORT') ?: 3306));
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_NAME', getenv('DB_NAME') ?: 'bunny_door');
 
 // Python Face Server
-define('FACE_SERVER_URL', 'http://localhost:5000');
+define('FACE_SERVER_URL', getenv('FACE_SERVER_URL') ?: 'http://localhost:5000');
 
 // Application
 define('APP_NAME', 'Bunny Door System');
@@ -43,7 +55,7 @@ function getDB(): PDO {
 function jsonResponse($data, int $code = 200): void {
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
-    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Origin: http://localhost');
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type');
     echo json_encode($data, JSON_UNESCAPED_UNICODE);

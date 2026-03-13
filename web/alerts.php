@@ -72,7 +72,7 @@ async function loadAlerts(filter = 'unresolved') {
                             <span class="px-2 py-0.5 rounded text-xs ${severityBadge[alert.severity]}">${alert.severity}</span>
                             ${alert.camera_id ? '<span class="text-xs text-gray-500">Cam ' + alert.camera_id + '</span>' : ''}
                         </div>
-                        <p class="text-sm text-gray-400">${alert.description || '-'}</p>
+                        <p class="text-sm text-gray-400">${esc(alert.description) || '-'}</p>
                         <p class="text-xs text-gray-500 mt-1">${formatDateTime(alert.created_at)}</p>
                     </div>
                 </div>

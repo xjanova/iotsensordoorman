@@ -230,7 +230,7 @@ async function loadRecentLogs() {
     tbody.innerHTML = data.map(log => `
         <tr class="border-b border-white/5 hover:bg-white/5">
             <td class="py-3 px-2 text-gray-300">${formatTime(log.created_at)}</td>
-            <td class="py-3 px-2">${log.first_name ? log.first_name + ' ' + log.last_name : '<span class="text-red-400">ไม่รู้จัก</span>'}</td>
+            <td class="py-3 px-2">${log.first_name ? esc(log.first_name) + ' ' + esc(log.last_name) : '<span class="text-red-400">ไม่รู้จัก</span>'}</td>
             <td class="py-3 px-2">
                 ${log.direction === 'IN'
                     ? '<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs">เข้า</span>'
@@ -239,10 +239,10 @@ async function loadRecentLogs() {
             <td class="py-3 px-2">
                 <div class="flex items-center gap-2">
                     <div class="w-16 bg-gray-700 rounded-full h-1.5">
-                        <div class="h-1.5 rounded-full ${log.confidence > 70 ? 'bg-green-400' : log.confidence > 40 ? 'bg-yellow-400' : 'bg-red-400'}"
-                             style="width: ${log.confidence || 0}%"></div>
+                        <div class="h-1.5 rounded-full ${parseFloat(log.confidence) > 70 ? 'bg-green-400' : parseFloat(log.confidence) > 40 ? 'bg-yellow-400' : 'bg-red-400'}"
+                             style="width: ${parseFloat(log.confidence) || 0}%"></div>
                     </div>
-                    <span class="text-xs text-gray-400">${log.confidence || 0}%</span>
+                    <span class="text-xs text-gray-400">${parseFloat(log.confidence) || 0}%</span>
                 </div>
             </td>
             <td class="py-3 px-2">

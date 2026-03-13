@@ -77,6 +77,7 @@ def get_db():
 
 
 def log_access(employee_id, direction, method, confidence, camera_id, sensor_id, snapshot, authorized):
+    db = None
     try:
         db = get_db()
         cursor = db.cursor()
@@ -87,12 +88,15 @@ def log_access(employee_id, direction, method, confidence, camera_id, sensor_id,
         """, (employee_id, direction, method, confidence, camera_id, sensor_id, snapshot, authorized))
         db.commit()
         cursor.close()
-        db.close()
     except Exception as e:
         print(f"[DB Error] {e}")
+    finally:
+        if db:
+            db.close()
 
 
 def log_anomaly(alert_type, severity, description, camera_id, snapshot):
+    db = None
     try:
         db = get_db()
         cursor = db.cursor()
@@ -102,12 +106,15 @@ def log_anomaly(alert_type, severity, description, camera_id, snapshot):
         """, (alert_type, severity, description, camera_id, snapshot))
         db.commit()
         cursor.close()
-        db.close()
     except Exception as e:
         print(f"[DB Error] {e}")
+    finally:
+        if db:
+            db.close()
 
 
 def get_employee_by_name(name):
+    db = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -117,14 +124,17 @@ def get_employee_by_name(name):
         """, (f"{name}%",))
         result = cursor.fetchone()
         cursor.close()
-        db.close()
         return result
     except Exception as e:
         print(f"[DB Error] {e}")
         return None
+    finally:
+        if db:
+            db.close()
 
 
 def update_system_status(component, status, ip=None):
+    db = None
     try:
         db = get_db()
         cursor = db.cursor()
@@ -135,9 +145,11 @@ def update_system_status(component, status, ip=None):
         """, (status, ip, component))
         db.commit()
         cursor.close()
-        db.close()
     except Exception as e:
         print(f"[DB Error] {e}")
+    finally:
+        if db:
+            db.close()
 
 
 # ============================================================
@@ -224,14 +236,24 @@ def camera_thread(camera_id, cam_name, bg_subtractor):
 # ============================================================
 # Face Processing Logic
 # ============================================================
+# Debounce: ป้องกันการ process ซ้ำในเวลาสั้น
+_last_action_time = {}  # {"person_name": timestamp}
+DEBOUNCE_SECONDS = 10
+
 def process_detected_faces(frame, faces, names, confidences, camera_id, cam_name):
-    """ประมวลผลใบหน้าที่ตรวจพบ"""
+    """ประมวลผลใบหน้าที่ตรวจพบ (มี debounce)"""
     direction = "IN" if cam_name == "camera_outside" else "OUT"
     now = time.time()
 
     for (top, right, bottom, left), name, conf in zip(faces, names, confidences):
+        # Debounce check
+        debounce_key = f"{name}_{cam_name}"
+        if debounce_key in _last_action_time and (now - _last_action_time[debounce_key]) < DEBOUNCE_SECONDS:
+            continue
+
         if name == "Unknown":
             if config.ALERT_ON_UNKNOWN_FACE:
+                _last_action_time[debounce_key] = now
                 snapshot = save_snapshot(frame, "unknown", camera_id)
                 log_anomaly(
                     "UNKNOWN_FACE", "HIGH",
@@ -240,6 +262,8 @@ def process_detected_faces(frame, faces, names, confidences, camera_id, cam_name
                 )
                 log_access(None, direction, "FACE", 0, camera_id, None, snapshot, 0)
             continue
+
+        _last_action_time[debounce_key] = now
 
         # ค้นหาพนักงานในฐานข้อมูล
         employee = get_employee_by_name(name)
@@ -266,6 +290,8 @@ def process_detected_faces(frame, faces, names, confidences, camera_id, cam_name
 
 def save_snapshot(frame, label, camera_id):
     """บันทึกภาพถ่าย"""
+    # Sanitize label to prevent path traversal
+    label = label.replace("/", "").replace("\\", "").replace("..", "")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"cam{camera_id}_{label}_{timestamp}.jpg"
     filepath = os.path.join(config.SNAPSHOT_DIR, filename)
@@ -356,13 +382,16 @@ def api_door_lock():
         system_state["door_status"] = "locked"
         return jsonify({"success": True, "status": "locked"})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        print(f"[ESP32 Error] {e}")
+        return jsonify({"success": False, "error": "Failed to communicate with ESP32"}), 500
 
 
 @app.route('/api/motion', methods=['POST'])
 def api_motion():
     """รับข้อมูล motion จาก ESP32"""
     data = request.json
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
     sensor = data.get("sensor", "unknown")
     now = time.time()
 
@@ -378,6 +407,8 @@ def api_motion():
 def api_heartbeat():
     """รับ heartbeat จาก ESP32"""
     data = request.json
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
     system_state["esp32_online"] = True
     system_state["door_status"] = data.get("door", "unknown")
     update_system_status("esp32", "ONLINE", config.ESP32_IP)
@@ -394,21 +425,26 @@ def api_emergency():
 
 @app.route('/api/employees', methods=['GET'])
 def api_employees():
+    db = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
         cursor.execute("SELECT id, emp_code, first_name, last_name, department, position, face_image, is_authorized FROM employees ORDER BY emp_code")
         employees = cursor.fetchall()
         cursor.close()
-        db.close()
         return jsonify(employees)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"[DB Error] {e}")
+        return jsonify({"error": "Database error"}), 500
+    finally:
+        if db:
+            db.close()
 
 
 @app.route('/api/logs/recent', methods=['GET'])
 def api_recent_logs():
-    limit = request.args.get('limit', 50, type=int)
+    limit = min(request.args.get('limit', 50, type=int), 500)
+    db = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -421,19 +457,23 @@ def api_recent_logs():
         """, (limit,))
         logs = cursor.fetchall()
         cursor.close()
-        db.close()
         # Convert datetime to string
         for log in logs:
             if log.get("created_at"):
                 log["created_at"] = log["created_at"].isoformat()
         return jsonify(logs)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"[DB Error] {e}")
+        return jsonify({"error": "Database error"}), 500
+    finally:
+        if db:
+            db.close()
 
 
 @app.route('/api/alerts/recent', methods=['GET'])
 def api_recent_alerts():
-    limit = request.args.get('limit', 20, type=int)
+    limit = min(request.args.get('limit', 20, type=int), 200)
+    db = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -442,7 +482,6 @@ def api_recent_alerts():
         """, (limit,))
         alerts = cursor.fetchall()
         cursor.close()
-        db.close()
         for alert in alerts:
             if alert.get("created_at"):
                 alert["created_at"] = alert["created_at"].isoformat()
@@ -450,11 +489,16 @@ def api_recent_alerts():
                 alert["resolved_at"] = alert["resolved_at"].isoformat()
         return jsonify(alerts)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"[DB Error] {e}")
+        return jsonify({"error": "Database error"}), 500
+    finally:
+        if db:
+            db.close()
 
 
 @app.route('/api/stats', methods=['GET'])
 def api_stats():
+    db = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -488,7 +532,6 @@ def api_stats():
         today_alerts = cursor.fetchone()["count"]
 
         cursor.close()
-        db.close()
 
         return jsonify({
             "total_employees": total_employees,
@@ -499,7 +542,11 @@ def api_stats():
             "today_alerts": today_alerts,
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"[DB Error] {e}")
+        return jsonify({"error": "Database error"}), 500
+    finally:
+        if db:
+            db.close()
 
 
 # ============================================================
