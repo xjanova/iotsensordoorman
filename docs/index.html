@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bunny Door System - เอกสารโครงงาน</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body { font-family: 'Sarabun', sans-serif; }
+        code, pre { font-family: 'JetBrains Mono', monospace; }
+        .doc-section { scroll-margin-top: 80px; }
+        .toc-link { transition: all 0.2s; }
+        .toc-link:hover, .toc-link.active { color: #60a5fa; border-left-color: #3b82f6; }
+        pre { background: #1e293b; border-radius: 8px; padding: 16px; overflow-x: auto; }
+        .wiring-box { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255,255,255,0.1); }
+        .pin-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+        .component-card { transition: transform 0.2s; }
+        .component-card:hover { transform: translateY(-2px); }
+        .improved-badge { background: linear-gradient(135deg, #22c55e20, #16a34a20); border: 1px solid #22c55e40; }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-200">
+
+<!-- Navigation -->
+<nav class="fixed top-0 left-0 right-0 bg-gray-950/90 backdrop-blur-lg border-b border-white/10 z-50">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                <i class="fas fa-shield-alt text-white text-sm"></i>
+            </div>
+            <span class="font-bold text-lg">Bunny Door System</span>
+            <span class="text-xs text-gray-500 ml-2">v2.0 Documentation</span>
+        </div>
+        <div class="flex gap-6 text-sm">
+            <a href="#overview" class="text-gray-400 hover:text-blue-400">ภาพรวม</a>
+            <a href="#architecture" class="text-gray-400 hover:text-blue-400">สถาปัตยกรรม</a>
+            <a href="#wiring" class="text-gray-400 hover:text-blue-400">การเดินสาย</a>
+            <a href="#setup" class="text-gray-400 hover:text-blue-400">การติดตั้ง</a>
+            <a href="#improved" class="text-gray-400 hover:text-blue-400">สิ่งที่ปรับปรุง</a>
+        </div>
+    </div>
+</nav>
+
+<div class="flex max-w-7xl mx-auto pt-20">
+    <!-- Sidebar TOC -->
+    <aside class="w-64 fixed h-[calc(100vh-80px)] overflow-y-auto p-6 border-r border-white/5 hidden lg:block">
+        <p class="text-xs text-gray-500 uppercase tracking-wider mb-4">สารบัญ</p>
+        <nav class="space-y-1">
+            <a href="#overview" class="toc-link block text-sm text-gray-400 pl-3 py-1 border-l-2 border-transparent">1. ภาพรวมโครงงาน</a>
+            <a href="#objectives" class="toc-link block text-sm text-gray-400 pl-3 py-1 border-l-2 border-transparent">2. วัตถุประสงค์</a>
+            <a href="#architecture" class="toc-link block text-sm text-gray-400 pl-3 py-1 border-l-2 border-transparent">3. สถาปัตยกรรมระบบ</a>
+            <a href="#hardware" class="toc-link block text-sm text-gray-400 pl-3 py-1 border-l-2 border-transparent">4. อุปกรณ์ฮาร์ดแวร์</a>
+            <a href="#wiring" class="toc-link block text-sm text-gray-400 pl-3 py-1 border-l-2 border-transparent">5. แผนผังการเดินสาย</a>
+            <a href="#software" class="toc-link block text-sm text-gray-400 pl-3 py-1 border-l-2 border-transparent">6. ซอฟต์แวร์</a>
+            <a href="#setup" class="toc-link block text-sm text-gray-400 pl-3 py-1 border-l-2 border-transparent">7. การติดตั้ง</a>
+            <a href="#api" class="toc-link block text-sm text-gray-400 pl-3 py-1 border-l-2 border-transparent">8. API Reference</a>
+            <a href="#improved" class="toc-link block text-sm text-gray-400 pl-3 py-1 border-l-2 border-transparent">9. สิ่งที่ปรับปรุง</a>
+            <a href="#concept" class="toc-link block text-sm text-gray-400 pl-3 py-1 border-l-2 border-transparent">10. คอนเซปต์เพิ่มเติม</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 lg:ml-64 px-6 py-8 max-w-4xl">
+
+        <!-- ============================================================ -->
+        <!-- 1. Overview -->
+        <!-- ============================================================ -->
+        <section id="overview" class="doc-section mb-16">
+            <h2 class="text-3xl font-bold mb-4 text-white">1. ภาพรวมโครงงาน</h2>
+            <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6 mb-6">
+                <h3 class="text-xl font-bold text-blue-400 mb-2">Bunny Door System</h3>
+                <p class="text-lg text-gray-300 mb-2">ระบบตรวจสอบบุคคลเข้า-ออกห้องสโตร์ด้วยการประมวลผลภาพ</p>
+                <p class="text-sm text-gray-400">Authorized Access System for Store Room</p>
+            </div>
+
+            <p class="text-gray-300 leading-relaxed mb-4">
+                ระบบนี้เป็นโครงงานของสาขาเทคโนโลยีไฟฟ้าอุตสาหกรรม (ต่อเนื่อง) คณะเทคโนโลยีอุตสาหกรรม
+                มหาวิทยาลัยราชภัฏวไลยอลงกรณ์ ในพระบรมราชูปถัมภ์ จังหวัดปทุมธานี
+            </p>
+            <p class="text-gray-300 leading-relaxed">
+                ออกแบบมาเพื่อควบคุมการเข้า-ออกห้องเก็บของ (สโตร์) โดยใช้เทคโนโลยี Face Recognition ร่วมกับ
+                IoT Sensors, ESP32 และ Raspberry Pi ทำงานผ่านเครือข่าย HTTP มี Web Dashboard สำหรับจัดการข้อมูล
+            </p>
+
+            <!-- Key Features -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                <div class="bg-white/5 rounded-xl p-5 component-card">
+                    <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center mb-3">
+                        <i class="fas fa-face-smile text-green-400"></i>
+                    </div>
+                    <h4 class="font-medium text-white mb-1">Face Recognition</h4>
+                    <p class="text-sm text-gray-400">ระบุตัวตนด้วย HOG/CNN + Face Embedding 128-D Vector</p>
+                </div>
+                <div class="bg-white/5 rounded-xl p-5 component-card">
+                    <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center mb-3">
+                        <i class="fas fa-satellite-dish text-blue-400"></i>
+                    </div>
+                    <h4 class="font-medium text-white mb-1">Dual Sensors</h4>
+                    <p class="text-sm text-gray-400">PIR 2 ตัว (นอก+ใน) จับการเคลื่อนไหวทั้ง 2 ด้าน</p>
+                </div>
+                <div class="bg-white/5 rounded-xl p-5 component-card">
+                    <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center mb-3">
+                        <i class="fas fa-video text-purple-400"></i>
+                    </div>
+                    <h4 class="font-medium text-white mb-1">Dual Cameras</h4>
+                    <p class="text-sm text-gray-400">กล้อง USB 2 ตัว ถ่ายทั้งขาเข้าและขาออก</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- 2. Objectives -->
+        <!-- ============================================================ -->
+        <section id="objectives" class="doc-section mb-16">
+            <h2 class="text-3xl font-bold mb-4 text-white">2. วัตถุประสงค์</h2>
+            <div class="space-y-4">
+                <div class="flex items-start gap-4 bg-white/5 rounded-xl p-5">
+                    <span class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-sm font-bold shrink-0">1</span>
+                    <p class="text-gray-300">ออกแบบระบบบันทึกภาพและเวลาของผู้ที่เข้า-ออกห้องเก็บของ (สโตร์)</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white/5 rounded-xl p-5">
+                    <span class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-sm font-bold shrink-0">2</span>
+                    <p class="text-gray-300">สร้างระบบระบุและตรวจสอบใบหน้าบุคคลสำหรับควบคุมสิทธิ์การเข้า-ออก</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white/5 rounded-xl p-5">
+                    <span class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-sm font-bold shrink-0">3</span>
+                    <p class="text-gray-300">พัฒนาระบบควบคุมการเข้า-ออกด้วยการประมวลผลภาพ + IoT + HTTP Network</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white/5 rounded-xl p-5">
+                    <span class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-sm font-bold shrink-0">4</span>
+                    <p class="text-gray-300">ควบคุมอุปกรณ์หน้างาน (Relay, กลอนแม่เหล็ก) ผ่านคำสั่งจากระบบส่วนกลาง</p>
+                </div>
+                <div class="flex items-start gap-4 bg-white/5 rounded-xl p-5">
+                    <span class="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-sm font-bold shrink-0">5</span>
+                    <p class="text-gray-300"><strong>เพิ่มเติม:</strong> ตรวจจับการเข้า-ออกที่ผิดปกติ (Tailgating) ด้วยเซ็นเซอร์ + กล้อง 2 ด้าน</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- 3. Architecture -->
+        <!-- ============================================================ -->
+        <section id="architecture" class="doc-section mb-16">
+            <h2 class="text-3xl font-bold mb-4 text-white">3. สถาปัตยกรรมระบบ</h2>
+
+            <!-- System Flow Diagram (ASCII Art) -->
+            <div class="wiring-box rounded-xl p-6 mb-6 overflow-x-auto">
+                <p class="text-xs text-gray-500 mb-4">แผนผังการทำงานของระบบทั้งหมด</p>
+<pre class="text-green-400 text-xs leading-relaxed whitespace-pre" style="background:transparent; padding:0;">
+┌─────────────────────────────────────────────────────────────────────┐
+│                        BUNNY DOOR SYSTEM                            │
+│                    ระบบอนุญาตเข้า-ออกห้องสโตร์                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│   ┌──────────┐    USB     ┌──────────────────────┐                  │
+│   │ Camera 1 │───────────▶│                      │                  │
+│   │ (ด้านนอก)│            │    Raspberry Pi      │    HTTP          │
+│   └──────────┘            │  ┌────────────────┐  │───────────┐      │
+│                           │  │ Face Server    │  │           │      │
+│   ┌──────────┐    USB     │  │ (Python+Flask) │  │           ▼      │
+│   │ Camera 2 │───────────▶│  │                │  │   ┌────────────┐ │
+│   │ (ด้านใน) │            │  │ - Face Recog.  │  │   │  Laragon   │ │
+│   └──────────┘            │  │ - Motion Det.  │  │   │ (Apache +  │ │
+│                           │  │ - Tailgate Det.│  │   │  MySQL)    │ │
+│                           │  └────────────────┘  │   │            │ │
+│                           └──────────┬───────────┘   │ PHP Web    │ │
+│                                      │ HTTP          │ Dashboard  │ │
+│                                      ▼               └────────────┘ │
+│   ┌──────────┐            ┌──────────────────────┐        ▲        │
+│   │ PIR Out  │──GPIO27──▶│                      │        │        │
+│   │(ด้านนอก) │            │       ESP32          │   Web Browser   │
+│   └──────────┘            │  ┌────────────────┐  │        │        │
+│                           │  │ - WiFi HTTP    │  │   ┌────────────┐ │
+│   ┌──────────┐            │  │ - PIR Monitor  │  │   │   ผู้ดูแล   │ │
+│   │ PIR In   │──GPIO26──▶│  │ - Relay Control│  │   │  (Browser) │ │
+│   │(ด้านใน)  │            │  └────────────────┘  │   └────────────┘ │
+│   └──────────┘            └──────────┬───────────┘                  │
+│                                      │ GPIO25                       │
+│                                      ▼                              │
+│                           ┌──────────────────────┐                  │
+│   ┌──────────┐            │    Relay Module       │                  │
+│   │ Magnetic │◀───────────│  (ตัด-ต่อไฟ 12V)     │                  │
+│   │   Lock   │            └──────────────────────┘                  │
+│   │  (12V)   │                                                      │
+│   └──────────┘                                                      │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘</pre>
+            </div>
+
+            <!-- Communication Flow -->
+            <h3 class="text-xl font-bold text-white mb-4">ลำดับการทำงาน</h3>
+            <div class="space-y-3">
+                <div class="flex items-center gap-4 bg-white/5 rounded-lg p-4">
+                    <span class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-sm font-bold text-black shrink-0">1</span>
+                    <p class="text-gray-300"><strong>PIR Sensor</strong> ตรวจจับการเคลื่อนไหว → ESP32 ส่ง HTTP POST ไป Raspberry Pi</p>
+                </div>
+                <div class="flex items-center gap-4 bg-white/5 rounded-lg p-4">
+                    <span class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-sm font-bold text-black shrink-0">2</span>
+                    <p class="text-gray-300"><strong>Camera</strong> จับภาพ → Face Recognition ตรวจสอบใบหน้า</p>
+                </div>
+                <div class="flex items-center gap-4 bg-white/5 rounded-lg p-4">
+                    <span class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-sm font-bold text-black shrink-0">3</span>
+                    <p class="text-gray-300"><strong>ตรวจสอบสิทธิ์</strong> จากฐานข้อมูล MySQL → ถ้า Authorized ส่งคำสั่ง unlock</p>
+                </div>
+                <div class="flex items-center gap-4 bg-white/5 rounded-lg p-4">
+                    <span class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-sm font-bold text-black shrink-0">4</span>
+                    <p class="text-gray-300"><strong>Raspberry Pi</strong> → HTTP POST /api/door/unlock → ESP32</p>
+                </div>
+                <div class="flex items-center gap-4 bg-white/5 rounded-lg p-4">
+                    <span class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-sm font-bold text-black shrink-0">5</span>
+                    <p class="text-gray-300"><strong>ESP32</strong> → GPIO25 HIGH → Relay ON → กลอนแม่เหล็กปลดล็อก (7 วินาที)</p>
+                </div>
+                <div class="flex items-center gap-4 bg-white/5 rounded-lg p-4">
+                    <span class="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-sm font-bold text-black shrink-0">6</span>
+                    <p class="text-gray-300"><strong>ครบเวลา</strong> → Relay OFF → ประตูล็อกอัตโนมัติ + บันทึกลง DB</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- 4. Hardware -->
+        <!-- ============================================================ -->
+        <section id="hardware" class="doc-section mb-16">
+            <h2 class="text-3xl font-bold mb-4 text-white">4. อุปกรณ์ฮาร์ดแวร์</h2>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm mb-8">
+                    <thead>
+                        <tr class="border-b border-white/10 text-gray-400">
+                            <th class="text-left py-3 px-4">อุปกรณ์</th>
+                            <th class="text-left py-3 px-4">จำนวน</th>
+                            <th class="text-left py-3 px-4">หน้าที่</th>
+                            <th class="text-left py-3 px-4">หมายเหตุ</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-white/5">
+                            <td class="py-3 px-4 font-medium">Raspberry Pi 4</td>
+                            <td class="py-3 px-4">1</td>
+                            <td class="py-3 px-4">Main Controller + Face Server</td>
+                            <td class="py-3 px-4 text-gray-500">RAM 4GB ขึ้นไป</td>
+                        </tr>
+                        <tr class="border-b border-white/5">
+                            <td class="py-3 px-4 font-medium">ESP32 DevKit</td>
+                            <td class="py-3 px-4">1</td>
+                            <td class="py-3 px-4">ควบคุม Sensor + Relay + HTTP</td>
+                            <td class="py-3 px-4 text-gray-500">WiFi + Bluetooth</td>
+                        </tr>
+                        <tr class="border-b border-white/5">
+                            <td class="py-3 px-4 font-medium">USB Camera / Webcam</td>
+                            <td class="py-3 px-4 text-green-400 font-bold">2</td>
+                            <td class="py-3 px-4">ถ่ายภาพด้านนอก + ด้านใน</td>
+                            <td class="py-3 px-4 text-gray-500">ต่อ USB กับ Raspberry Pi</td>
+                        </tr>
+                        <tr class="border-b border-white/5">
+                            <td class="py-3 px-4 font-medium">PIR Sensor (HC-SR501)</td>
+                            <td class="py-3 px-4 text-green-400 font-bold">2</td>
+                            <td class="py-3 px-4">ตรวจจับการเคลื่อนไหว นอก + ใน</td>
+                            <td class="py-3 px-4 text-gray-500">ต่อกับ ESP32</td>
+                        </tr>
+                        <tr class="border-b border-white/5">
+                            <td class="py-3 px-4 font-medium">Relay Module 5V</td>
+                            <td class="py-3 px-4">1</td>
+                            <td class="py-3 px-4">ตัด-ต่อไฟกลอนแม่เหล็ก</td>
+                            <td class="py-3 px-4 text-gray-500">1 Channel</td>
+                        </tr>
+                        <tr class="border-b border-white/5">
+                            <td class="py-3 px-4 font-medium">กลอนแม่เหล็กไฟฟ้า 12V</td>
+                            <td class="py-3 px-4">1</td>
+                            <td class="py-3 px-4">ล็อก/ปลดล็อกประตู</td>
+                            <td class="py-3 px-4 text-gray-500">Fail-Safe (ไฟดับ = ปลดล็อก)</td>
+                        </tr>
+                        <tr class="border-b border-white/5">
+                            <td class="py-3 px-4 font-medium">Power Supply 12V 2A</td>
+                            <td class="py-3 px-4">1</td>
+                            <td class="py-3 px-4">จ่ายไฟให้กลอนแม่เหล็ก</td>
+                            <td class="py-3 px-4 text-gray-500">DC Adapter</td>
+                        </tr>
+                        <tr class="border-b border-white/5">
+                            <td class="py-3 px-4 font-medium">Buzzer 5V</td>
+                            <td class="py-3 px-4">1</td>
+                            <td class="py-3 px-4">แจ้งเตือนเสียง</td>
+                            <td class="py-3 px-4 text-gray-500">Active Buzzer</td>
+                        </tr>
+                        <tr class="border-b border-white/5">
+                            <td class="py-3 px-4 font-medium">LED สีเขียว + สีแดง</td>
+                            <td class="py-3 px-4">อย่างละ 1</td>
+                            <td class="py-3 px-4">แสดงสถานะ อนุญาต/ไม่อนุญาต</td>
+                            <td class="py-3 px-4 text-gray-500">+ Resistor 220Ω</td>
+                        </tr>
+                        <tr class="border-b border-white/5">
+                            <td class="py-3 px-4 font-medium">ปุ่มกด (Emergency)</td>
+                            <td class="py-3 px-4">1</td>
+                            <td class="py-3 px-4">ปุ่มฉุกเฉิน (เปิดประตูจากด้านใน)</td>
+                            <td class="py-3 px-4 text-gray-500">Pull-up</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- 5. Wiring Diagram -->
+        <!-- ============================================================ -->
+        <section id="wiring" class="doc-section mb-16">
+            <h2 class="text-3xl font-bold mb-4 text-white">5. แผนผังการเดินสาย (Wiring Diagram)</h2>
+
+            <!-- ESP32 Wiring -->
+            <h3 class="text-xl font-bold text-white mb-4">5.1 การต่อสาย ESP32</h3>
+            <div class="wiring-box rounded-xl p-6 mb-8 overflow-x-auto">
+<pre class="text-cyan-400 text-xs leading-relaxed whitespace-pre" style="background:transparent; padding:0;">
+                            ┌────────────────┐
+                            │    ESP32        │
+                            │   DevKit V1    │
+                            │                │
+    PIR Outside ───────────▶│ GPIO 27  ◄──── │ INPUT
+                            │                │
+    PIR Inside  ───────────▶│ GPIO 26  ◄──── │ INPUT
+                            │                │
+    Relay IN    ◀───────────│ GPIO 25  ────▶ │ OUTPUT
+                            │                │
+    Buzzer +    ◀───────────│ GPIO 33  ────▶ │ OUTPUT
+                            │                │
+    LED Green   ◀──[220Ω]──│ GPIO 32  ────▶ │ OUTPUT
+                            │                │
+    LED Red     ◀──[220Ω]──│ GPIO 14  ────▶ │ OUTPUT
+                            │                │
+    Emergency   ───────────▶│ GPIO 13  ◄──── │ INPUT_PULLUP
+    Button                  │                │
+                            │ 3.3V ─────────▶│ PIR VCC (ทั้ง 2 ตัว)
+                            │ GND  ─────────▶│ PIR GND, LED GND, Buzzer GND
+                            │ 5V/VIN ───────▶│ Relay VCC
+                            └────────────────┘</pre>
+            </div>
+
+            <!-- PIR Wiring -->
+            <h3 class="text-xl font-bold text-white mb-4">5.2 การต่อ PIR Sensor (HC-SR501)</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div class="wiring-box rounded-xl p-5">
+                    <h4 class="text-sm font-bold text-yellow-400 mb-3">PIR 1 - ด้านนอกประตู</h4>
+<pre class="text-gray-300 text-xs" style="background:transparent; padding:0;">
+  HC-SR501          ESP32
+  ┌─────────┐
+  │  VCC ───│─────── 3.3V
+  │  OUT ───│─────── GPIO 27
+  │  GND ───│─────── GND
+  └─────────┘
+
+  * ติดตั้ง: หันหน้าออกด้านนอกประตู
+  * ระยะตรวจจับ: ปรับ ~3 เมตร
+  * หน่วงเวลา: ปรับ ~3 วินาที</pre>
+                </div>
+                <div class="wiring-box rounded-xl p-5">
+                    <h4 class="text-sm font-bold text-purple-400 mb-3">PIR 2 - ด้านในประตู</h4>
+<pre class="text-gray-300 text-xs" style="background:transparent; padding:0;">
+  HC-SR501          ESP32
+  ┌─────────┐
+  │  VCC ───│─────── 3.3V
+  │  OUT ───│─────── GPIO 26
+  │  GND ───│─────── GND
+  └─────────┘
+
+  * ติดตั้ง: หันหน้าเข้าด้านในห้อง
+  * ระยะตรวจจับ: ปรับ ~3 เมตร
+  * หน่วงเวลา: ปรับ ~3 วินาที</pre>
+                </div>
+            </div>
+
+            <!-- Relay + Magnetic Lock Wiring -->
+            <h3 class="text-xl font-bold text-white mb-4">5.3 การต่อ Relay + กลอนแม่เหล็กไฟฟ้า</h3>
+            <div class="wiring-box rounded-xl p-6 mb-8 overflow-x-auto">
+<pre class="text-orange-400 text-xs leading-relaxed whitespace-pre" style="background:transparent; padding:0;">
+  ESP32              Relay Module          กลอนแม่เหล็ก 12V
+  ┌──────┐          ┌──────────┐          ┌───────────┐
+  │      │          │          │          │           │
+  │GPIO25│─────────▶│ IN       │          │           │
+  │      │          │          │          │           │
+  │ 5V   │─────────▶│ VCC      │          │           │
+  │      │          │          │          │           │
+  │ GND  │─────────▶│ GND      │          │           │
+  │      │          │          │          │           │
+  └──────┘          │    COM ──│─────┐    │           │
+                    │          │     │    │           │
+                    │    NO  ──│─────┼───▶│ + (สาย1)  │
+                    │          │     │    │           │
+                    └──────────┘     │    │ - (สาย2)  │
+                                     │    └─────┬─────┘
+                  Power Supply 12V   │          │
+                  ┌──────────────┐   │          │
+                  │ +12V  ───────│───┘          │
+                  │ GND   ───────│──────────────┘
+                  └──────────────┘
+
+  ** สำคัญ **
+  Relay ใช้ขั้ว NO (Normally Open):
+  - Relay OFF → วงจรเปิด → กลอนล็อก (สถานะปกติ)
+  - Relay ON  → วงจรปิด  → กลอนปลดล็อก
+  - ไฟดับ = Fail-Safe → กลอนปลดล็อกอัตโนมัติ</pre>
+            </div>
+
+            <!-- Camera + Raspberry Pi -->
+            <h3 class="text-xl font-bold text-white mb-4">5.4 การต่อกล้อง USB กับ Raspberry Pi</h3>
+            <div class="wiring-box rounded-xl p-6 mb-8 overflow-x-auto">
+<pre class="text-blue-400 text-xs leading-relaxed whitespace-pre" style="background:transparent; padding:0;">
+  ┌────────────────────────────────────────────┐
+  │              Raspberry Pi 4                │
+  │                                            │
+  │   USB 2.0 Port 1 ◀── Camera 1 (ด้านนอก)   │
+  │   USB 2.0 Port 2 ◀── Camera 2 (ด้านใน)    │
+  │   USB 3.0 Port   ◀── (สำรอง)              │
+  │   Ethernet/WiFi  ◀── เชื่อมต่อ Network     │
+  │                                            │
+  └────────────────────────────────────────────┘
+
+  Camera ID:
+  - Camera 1 (ด้านนอก) = /dev/video0 (ID: 0)
+  - Camera 2 (ด้านใน)  = /dev/video2 (ID: 1)
+
+  ** ตรวจสอบ Camera ID:
+  $ ls /dev/video*
+  $ v4l2-ctl --list-devices</pre>
+            </div>
+
+            <!-- Complete Physical Layout -->
+            <h3 class="text-xl font-bold text-white mb-4">5.5 แผนผังการติดตั้งจริง (Physical Layout)</h3>
+            <div class="wiring-box rounded-xl p-6 overflow-x-auto">
+<pre class="text-emerald-400 text-xs leading-relaxed whitespace-pre" style="background:transparent; padding:0;">
+                     ประตูห้องสโตร์
+          ◀──── ด้านนอก ────│──── ด้านใน ────▶
+
+      ┌──────────┐          │          ┌──────────┐
+      │ Camera 1 │   ┌──────┤──────┐   │ Camera 2 │
+      │ (USB)    │   │กลอน  │      │   │ (USB)    │
+      │ ▼ มอง   │   │แม่เหล็ก│      │   │ ▼ มอง   │
+      │  เข้ามา  │   │ 12V  │      │   │  ออกไป   │
+      └──────────┘   └──────┤──────┘   └──────────┘
+                            │
+      ┌──────────┐          │          ┌──────────┐
+      │ PIR 1    │          │          │ PIR 2    │
+      │(ด้านนอก)│          │          │(ด้านใน) │
+      │ → จับคน  │          │          │ → จับคน  │
+      │  เดินเข้า│      ┌───┤───┐      │  เดินออก │
+      └──────────┘      │ ปุ่ม  │      └──────────┘
+                        │Emergency│
+                        │(ด้านใน)│
+                        └───────┘
+
+      ┌─────────────────────────────────────────┐
+      │         ห้องควบคุม / Server Room         │
+      │                                         │
+      │  ┌──────────┐  ┌──────────┐  ┌────────┐│
+      │  │Raspberry │  │  ESP32   │  │ Relay  ││
+      │  │  Pi 4    │  │          │  │Module  ││
+      │  │(+Camera  │  │(+PIR x2) │  │        ││
+      │  │ USB x2)  │  │          │  │        ││
+      │  └──────────┘  └──────────┘  └────────┘│
+      │                              ┌────────┐│
+      │  ┌──────────┐               │Power   ││
+      │  │ Computer │               │Supply  ││
+      │  │(Laragon) │               │ 12V    ││
+      │  └──────────┘               └────────┘│
+      └─────────────────────────────────────────┘</pre>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- 6. Software -->
+        <!-- ============================================================ -->
+        <section id="software" class="doc-section mb-16">
+            <h2 class="text-3xl font-bold mb-4 text-white">6. ซอฟต์แวร์ที่ใช้</h2>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-white/10 text-gray-400">
+                            <th class="text-left py-3 px-4">หมวดหมู่</th>
+                            <th class="text-left py-3 px-4">เทคโนโลยี</th>
+                            <th class="text-left py-3 px-4">หน้าที่</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-white/5"><td class="py-3 px-4">Web Server</td><td class="py-3 px-4">Laragon (Apache)</td><td class="py-3 px-4">รัน Web Dashboard</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-3 px-4">Database</td><td class="py-3 px-4">MySQL 8.4</td><td class="py-3 px-4">จัดเก็บข้อมูลทั้งหมด</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-3 px-4">Backend Web</td><td class="py-3 px-4">PHP 8.3</td><td class="py-3 px-4">API + Web Pages</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-3 px-4">Frontend</td><td class="py-3 px-4">Tailwind CSS + JS</td><td class="py-3 px-4">UI Dashboard</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-3 px-4">Face Server</td><td class="py-3 px-4">Python 3 + Flask</td><td class="py-3 px-4">Face Recognition API</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-3 px-4">Image Processing</td><td class="py-3 px-4">OpenCV + face_recognition</td><td class="py-3 px-4">ตรวจจับและระบุใบหน้า</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-3 px-4">Motion Detection</td><td class="py-3 px-4">BackgroundSubtractor MOG2</td><td class="py-3 px-4">ตรวจจับการเคลื่อนไหว (ลด CPU)</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-3 px-4">IoT Firmware</td><td class="py-3 px-4">Arduino (ESP32)</td><td class="py-3 px-4">ควบคุมเซ็นเซอร์ + Relay</td></tr>
+                        <tr class="border-b border-white/5"><td class="py-3 px-4">Communication</td><td class="py-3 px-4">HTTP REST API</td><td class="py-3 px-4">สื่อสารระหว่างอุปกรณ์</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- File Structure -->
+            <h3 class="text-xl font-bold text-white mt-8 mb-4">โครงสร้างไฟล์</h3>
+            <div class="bg-gray-900 rounded-xl p-6">
+<pre class="text-gray-300 text-xs" style="background:transparent; padding:0;">
+Src/
+├── database/
+│   └── schema.sql              # สร้างฐานข้อมูล + ข้อมูลเริ่มต้น
+├── esp32/
+│   └── door_controller/
+│       └── door_controller.ino # Firmware ESP32
+├── python/
+│   ├── config.py               # ค่าตั้งระบบ Python
+│   ├── simple_facerec.py       # โมดูล Face Recognition
+│   ├── face_server.py          # Flask API + Camera + Detection
+│   └── requirements.txt        # Python dependencies
+├── web/                        # → คัดลอกไป C:/laragon/www/bunny-door/
+│   ├── index.php               # Dashboard
+│   ├── cameras.php             # ดูกล้องสด
+│   ├── employees.php           # จัดการพนักงาน
+│   ├── logs.php                # ประวัติเข้า-ออก
+│   ├── alerts.php              # แจ้งเตือนผิดปกติ
+│   ├── settings.php            # ตั้งค่าระบบ
+│   ├── config.php              # ค่าตั้งฝั่ง PHP
+│   ├── api/                    # REST API endpoints
+│   │   ├── employees.php
+│   │   ├── access_logs.php
+│   │   ├── alerts.php
+│   │   ├── stats.php
+│   │   └── settings.php
+│   └── includes/
+│       ├── header.php
+│       └── footer.php
+└── docs/
+    └── index.html              # เอกสารนี้</pre>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- 7. Setup -->
+        <!-- ============================================================ -->
+        <section id="setup" class="doc-section mb-16">
+            <h2 class="text-3xl font-bold mb-4 text-white">7. การติดตั้งระบบ</h2>
+
+            <!-- Step 1: Database -->
+            <div class="bg-white/5 rounded-xl p-6 mb-6">
+                <h3 class="text-lg font-bold text-blue-400 mb-3">ขั้นตอนที่ 1: สร้างฐานข้อมูล</h3>
+                <p class="text-sm text-gray-400 mb-3">เปิด Laragon → Start All → เปิด phpMyAdmin</p>
+<pre class="text-sm"><code class="text-green-400">-- วิธีที่ 1: Import ผ่าน phpMyAdmin
+-- เปิด http://localhost/phpmyadmin
+-- คลิก Import → เลือกไฟล์ database/schema.sql
+
+-- วิธีที่ 2: Command line
+mysql -u root < database/schema.sql</code></pre>
+            </div>
+
+            <!-- Step 2: Web -->
+            <div class="bg-white/5 rounded-xl p-6 mb-6">
+                <h3 class="text-lg font-bold text-blue-400 mb-3">ขั้นตอนที่ 2: ติดตั้ง Web Dashboard</h3>
+<pre class="text-sm"><code class="text-green-400"># คัดลอกโฟลเดอร์ web/ ไปที่ Laragon
+# Windows:
+xcopy /E /I "Src\web" "C:\laragon\www\bunny-door"
+
+# หรือสร้าง Symbolic Link:
+mklink /D "C:\laragon\www\bunny-door" "E:\ไฟล์งาน\IOT\กุลธิดา\Src\web"
+
+# เปิดเบราว์เซอร์: http://localhost/bunny-door</code></pre>
+            </div>
+
+            <!-- Step 3: Python -->
+            <div class="bg-white/5 rounded-xl p-6 mb-6">
+                <h3 class="text-lg font-bold text-blue-400 mb-3">ขั้นตอนที่ 3: ติดตั้ง Python Face Server</h3>
+<pre class="text-sm"><code class="text-green-400"># ติดตั้ง Python dependencies
+cd Src/python
+pip install -r requirements.txt
+
+# ** หมายเหตุ: dlib อาจต้องติดตั้ง CMake ก่อน
+# Windows:
+pip install cmake
+pip install dlib
+pip install face_recognition
+
+# สร้างโฟลเดอร์รูปใบหน้า
+mkdir images
+mkdir snapshots
+
+# ใส่รูปใบหน้าพนักงาน (ตั้งชื่อไฟล์ = ชื่อใน DB)
+# เช่น: images/kulthida.jpg, images/nattanan.jpg
+
+# รัน Face Server
+python face_server.py</code></pre>
+            </div>
+
+            <!-- Step 4: ESP32 -->
+            <div class="bg-white/5 rounded-xl p-6 mb-6">
+                <h3 class="text-lg font-bold text-blue-400 mb-3">ขั้นตอนที่ 4: อัปโหลด Firmware ESP32</h3>
+<pre class="text-sm"><code class="text-green-400"># 1. เปิด Arduino IDE
+# 2. ติดตั้ง Board: ESP32 (Espressif Systems)
+# 3. ติดตั้ง Library:
+#    - ArduinoJson
+#    - WiFi (มาพร้อม ESP32 board)
+#    - HTTPClient (มาพร้อม ESP32 board)
+#    - WebServer (มาพร้อม ESP32 board)
+#
+# 4. แก้ไขค่า WiFi ในไฟล์ door_controller.ino:
+#    const char* WIFI_SSID = "YOUR_WIFI";
+#    const char* WIFI_PASSWORD = "YOUR_PASSWORD";
+#    const char* SERVER_URL = "http://&lt;Raspberry_Pi_IP&gt;:5000";
+#
+# 5. เลือก Board: ESP32 Dev Module
+# 6. เลือก Port แล้วกด Upload</code></pre>
+            </div>
+
+            <!-- Step 5: Test -->
+            <div class="bg-white/5 rounded-xl p-6">
+                <h3 class="text-lg font-bold text-green-400 mb-3">ขั้นตอนที่ 5: ทดสอบระบบ</h3>
+<pre class="text-sm"><code class="text-green-400"># 1. ตรวจสอบ Laragon ทำงาน
+#    http://localhost/bunny-door
+
+# 2. ตรวจสอบ Face Server ทำงาน
+#    http://localhost:5000/api/status
+
+# 3. ตรวจสอบ ESP32 เชื่อมต่อ
+#    http://&lt;ESP32_IP&gt;/api/status
+
+# 4. ทดสอบ Face Recognition
+#    - ยืนหน้ากล้อง ระยะ 0.5-1.5 เมตร
+#    - ระบบควรแสดงชื่อ + กรอบสีเขียว
+#    - ถ้า Authorized → ประตูเปิดอัตโนมัติ
+
+# 5. ทดสอบ Dashboard
+#    - ดูสถิติเข้า-ออก
+#    - ดูกล้องสด
+#    - ดูประวัติ + แจ้งเตือน</code></pre>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- 8. API Reference -->
+        <!-- ============================================================ -->
+        <section id="api" class="doc-section mb-16">
+            <h2 class="text-3xl font-bold mb-4 text-white">8. API Reference</h2>
+
+            <h3 class="text-lg font-bold text-white mb-4">Python Face Server (Port 5000)</h3>
+            <div class="space-y-3 mb-8">
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-green-400">GET</code> <code class="text-white">/api/status</code>
+                    <p class="text-sm text-gray-400 mt-1">สถานะระบบ: ประตู, กล้อง, เซ็นเซอร์, จำนวนคน</p>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-green-400">GET</code> <code class="text-white">/api/stream/outside</code>
+                    <p class="text-sm text-gray-400 mt-1">MJPEG stream กล้องด้านนอก</p>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-green-400">GET</code> <code class="text-white">/api/stream/inside</code>
+                    <p class="text-sm text-gray-400 mt-1">MJPEG stream กล้องด้านใน</p>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-yellow-400">POST</code> <code class="text-white">/api/door/unlock</code>
+                    <p class="text-sm text-gray-400 mt-1">สั่งเปิดประตู (ส่งคำสั่งไป ESP32)</p>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-yellow-400">POST</code> <code class="text-white">/api/door/lock</code>
+                    <p class="text-sm text-gray-400 mt-1">สั่งล็อกประตู</p>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-yellow-400">POST</code> <code class="text-white">/api/motion</code>
+                    <p class="text-sm text-gray-400 mt-1">รับข้อมูลจากเซ็นเซอร์ PIR (ESP32 → Pi)</p>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-green-400">GET</code> <code class="text-white">/api/stats</code>
+                    <p class="text-sm text-gray-400 mt-1">สถิติสำหรับ Dashboard</p>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-green-400">GET</code> <code class="text-white">/api/logs/recent?limit=50</code>
+                    <p class="text-sm text-gray-400 mt-1">ประวัติเข้า-ออกล่าสุด</p>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-green-400">GET</code> <code class="text-white">/api/alerts/recent?limit=20</code>
+                    <p class="text-sm text-gray-400 mt-1">แจ้งเตือนล่าสุด</p>
+                </div>
+            </div>
+
+            <h3 class="text-lg font-bold text-white mb-4">ESP32 HTTP Server (Port 80)</h3>
+            <div class="space-y-3">
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-yellow-400">POST</code> <code class="text-white">/api/door/unlock</code>
+                    <p class="text-sm text-gray-400 mt-1">สั่ง Relay ON → ปลดล็อกประตู</p>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-yellow-400">POST</code> <code class="text-white">/api/door/lock</code>
+                    <p class="text-sm text-gray-400 mt-1">สั่ง Relay OFF → ล็อกประตู</p>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-green-400">GET</code> <code class="text-white">/api/status</code>
+                    <p class="text-sm text-gray-400 mt-1">สถานะ: ประตู, PIR, WiFi RSSI, uptime</p>
+                </div>
+                <div class="bg-white/5 rounded-lg p-4">
+                    <code class="text-green-400">GET</code> <code class="text-white">/ping</code>
+                    <p class="text-sm text-gray-400 mt-1">Health check → ตอบ "pong"</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- 9. Improvements -->
+        <!-- ============================================================ -->
+        <section id="improved" class="doc-section mb-16">
+            <h2 class="text-3xl font-bold mb-4 text-white">9. สิ่งที่ปรับปรุงจากต้นฉบับ</h2>
+            <p class="text-gray-400 mb-6">เทคนิคที่ปรับปรุงให้ดีกว่าในเอกสาร Presentation เดิม</p>
+
+            <div class="space-y-4">
+                <div class="improved-badge rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 mt-1"><i class="fas fa-arrow-up"></i></span>
+                        <div>
+                            <h4 class="font-bold text-white">Thread-safe Face Recognition</h4>
+                            <p class="text-sm text-gray-400 mt-1">ต้นฉบับ: single-thread, กล้องตัวเดียว → <strong class="text-green-400">ปรับปรุง:</strong> multi-thread, กล้อง 2 ตัวทำงานขนานกัน ไม่บล็อกกัน ใช้ threading.Lock ป้องกัน race condition</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="improved-badge rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 mt-1"><i class="fas fa-arrow-up"></i></span>
+                        <div>
+                            <h4 class="font-bold text-white">Confidence Score (% ความมั่นใจ)</h4>
+                            <p class="text-sm text-gray-400 mt-1">ต้นฉบับ: แสดงแค่ชื่อ Known/Unknown → <strong class="text-green-400">ปรับปรุง:</strong> คำนวณ confidence จาก face_distance แปลงเป็น % แสดงบน Dashboard</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="improved-badge rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 mt-1"><i class="fas fa-arrow-up"></i></span>
+                        <div>
+                            <h4 class="font-bold text-white">Motion-triggered Recognition</h4>
+                            <p class="text-sm text-gray-400 mt-1">ต้นฉบับ: process ทุก 60 เฟรม (คงที่) → <strong class="text-green-400">ปรับปรุง:</strong> ใช้ MOG2 Background Subtraction ตรวจจับ motion ก่อน จึงสั่ง Face Recognition เฉพาะเมื่อมีคนเคลื่อนไหว ประหยัด CPU มากขึ้น</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="improved-badge rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 mt-1"><i class="fas fa-arrow-up"></i></span>
+                        <div>
+                            <h4 class="font-bold text-white">HTTP REST API แทน Serial</h4>
+                            <p class="text-sm text-gray-400 mt-1">ต้นฉบับ: แนะนำ Serial/UART → <strong class="text-green-400">ปรับปรุง:</strong> ใช้ WiFi HTTP ทั้งหมด ทำให้ ESP32 และ Pi ไม่ต้องอยู่ติดกัน ขยายระบบง่าย รองรับหลายอุปกรณ์</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="improved-badge rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 mt-1"><i class="fas fa-arrow-up"></i></span>
+                        <div>
+                            <h4 class="font-bold text-white">Web Dashboard + MJPEG Streaming</h4>
+                            <p class="text-sm text-gray-400 mt-1">ต้นฉบับ: ใช้ XAMPP + หน้าเว็บเบื้องต้น → <strong class="text-green-400">ปรับปรุง:</strong> ใช้ Laragon + Tailwind CSS Dashboard สวยงาม, MJPEG stream ดูกล้องสดผ่าน browser ได้ทันที</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="improved-badge rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 mt-1"><i class="fas fa-arrow-up"></i></span>
+                        <div>
+                            <h4 class="font-bold text-white">Anomaly Detection System</h4>
+                            <p class="text-sm text-gray-400 mt-1">ต้นฉบับ: ไม่มี → <strong class="text-green-400">เพิ่มใหม่:</strong> ตรวจจับ Tailgating, Unknown Face, Forced Entry, Sensor Mismatch แยก severity 4 ระดับ</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="improved-badge rounded-xl p-5">
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 mt-1"><i class="fas fa-arrow-up"></i></span>
+                        <div>
+                            <h4 class="font-bold text-white">Snapshot System</h4>
+                            <p class="text-sm text-gray-400 mt-1">ต้นฉบับ: ไม่มีการบันทึกภาพ → <strong class="text-green-400">เพิ่มใหม่:</strong> บันทึกภาพถ่ายอัตโนมัติทุกครั้งที่มีการเข้า-ออก + เมื่อเกิดเหตุผิดปกติ</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- 10. Concept -->
+        <!-- ============================================================ -->
+        <section id="concept" class="doc-section mb-16">
+            <h2 class="text-3xl font-bold mb-4 text-white">10. คอนเซปต์เพิ่มเติม: Dual Sensor + Dual Camera</h2>
+
+            <div class="bg-orange-500/10 border border-orange-500/20 rounded-xl p-6 mb-6">
+                <h3 class="text-lg font-bold text-orange-400 mb-2">ทำไมต้องมี 2 เซ็นเซอร์ + 2 กล้อง?</h3>
+                <p class="text-gray-300">เมื่อมีบุคคลเข้า-ออกมาพร้อมกัน ให้เซ็นเซอร์เป็นตัวจับเพื่อบอกว่าใครมาก่อน-มาหลัง
+                และให้ประตูด้านใดต้องเปิดก่อน พร้อมทั้งบันทึกภาพเพื่อตรวจสอบว่ามีการแทรกเข้า-ออกที่ผิดปกติหรือไม่</p>
+            </div>
+
+            <!-- Scenario diagrams -->
+            <h3 class="text-lg font-bold text-white mb-4">สถานการณ์ที่ระบบจัดการ</h3>
+            <div class="space-y-4">
+                <div class="bg-white/5 rounded-xl p-5">
+                    <h4 class="font-medium text-green-400 mb-2"><i class="fas fa-check-circle mr-2"></i>สถานการณ์ปกติ: คนเข้า 1 คน</h4>
+                    <p class="text-sm text-gray-400">PIR Outside ทำงาน → Camera 1 จับหน้า → ตรวจสอบสิทธิ์ → เปิดประตู → PIR Inside ทำงาน → Camera 2 บันทึกภาพขาเข้า</p>
+                </div>
+                <div class="bg-white/5 rounded-xl p-5">
+                    <h4 class="font-medium text-green-400 mb-2"><i class="fas fa-check-circle mr-2"></i>สถานการณ์ปกติ: คนออก 1 คน</h4>
+                    <p class="text-sm text-gray-400">PIR Inside ทำงาน → Camera 2 จับหน้า → บันทึกว่า "ออก" → เปิดประตู → PIR Outside → Camera 1 บันทึกภาพขาออก</p>
+                </div>
+                <div class="bg-white/5 rounded-xl p-5">
+                    <h4 class="font-medium text-yellow-400 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>สถานการณ์: เข้า-ออกพร้อมกัน</h4>
+                    <p class="text-sm text-gray-400">PIR ทั้ง 2 ตัวทำงานพร้อมกัน → ระบบตรวจจับทั้ง 2 ฝั่ง → ให้สิทธิ์ "คนมาก่อน" ตาม timestamp ของ PIR → เปิดประตู → บันทึกทั้ง 2 คน</p>
+                </div>
+                <div class="bg-white/5 rounded-xl p-5">
+                    <h4 class="font-medium text-red-400 mb-2"><i class="fas fa-times-circle mr-2"></i>สถานการณ์ผิดปกติ: Tailgating (แอบเข้าตาม)</h4>
+                    <p class="text-sm text-gray-400">Camera ตรวจพบ &gt;1 คนในเฟรมเดียว แต่มีคนไม่รู้จัก → แจ้งเตือน TAILGATING severity CRITICAL → บันทึก Snapshot → แจ้งผู้ดูแลผ่าน Dashboard</p>
+                </div>
+                <div class="bg-white/5 rounded-xl p-5">
+                    <h4 class="font-medium text-red-400 mb-2"><i class="fas fa-times-circle mr-2"></i>สถานการณ์ผิดปกติ: ใบหน้าไม่รู้จัก</h4>
+                    <p class="text-sm text-gray-400">Camera จับภาพได้แต่ไม่ตรงกับฐานข้อมูล → แจ้งเตือน UNKNOWN_FACE → บันทึก Snapshot → ไม่เปิดประตู → แสดงสถานะ "ปฏิเสธ"</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="border-t border-white/10 pt-8 pb-16 text-center text-gray-500 text-sm">
+            <p>Bunny Door System v2.0 - เอกสารโครงงาน</p>
+            <p class="mt-1">สาขาเทคโนโลยีไฟฟ้าอุตสาหกรรม (ต่อเนื่อง) คณะเทคโนโลยีอุตสาหกรรม</p>
+            <p class="mt-1">มหาวิทยาลัยราชภัฏวไลยอลงกรณ์ ในพระบรมราชูปถัมภ์</p>
+        </footer>
+    </main>
+</div>
+
+<script>
+// Active TOC highlighting
+const sections = document.querySelectorAll('.doc-section');
+const tocLinks = document.querySelectorAll('.toc-link');
+window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(section => {
+        if (window.scrollY >= section.offsetTop - 100) {
+            current = section.getAttribute('id');
+        }
+    });
+    tocLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+            link.classList.add('active');
+        }
+    });
+});
+</script>
+</body>
+</html>
