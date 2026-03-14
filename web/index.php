@@ -2,14 +2,37 @@
 <?php include 'includes/header.php'; ?>
 
 <?php
-// ดึงสถานะกล้องจาก DB
+// ดึงสถานะทั้งหมดจาก DB (ไม่พึ่ง face_server API)
 $db = getDB();
-$camStatus = [];
-foreach ($db->query("SELECT component, status FROM system_status WHERE component LIKE 'camera_%'")->fetchAll() as $row) {
-    $camStatus[$row['component']] = $row['status'];
+
+// สถานะระบบ (เช็ค heartbeat ว่า stale ไหม — ถ้าเกิน 60 วิ ถือว่า offline)
+$sysStatus = [];
+foreach ($db->query("SELECT component, status, last_heartbeat FROM system_status")->fetchAll() as $row) {
+    $isStale = $row['last_heartbeat'] && (strtotime('now') - strtotime($row['last_heartbeat'])) > 60;
+    $sysStatus[$row['component']] = $isStale ? 'OFFLINE' : $row['status'];
 }
-$cam1Online = ($camStatus['camera_outside'] ?? '') === 'ONLINE';
-$cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
+$cam1Online = ($sysStatus['camera_outside'] ?? '') === 'ONLINE';
+$cam2Online = ($sysStatus['camera_inside'] ?? '') === 'ONLINE';
+$faceServerOnline = ($sysStatus['face_server'] ?? '') === 'ONLINE';
+$esp32Online = ($sysStatus['esp32'] ?? '') === 'ONLINE';
+
+// สถิติวันนี้
+$stmt = $db->query("SELECT COUNT(DISTINCT employee_id) as c FROM access_logs WHERE direction='IN' AND DATE(created_at) = CURDATE() AND is_authorized = 1");
+$todayIn = $stmt->fetch()['c'] ?? 0;
+
+$stmt = $db->query("SELECT COUNT(DISTINCT employee_id) as c FROM access_logs WHERE direction='OUT' AND DATE(created_at) = CURDATE() AND is_authorized = 1");
+$todayOut = $stmt->fetch()['c'] ?? 0;
+
+$currentlyInside = max(0, $todayIn - $todayOut);
+
+$stmt = $db->query("SELECT COUNT(*) as c FROM anomaly_alerts WHERE is_resolved = 0");
+$unresolvedAlerts = $stmt->fetch()['c'] ?? 0;
+
+// ประวัติล่าสุด
+$stmt = $db->query("SELECT al.*, e.first_name, e.last_name, e.emp_code
+    FROM access_logs al LEFT JOIN employees e ON al.employee_id = e.id
+    ORDER BY al.created_at DESC LIMIT 10");
+$recentLogs = $stmt->fetchAll();
 ?>
 
 <!-- Page Header -->
@@ -32,7 +55,7 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
         <div class="flex justify-between items-start">
             <div>
                 <p class="text-gray-400 text-sm">เข้างานวันนี้</p>
-                <p class="text-3xl font-bold text-white mt-2" id="statIn">-</p>
+                <p class="text-3xl font-bold text-white mt-2" id="statIn"><?= $todayIn ?></p>
             </div>
             <div class="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center">
                 <i class="fas fa-arrow-right-to-bracket text-green-400 text-xl"></i>
@@ -45,7 +68,7 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
         <div class="flex justify-between items-start">
             <div>
                 <p class="text-gray-400 text-sm">ออกงานวันนี้</p>
-                <p class="text-3xl font-bold text-white mt-2" id="statOut">-</p>
+                <p class="text-3xl font-bold text-white mt-2" id="statOut"><?= $todayOut ?></p>
             </div>
             <div class="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
                 <i class="fas fa-arrow-right-from-bracket text-blue-400 text-xl"></i>
@@ -58,7 +81,7 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
         <div class="flex justify-between items-start">
             <div>
                 <p class="text-gray-400 text-sm">อยู่ในพื้นที่</p>
-                <p class="text-3xl font-bold text-white mt-2" id="statInside">-</p>
+                <p class="text-3xl font-bold text-white mt-2" id="statInside"><?= $currentlyInside ?></p>
             </div>
             <div class="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
                 <i class="fas fa-person text-purple-400 text-xl"></i>
@@ -71,7 +94,7 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
         <div class="flex justify-between items-start">
             <div>
                 <p class="text-gray-400 text-sm">แจ้งเตือน</p>
-                <p class="text-3xl font-bold text-white mt-2" id="statAlerts">-</p>
+                <p class="text-3xl font-bold text-white mt-2" id="statAlerts"><?= $unresolvedAlerts ?></p>
             </div>
             <div class="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center">
                 <i class="fas fa-bell text-red-400 text-xl"></i>
@@ -129,29 +152,39 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
             <i class="fas fa-door-closed text-blue-400"></i> สถานะประตู
         </h3>
         <div class="text-center py-6">
-            <div class="w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 transition-all" id="doorIcon">
-                <i class="fas fa-lock text-4xl" id="doorIconInner"></i>
+            <div class="w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-red-500/20" id="doorIcon">
+                <i class="fas fa-lock text-4xl text-red-400" id="doorIconInner"></i>
             </div>
-            <p class="text-xl font-bold" id="doorStatusText">กำลังตรวจสอบ...</p>
+            <p class="text-xl font-bold text-red-400" id="doorStatusText">ประตูล็อก</p>
             <p class="text-sm text-gray-400 mt-1" id="doorStatusSub"></p>
         </div>
         <div class="space-y-3 mt-4">
             <div class="flex justify-between items-center text-sm">
-                <span class="text-gray-400">เซ็นเซอร์นอก</span>
-                <span class="flex items-center gap-1" id="sensorOutStatus">
-                    <span class="w-2 h-2 bg-gray-500 rounded-full"></span> ไม่มีสัญญาณ
-                </span>
-            </div>
-            <div class="flex justify-between items-center text-sm">
-                <span class="text-gray-400">เซ็นเซอร์ใน</span>
-                <span class="flex items-center gap-1" id="sensorInStatus">
-                    <span class="w-2 h-2 bg-gray-500 rounded-full"></span> ไม่มีสัญญาณ
+                <span class="text-gray-400">Face Server</span>
+                <span class="flex items-center gap-1">
+                    <span class="w-2 h-2 <?= $faceServerOnline ? 'bg-green-400' : 'bg-red-400' ?> rounded-full"></span>
+                    <?= $faceServerOnline ? 'Online' : 'Offline' ?>
                 </span>
             </div>
             <div class="flex justify-between items-center text-sm">
                 <span class="text-gray-400">ESP32</span>
-                <span class="flex items-center gap-1" id="esp32Status">
-                    <span class="w-2 h-2 bg-gray-500 rounded-full"></span> Offline
+                <span class="flex items-center gap-1">
+                    <span class="w-2 h-2 <?= $esp32Online ? 'bg-green-400' : 'bg-red-400' ?> rounded-full"></span>
+                    <?= $esp32Online ? 'Online' : 'Offline' ?>
+                </span>
+            </div>
+            <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-400">กล้องนอก</span>
+                <span class="flex items-center gap-1">
+                    <span class="w-2 h-2 <?= $cam1Online ? 'bg-green-400' : 'bg-red-400' ?> rounded-full"></span>
+                    <?= $cam1Online ? 'Online' : 'Offline' ?>
+                </span>
+            </div>
+            <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-400">กล้องใน</span>
+                <span class="flex items-center gap-1">
+                    <span class="w-2 h-2 <?= $cam2Online ? 'bg-green-400' : 'bg-red-400' ?> rounded-full"></span>
+                    <?= $cam2Online ? 'Online' : 'Offline' ?>
                 </span>
             </div>
         </div>
@@ -186,7 +219,40 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
                 </tr>
             </thead>
             <tbody id="recentLogs">
-                <tr><td colspan="5" class="text-center text-gray-500 py-8">กำลังโหลด...</td></tr>
+                <?php if (empty($recentLogs)): ?>
+                <tr><td colspan="5" class="text-center text-gray-500 py-8">ไม่มีข้อมูล</td></tr>
+                <?php else: ?>
+                <?php foreach ($recentLogs as $log): ?>
+                <tr class="border-b border-white/5 hover:bg-white/5">
+                    <td class="py-3 px-2 text-gray-300"><?= date('H:i:s', strtotime($log['created_at'])) ?></td>
+                    <td class="py-3 px-2"><?= $log['first_name'] ? esc($log['first_name']) . ' ' . esc($log['last_name']) : '<span class="text-red-400">ไม่รู้จัก</span>' ?></td>
+                    <td class="py-3 px-2">
+                        <?php if ($log['direction'] === 'IN'): ?>
+                        <span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs">เข้า</span>
+                        <?php else: ?>
+                        <span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs">ออก</span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="py-3 px-2">
+                        <?php $conf = floatval($log['confidence'] ?? 0); ?>
+                        <div class="flex items-center gap-2">
+                            <div class="w-16 bg-gray-700 rounded-full h-1.5">
+                                <div class="h-1.5 rounded-full <?= $conf > 70 ? 'bg-green-400' : ($conf > 40 ? 'bg-yellow-400' : 'bg-red-400') ?>"
+                                     style="width: <?= $conf ?>%"></div>
+                            </div>
+                            <span class="text-xs text-gray-400"><?= $conf ?>%</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-2">
+                        <?php if ($log['is_authorized']): ?>
+                        <span class="text-green-400"><i class="fas fa-check-circle"></i></span>
+                        <?php else: ?>
+                        <span class="text-red-400"><i class="fas fa-times-circle"></i></span>
+                        <?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
@@ -194,113 +260,56 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
 
 <script>
 // ============================================================
-// Dashboard Logic
+// Dashboard Logic (ใช้ PHP render ข้อมูลหลัก, JS เฉพาะ snapshot + door + clock)
 // ============================================================
 
-// Load stats
-async function loadStats() {
-    const data = await fetchAPI(FACE_SERVER + '/api/stats');
-    if (data) {
-        document.getElementById('statIn').textContent = data.today_in || 0;
-        document.getElementById('statOut').textContent = data.today_out || 0;
-        document.getElementById('statInside').textContent = data.currently_inside || 0;
-        document.getElementById('statAlerts').textContent = data.unresolved_alerts || 0;
-    }
-}
-
-// Load status
-async function loadStatus() {
-    const data = await fetchAPI(FACE_SERVER + '/api/status');
-    if (data) {
-        // Door
-        const doorIcon = document.getElementById('doorIcon');
-        const doorInner = document.getElementById('doorIconInner');
-        const doorText = document.getElementById('doorStatusText');
-        if (data.door === 'unlocked') {
-            doorIcon.className = 'w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-green-500/20';
-            doorInner.className = 'fas fa-lock-open text-4xl text-green-400';
-            doorText.textContent = 'ประตูเปิด';
-            doorText.className = 'text-xl font-bold text-green-400';
-        } else {
-            doorIcon.className = 'w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-red-500/20';
-            doorInner.className = 'fas fa-lock text-4xl text-red-400';
-            doorText.textContent = 'ประตูล็อก';
-            doorText.className = 'text-xl font-bold text-red-400';
-        }
-    }
-}
-
-// Load recent logs
-async function loadRecentLogs() {
-    const data = await fetchAPI(FACE_SERVER + '/api/logs/recent?limit=10');
-    const tbody = document.getElementById('recentLogs');
-    if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-8">ไม่มีข้อมูล</td></tr>';
-        return;
-    }
-    tbody.innerHTML = data.map(log => `
-        <tr class="border-b border-white/5 hover:bg-white/5">
-            <td class="py-3 px-2 text-gray-300">${formatTime(log.created_at)}</td>
-            <td class="py-3 px-2">${log.first_name ? esc(log.first_name) + ' ' + esc(log.last_name) : '<span class="text-red-400">ไม่รู้จัก</span>'}</td>
-            <td class="py-3 px-2">
-                ${log.direction === 'IN'
-                    ? '<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs">เข้า</span>'
-                    : '<span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs">ออก</span>'}
-            </td>
-            <td class="py-3 px-2">
-                <div class="flex items-center gap-2">
-                    <div class="w-16 bg-gray-700 rounded-full h-1.5">
-                        <div class="h-1.5 rounded-full ${parseFloat(log.confidence) > 70 ? 'bg-green-400' : parseFloat(log.confidence) > 40 ? 'bg-yellow-400' : 'bg-red-400'}"
-                             style="width: ${parseFloat(log.confidence) || 0}%"></div>
-                    </div>
-                    <span class="text-xs text-gray-400">${parseFloat(log.confidence) || 0}%</span>
-                </div>
-            </td>
-            <td class="py-3 px-2">
-                ${log.is_authorized
-                    ? '<span class="text-green-400"><i class="fas fa-check-circle"></i></span>'
-                    : '<span class="text-red-400"><i class="fas fa-times-circle"></i></span>'}
-            </td>
-        </tr>
-    `).join('');
-}
-
-// Camera snapshots (refresh ทุก 3 วินาที แทน MJPEG stream)
-function initStreams() {
-    refreshDashboardSnapshots();
-    setInterval(refreshDashboardSnapshots, 3000);
-}
+// Camera snapshots (refresh ทุก 3 วินาที)
+<?php if ($cam1Online || $cam2Online): ?>
 function refreshDashboardSnapshots() {
     const ts = Date.now();
-    const outside = document.getElementById('streamOutside');
-    const inside = document.getElementById('streamInside');
-
+    <?php if ($cam1Online): ?>
     const outImg = new Image();
     outImg.onload = () => {
-        outside.src = outImg.src;
-        outside.style.display = '';
+        document.getElementById('streamOutside').src = outImg.src;
+        document.getElementById('streamOutside').style.display = '';
         document.getElementById('streamOutPlaceholder').style.display = 'none';
     };
     outImg.src = FACE_SERVER + '/api/snapshot/outside?t=' + ts;
+    <?php endif; ?>
 
+    <?php if ($cam2Online): ?>
     const inImg = new Image();
     inImg.onload = () => {
-        inside.src = inImg.src;
-        inside.style.display = '';
+        document.getElementById('streamInside').src = inImg.src;
+        document.getElementById('streamInside').style.display = '';
         document.getElementById('streamInPlaceholder').style.display = 'none';
     };
     inImg.src = FACE_SERVER + '/api/snapshot/inside?t=' + ts;
+    <?php endif; ?>
 }
+refreshDashboardSnapshots();
+setInterval(refreshDashboardSnapshots, 3000);
+<?php endif; ?>
 
 // Door controls
 async function unlockDoor() {
     const data = await postAPI(FACE_SERVER + '/api/door/unlock');
-    if (data?.success) loadStatus();
+    if (data?.success) {
+        document.getElementById('doorIcon').className = 'w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-green-500/20';
+        document.getElementById('doorIconInner').className = 'fas fa-lock-open text-4xl text-green-400';
+        document.getElementById('doorStatusText').textContent = 'ประตูเปิด';
+        document.getElementById('doorStatusText').className = 'text-xl font-bold text-green-400';
+    }
 }
 
 async function lockDoor() {
     const data = await postAPI(FACE_SERVER + '/api/door/lock');
-    if (data?.success) loadStatus();
+    if (data?.success) {
+        document.getElementById('doorIcon').className = 'w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-red-500/20';
+        document.getElementById('doorIconInner').className = 'fas fa-lock text-4xl text-red-400';
+        document.getElementById('doorStatusText').textContent = 'ประตูล็อก';
+        document.getElementById('doorStatusText').className = 'text-xl font-bold text-red-400';
+    }
 }
 
 // Clock
@@ -308,18 +317,11 @@ function updateClock() {
     document.getElementById('currentTime').textContent =
         new Date().toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'medium' });
 }
-
-// Init
-loadStats();
-loadStatus();
-loadRecentLogs();
-initStreams();
 updateClock();
-
-setInterval(loadStats, 15000);
-setInterval(loadStatus, 5000);
-setInterval(loadRecentLogs, 10000);
 setInterval(updateClock, 1000);
+
+// Auto-refresh page ทุก 30 วินาที เพื่ออัปเดตสถิติ/สถานะจาก DB
+setTimeout(() => location.reload(), 30000);
 </script>
 
 <?php include 'includes/footer.php'; ?>
