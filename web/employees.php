@@ -126,6 +126,11 @@
                     </div>
                     <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handlePhotoSelect(this)">
 
+                    <!-- ปุ่มถ่ายจากกล้อง Pi -->
+                    <button type="button" onclick="openCameraCapture()" class="w-40 mt-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 text-xs py-2 rounded-lg transition flex items-center justify-center gap-1.5 border border-cyan-500/20">
+                        <i class="fas fa-video"></i> ถ่ายจากกล้อง Pi
+                    </button>
+
                     <!-- Progress Bar -->
                     <div id="uploadProgress" class="hidden mt-3">
                         <div class="flex justify-between text-xs mb-1">
@@ -188,6 +193,56 @@
                 <button type="button" onclick="closeModal()" class="flex-1 bg-white/10 hover:bg-white/20 text-white py-2.5 rounded-lg transition">ยกเลิก</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Camera Capture Modal -->
+<div id="cameraModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center">
+    <div class="glass bg-brand-800 rounded-2xl p-6 max-w-lg w-full mx-4" onclick="event.stopPropagation()">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold flex items-center gap-2">
+                <i class="fas fa-video text-cyan-400"></i> ถ่ายภาพจากกล้อง Pi
+            </h3>
+            <button onclick="closeCameraCapture()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+
+        <!-- เลือกกล้อง -->
+        <div class="flex gap-2 mb-4">
+            <button id="camBtnOutside" onclick="switchCaptureCamera('outside')" class="flex-1 py-2 rounded-lg text-sm transition bg-cyan-600/30 text-cyan-400 border border-cyan-500/30">
+                <i class="fas fa-door-open mr-1"></i> กล้องนอก
+            </button>
+            <button id="camBtnInside" onclick="switchCaptureCamera('inside')" class="flex-1 py-2 rounded-lg text-sm transition bg-white/5 text-gray-400 border border-white/10">
+                <i class="fas fa-door-closed mr-1"></i> กล้องใน
+            </button>
+        </div>
+
+        <!-- Live Preview -->
+        <div class="relative aspect-video bg-gray-900 rounded-xl overflow-hidden mb-4">
+            <img id="capturePreview" class="w-full h-full object-contain" alt="Camera Preview">
+            <div id="captureLoading" class="absolute inset-0 flex items-center justify-center bg-gray-900">
+                <div class="text-center text-gray-500">
+                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                    <p class="text-sm">กำลังเชื่อมต่อกล้อง...</p>
+                </div>
+            </div>
+            <!-- คำแนะนำ -->
+            <div class="absolute bottom-2 left-2 right-2 text-center">
+                <span class="bg-black/60 text-white text-xs px-3 py-1 rounded-full">
+                    <i class="fas fa-info-circle mr-1"></i> หันหน้าตรง ให้ใบหน้าอยู่กลางภาพ ระยะ 30-50 ซม.
+                </span>
+            </div>
+        </div>
+
+        <!-- ปุ่มถ่ายภาพ -->
+        <div class="flex gap-3">
+            <button id="btnCapture" onclick="capturePhoto()" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white py-3 rounded-xl transition font-medium flex items-center justify-center gap-2">
+                <i class="fas fa-camera text-lg"></i> ถ่ายภาพ
+            </button>
+            <button onclick="closeCameraCapture()" class="px-6 bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl transition">ยกเลิก</button>
+        </div>
+
+        <!-- ผลการถ่าย -->
+        <div id="captureResult" class="hidden mt-4 p-3 rounded-xl text-center"></div>
     </div>
 </div>
 
@@ -549,6 +604,132 @@ function deleteEmployee(id) {
             }
         }
     );
+}
+
+// ============================================================
+// Camera Capture (ถ่ายจากกล้อง Pi)
+// ============================================================
+let _captureCamera = 'outside';
+let _captureInterval = null;
+
+function openCameraCapture() {
+    document.getElementById('cameraModal').classList.remove('hidden');
+    document.getElementById('cameraModal').classList.add('flex');
+    document.getElementById('captureResult').classList.add('hidden');
+    document.getElementById('captureLoading').style.display = '';
+    _captureCamera = 'outside';
+    switchCaptureCamera('outside');
+    startCapturePreview();
+}
+
+function closeCameraCapture() {
+    document.getElementById('cameraModal').classList.add('hidden');
+    document.getElementById('cameraModal').classList.remove('flex');
+    stopCapturePreview();
+}
+
+function switchCaptureCamera(cam) {
+    _captureCamera = cam;
+    // UI toggle
+    const btnOut = document.getElementById('camBtnOutside');
+    const btnIn = document.getElementById('camBtnInside');
+    if (cam === 'outside') {
+        btnOut.className = 'flex-1 py-2 rounded-lg text-sm transition bg-cyan-600/30 text-cyan-400 border border-cyan-500/30';
+        btnIn.className = 'flex-1 py-2 rounded-lg text-sm transition bg-white/5 text-gray-400 border border-white/10';
+    } else {
+        btnIn.className = 'flex-1 py-2 rounded-lg text-sm transition bg-cyan-600/30 text-cyan-400 border border-cyan-500/30';
+        btnOut.className = 'flex-1 py-2 rounded-lg text-sm transition bg-white/5 text-gray-400 border border-white/10';
+    }
+    document.getElementById('captureLoading').style.display = '';
+}
+
+function startCapturePreview() {
+    stopCapturePreview();
+    refreshCapturePreview();
+    _captureInterval = setInterval(refreshCapturePreview, 2000);
+}
+
+function stopCapturePreview() {
+    if (_captureInterval) {
+        clearInterval(_captureInterval);
+        _captureInterval = null;
+    }
+}
+
+function refreshCapturePreview() {
+    const img = new Image();
+    img.onload = () => {
+        document.getElementById('capturePreview').src = img.src;
+        document.getElementById('captureLoading').style.display = 'none';
+    };
+    img.onerror = () => {
+        document.getElementById('captureLoading').style.display = '';
+        document.getElementById('captureLoading').querySelector('p').textContent = 'กล้องไม่พร้อม';
+    };
+    img.src = 'api/capture.php?camera=' + _captureCamera + '&t=' + Date.now();
+}
+
+async function capturePhoto() {
+    const btn = document.getElementById('btnCapture');
+    const result = document.getElementById('captureResult');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังถ่ายภาพ...';
+    result.classList.add('hidden');
+
+    try {
+        const empCode = document.getElementById('formEmpCode').value || 'capture';
+        const resp = await fetch('api/capture.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ camera: _captureCamera, emp_code: empCode }),
+        });
+        const data = await resp.json();
+
+        if (data.success && data.filename) {
+            // สำเร็จ — อัปเดต form
+            document.getElementById('formFaceImage').value = data.filename;
+            currentUploadedFile = data.filename;
+
+            // อัปเดต preview ในฟอร์ม
+            const preview = document.getElementById('photoPreview');
+            preview.src = 'uploads/faces/' + data.filename + '?t=' + Date.now();
+            preview.classList.remove('hidden');
+            document.getElementById('photoOverlay').classList.remove('hidden');
+            document.getElementById('photoPlaceholder').classList.add('hidden');
+            document.getElementById('uploadResult').classList.remove('hidden');
+
+            // แสดง face validation
+            showFaceValidation({
+                valid: true,
+                face_ratio: data.face_ratio,
+                quality_notes: data.quality_notes || [],
+            });
+
+            // แสดงผลสำเร็จ
+            result.innerHTML = `<div class="text-green-400"><i class="fas fa-check-circle text-lg mr-2"></i>ถ่ายภาพสำเร็จ! ใบหน้า ${data.face_ratio}%</div>`;
+            result.className = 'mt-4 p-3 rounded-xl text-center bg-green-500/10 border border-green-500/20';
+            result.classList.remove('hidden');
+
+            showToast('ถ่ายภาพจากกล้องสำเร็จ!', 'success');
+
+            // ปิด modal หลัง 1.5 วิ
+            setTimeout(() => closeCameraCapture(), 1500);
+        } else {
+            // ไม่สำเร็จ
+            result.innerHTML = `<div class="text-red-400"><i class="fas fa-exclamation-circle text-lg mr-2"></i>${data.error || 'เกิดข้อผิดพลาด'}</div>`;
+            result.className = 'mt-4 p-3 rounded-xl text-center bg-red-500/10 border border-red-500/20';
+            result.classList.remove('hidden');
+            showToast(data.error || 'ถ่ายภาพไม่สำเร็จ', 'error');
+        }
+    } catch (e) {
+        result.innerHTML = '<div class="text-red-400"><i class="fas fa-wifi-slash mr-2"></i>ไม่สามารถเชื่อมต่อ Face Server</div>';
+        result.className = 'mt-4 p-3 rounded-xl text-center bg-red-500/10 border border-red-500/20';
+        result.classList.remove('hidden');
+        showToast('ไม่สามารถเชื่อมต่อ Face Server', 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-camera text-lg"></i> ถ่ายภาพ';
 }
 
 // ============================================================

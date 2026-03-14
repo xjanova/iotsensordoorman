@@ -594,6 +594,91 @@ def api_esp32_health():
 
 
 # ============================================================
+# Camera Capture API (ถ่ายภาพจากกล้องตัวเดียวกับที่สแกน)
+# ============================================================
+@app.route('/api/capture/photo')
+def api_capture_photo():
+    """ถ่ายภาพคุณภาพสูงจากกล้อง (สำหรับลงทะเบียนใบหน้า)"""
+    cam = request.args.get('camera', 'outside')
+    cam_key = f"camera_{cam}"
+
+    if cam_key not in system_state:
+        return jsonify({"error": f"ไม่พบกล้อง {cam}"}), 404
+
+    # ดึง frame ดิบจากกล้อง (ไม่มีกรอบวาดทับ)
+    cam_name = cam_key
+    if cam_name not in _camera_captures or not _camera_captures[cam_name].isOpened():
+        return jsonify({"error": "กล้องไม่ได้เปิดอยู่"}), 503
+
+    cap = _camera_captures[cam_name]
+    ret, frame = cap.read()
+    if not ret or frame is None:
+        return jsonify({"error": "ไม่สามารถถ่ายภาพได้"}), 503
+
+    # Encode เป็น JPEG คุณภาพสูง (95%)
+    _, jpeg_buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    return Response(jpeg_buf.tobytes(), mimetype='image/jpeg',
+                    headers={'Cache-Control': 'no-cache, no-store'})
+
+
+@app.route('/api/capture/save', methods=['POST'])
+def api_capture_save():
+    """ถ่ายภาพจากกล้องแล้วบันทึกเป็นไฟล์ (สำหรับลงทะเบียน)"""
+    cam = request.json.get('camera', 'outside') if request.is_json else request.form.get('camera', 'outside')
+    emp_code = request.json.get('emp_code', 'capture') if request.is_json else request.form.get('emp_code', 'capture')
+
+    cam_key = f"camera_{cam}"
+    if cam_key not in _camera_captures or not _camera_captures[cam_key].isOpened():
+        return jsonify({"error": "กล้องไม่ได้เปิดอยู่"}), 503
+
+    cap = _camera_captures[cam_key]
+    ret, frame = cap.read()
+    if not ret or frame is None:
+        return jsonify({"error": "ไม่สามารถถ่ายภาพได้"}), 503
+
+    # ตรวจจับใบหน้าก่อนบันทึก
+    rgb_img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    face_locations = face_recognition.face_locations(rgb_img, model="hog")
+
+    if len(face_locations) == 0:
+        return jsonify({"error": "ไม่พบใบหน้าในภาพ ลองขยับเข้าใกล้กล้อง", "valid": False}), 400
+
+    if len(face_locations) > 1:
+        return jsonify({"error": f"พบ {len(face_locations)} ใบหน้า ควรมีเพียง 1 คนหน้ากล้อง", "valid": False}), 400
+
+    # คำนวณ face ratio
+    top, right, bottom, left = face_locations[0]
+    face_h = bottom - top
+    face_w = right - left
+    img_h, img_w = frame.shape[:2]
+    face_ratio = round((face_h * face_w) / (img_h * img_w) * 100, 1)
+
+    # ตรวจ encoding ได้ไหม
+    face_encodings = face_recognition.face_encodings(rgb_img, face_locations)
+    if not face_encodings:
+        return jsonify({"error": "ตรวจพบใบหน้าแต่ไม่สามารถวิเคราะห์ได้ ลองปรับแสง", "valid": False}), 400
+
+    # บันทึกไฟล์
+    import re
+    safe_code = re.sub(r'[^A-Za-z0-9\-]', '', emp_code) or 'capture'
+    filename = f"{safe_code}_{int(time.time())}.jpg"
+    save_dir = os.path.join(os.path.dirname(__file__), '..', 'web', 'uploads', 'faces')
+    os.makedirs(save_dir, exist_ok=True)
+    filepath = os.path.join(save_dir, filename)
+    cv2.imwrite(filepath, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+
+    return jsonify({
+        "success": True,
+        "filename": filename,
+        "face_ratio": face_ratio,
+        "face_size": {"width": face_w, "height": face_h},
+        "valid": True,
+        "quality_notes": ["ใบหน้าเล็ก ลองเข้าใกล้กว่านี้"] if face_ratio < 5 else [],
+        "message": "ถ่ายภาพสำเร็จ" + (f" (ใบหน้า {face_ratio}%)" if face_ratio else "")
+    })
+
+
+# ============================================================
 # Face Validation API (for photo upload)
 # ============================================================
 @app.route('/api/face/validate', methods=['POST'])
