@@ -29,7 +29,7 @@ import config
 # Initialize
 # ============================================================
 app = Flask(__name__)
-CORS(app, origins=["http://localhost", "http://127.0.0.1"])
+CORS(app)
 
 # Face Recognition
 sfr = SimpleFaceRec(
