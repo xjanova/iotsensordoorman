@@ -82,7 +82,7 @@
             <span class="text-xs text-gray-400">Camera 1</span>
         </div>
         <div class="stream-container aspect-video">
-            <img id="streamOutside" src="" alt="Camera Outside" class="w-full" onerror="this.style.display='none'">
+            <img id="streamOutside" src="" alt="Camera Outside" class="w-full" style="display:none">
             <div id="streamOutPlaceholder" class="absolute inset-0 flex items-center justify-center bg-gray-800">
                 <div class="text-center text-gray-500">
                     <i class="fas fa-video-slash text-3xl mb-2"></i>
@@ -102,7 +102,7 @@
             <span class="text-xs text-gray-400">Camera 2</span>
         </div>
         <div class="stream-container aspect-video">
-            <img id="streamInside" src="" alt="Camera Inside" class="w-full" onerror="this.style.display='none'">
+            <img id="streamInside" src="" alt="Camera Inside" class="w-full" style="display:none">
             <div id="streamInPlaceholder" class="absolute inset-0 flex items-center justify-center bg-gray-800">
                 <div class="text-center text-gray-500">
                     <i class="fas fa-video-slash text-3xl mb-2"></i>
@@ -254,15 +254,31 @@ async function loadRecentLogs() {
     `).join('');
 }
 
-// Camera streams
+// Camera snapshots (refresh ทุก 3 วินาที แทน MJPEG stream)
 function initStreams() {
+    refreshDashboardSnapshots();
+    setInterval(refreshDashboardSnapshots, 3000);
+}
+function refreshDashboardSnapshots() {
+    const ts = Date.now();
     const outside = document.getElementById('streamOutside');
     const inside = document.getElementById('streamInside');
-    outside.src = FACE_SERVER + '/api/stream/outside';
-    inside.src = FACE_SERVER + '/api/stream/inside';
 
-    outside.onload = () => document.getElementById('streamOutPlaceholder').style.display = 'none';
-    inside.onload = () => document.getElementById('streamInPlaceholder').style.display = 'none';
+    const outImg = new Image();
+    outImg.onload = () => {
+        outside.src = outImg.src;
+        outside.style.display = '';
+        document.getElementById('streamOutPlaceholder').style.display = 'none';
+    };
+    outImg.src = FACE_SERVER + '/api/snapshot/outside?t=' + ts;
+
+    const inImg = new Image();
+    inImg.onload = () => {
+        inside.src = inImg.src;
+        inside.style.display = '';
+        document.getElementById('streamInPlaceholder').style.display = 'none';
+    };
+    inImg.src = FACE_SERVER + '/api/snapshot/inside?t=' + ts;
 }
 
 // Door controls

@@ -1,13 +1,12 @@
 """
-Bunny Door System - Face Recognition + API Server
-===================================================
-เทคนิคที่ปรับปรุงจากต้นฉบับ:
-1. ใช้ Threading แยกกล้องแต่ละตัว (ไม่บล็อกกัน)
-2. เพิ่ม Motion-triggered recognition (ประหยัด CPU)
-3. เพิ่ม Tailgating detection (ตรวจจับการแอบเข้าตาม)
-4. เพิ่ม Snapshot บันทึกภาพทุกครั้งที่มีการเข้า-ออก
+Bunny Door System - Face Recognition + API Server (Lite)
+=========================================================
+ปรับปรุงสำหรับ Raspberry Pi 2GB RAM:
+1. ใช้ Snapshot mode แทน MJPEG streaming (ประหยัด connection + CPU)
+2. ลดความถี่อ่านเฟรม (~5 FPS) และประมวลผลใบหน้าทุก 15 เฟรม
+3. ลดความละเอียดกล้อง 320x240
+4. ไม่ใช้ BackgroundSubtractor (ประหยัด RAM)
 5. Flask API สำหรับสื่อสารกับ PHP Dashboard
-6. ใช้ BackgroundSubtractor MOG2 ตรวจจับการเคลื่อนไหว
 """
 
 import cv2
@@ -24,6 +23,7 @@ from datetime import datetime
 from collections import Counter
 from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
+import face_recognition
 from simple_facerec import SimpleFaceRec
 import config
 
@@ -41,18 +41,10 @@ sfr = SimpleFaceRec(
 )
 sfr.load_encoding_images(config.IMAGES_PATH)
 
-# Background Subtractors สำหรับ motion detection (แต่ละกล้อง)
-bg_sub_outside = cv2.createBackgroundSubtractorMOG2(
-    history=500, varThreshold=50, detectShadows=False
-)
-bg_sub_inside = cv2.createBackgroundSubtractorMOG2(
-    history=500, varThreshold=50, detectShadows=False
-)
-
-# State
+# State (ไม่ใช้ BackgroundSubtractor เพื่อประหยัด RAM)
 system_state = {
-    "camera_outside": {"frame": None, "faces": [], "motion": False, "lock": threading.Lock()},
-    "camera_inside": {"frame": None, "faces": [], "motion": False, "lock": threading.Lock()},
+    "camera_outside": {"jpeg": None, "faces": [], "motion": False, "lock": threading.Lock()},
+    "camera_inside": {"jpeg": None, "faces": [], "motion": False, "lock": threading.Lock()},
     "door_status": "locked",
     "last_motion_outside": 0,
     "last_motion_inside": 0,
@@ -161,8 +153,8 @@ def update_system_status(component, status, ip=None):
 # ============================================================
 _camera_captures = {}  # เก็บ VideoCapture objects สำหรับ cleanup
 
-def camera_thread(camera_id, cam_name, bg_subtractor):
-    """Thread สำหรับประมวลผลกล้องแต่ละตัว"""
+def camera_thread(camera_id, cam_name):
+    """Thread สำหรับประมวลผลกล้องแต่ละตัว (Lite mode สำหรับ Pi 2GB)"""
     print(f"[Camera] Starting {cam_name} (ID: {camera_id})")
 
     cap = cv2.VideoCapture(camera_id)
@@ -171,9 +163,10 @@ def camera_thread(camera_id, cam_name, bg_subtractor):
         update_system_status(cam_name, "OFFLINE")
         return
 
-    _camera_captures[cam_name] = cap  # เก็บไว้สำหรับ cleanup
+    _camera_captures[cam_name] = cap
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
+    cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
     update_system_status(cam_name, "ONLINE")
 
     frame_count = 0
@@ -184,27 +177,20 @@ def camera_thread(camera_id, cam_name, bg_subtractor):
     while system_state["running"]:
         ret, frame = cap.read()
         if not ret:
-            time.sleep(0.1)
+            time.sleep(0.5)
             continue
 
         frame_count += 1
-
-        # Motion detection ด้วย Background Subtraction
-        fg_mask = bg_subtractor.apply(frame)
-        motion_area = cv2.countNonZero(fg_mask)
-        has_motion = motion_area > 5000  # threshold
-
         cam_state = system_state[cam_name]
-        cam_state["motion"] = has_motion
 
-        # Face recognition เฉพาะเมื่อมี motion หรือทุก X เฟรม
-        if has_motion or frame_count % config.PROCESS_EVERY_X_FRAMES == 0:
+        # Face recognition ทุก X เฟรม
+        if frame_count % config.PROCESS_EVERY_X_FRAMES == 0:
             faces, names, confidences = sfr.detect_known_faces(frame)
             last_faces = faces
             last_names = names
             last_confidences = confidences
+            cam_state["motion"] = len(names) > 0
 
-            # ประมวลผลใบหน้าที่ตรวจพบ
             if names:
                 process_detected_faces(
                     frame, faces, names, confidences,
@@ -212,28 +198,25 @@ def camera_thread(camera_id, cam_name, bg_subtractor):
                     cam_name=cam_name
                 )
 
-        # วาดกรอบใบหน้าบนภาพ
-        display_frame = frame.copy()
-        for (top, right, bottom, left), name, conf in zip(last_faces, last_names, last_confidences):
-            color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
-            cv2.rectangle(display_frame, (left, top), (right, bottom), color, 2)
-            label = f"{name} ({conf}%)" if conf > 0 else "Unknown"
-            cv2.putText(display_frame, label, (left, top - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        # วาดกรอบใบหน้า (เฉพาะเมื่อมี)
+        display_frame = frame
+        if last_faces:
+            display_frame = frame.copy()
+            for (top, right, bottom, left), name, conf in zip(last_faces, last_names, last_confidences):
+                color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
+                cv2.rectangle(display_frame, (left, top), (right, bottom), color, 2)
+                label = f"{name} ({conf}%)" if conf > 0 else "Unknown"
+                cv2.putText(display_frame, label, (left, top - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
-        # แสดง motion indicator
-        if has_motion:
-            cv2.putText(display_frame, "MOTION", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-
-        # แสดงจำนวนคน
-        cv2.putText(display_frame, f"Faces: {len(last_names)}", (10, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-
-        # อัปเดต frame สำหรับ streaming
+        # Encode เป็น JPEG เก็บไว้ (ไม่ต้อง stream ตลอด)
+        _, jpeg_buf = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
         with cam_state["lock"]:
-            cam_state["frame"] = display_frame
+            cam_state["jpeg"] = jpeg_buf.tobytes()
             cam_state["faces"] = list(zip(last_names, last_confidences))
+
+        # หน่วงเวลา ~5 FPS เพื่อประหยัด CPU
+        time.sleep(0.2)
 
     cap.release()
     update_system_status(cam_name, "OFFLINE")
@@ -320,21 +303,8 @@ def unlock_door():
 
 
 # ============================================================
-# Video Streaming
+# Snapshot API (แทน MJPEG stream เพื่อประหยัด resource)
 # ============================================================
-def generate_stream(cam_name):
-    """สร้าง MJPEG stream สำหรับ web dashboard"""
-    while system_state["running"]:
-        cam_state = system_state[cam_name]
-        with cam_state["lock"]:
-            frame = cam_state["frame"]
-
-        if frame is not None:
-            _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-        else:
-            time.sleep(0.1)
 
 
 # ============================================================
@@ -346,16 +316,28 @@ def index():
     return jsonify({"system": "Bunny Door System", "status": "running"})
 
 
-@app.route('/api/stream/outside')
-def stream_outside():
-    return Response(generate_stream("camera_outside"),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+@app.route('/api/snapshot/outside')
+def snapshot_outside():
+    """ส่ง JPEG snapshot ล่าสุดจากกล้องด้านนอก"""
+    cam_state = system_state["camera_outside"]
+    with cam_state["lock"]:
+        jpeg = cam_state["jpeg"]
+    if jpeg:
+        return Response(jpeg, mimetype='image/jpeg',
+                        headers={'Cache-Control': 'no-cache, no-store'})
+    return Response(status=204)
 
 
-@app.route('/api/stream/inside')
-def stream_inside():
-    return Response(generate_stream("camera_inside"),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+@app.route('/api/snapshot/inside')
+def snapshot_inside():
+    """ส่ง JPEG snapshot ล่าสุดจากกล้องด้านใน"""
+    cam_state = system_state["camera_inside"]
+    with cam_state["lock"]:
+        jpeg = cam_state["jpeg"]
+    if jpeg:
+        return Response(jpeg, mimetype='image/jpeg',
+                        headers={'Cache-Control': 'no-cache, no-store'})
+    return Response(status=204)
 
 
 @app.route('/api/status')
@@ -647,7 +629,7 @@ if __name__ == "__main__":
     if config.CAMERA_OUTSIDE_ID >= 0:
         t_outside = threading.Thread(
             target=camera_thread,
-            args=(config.CAMERA_OUTSIDE_ID, "camera_outside", bg_sub_outside),
+            args=(config.CAMERA_OUTSIDE_ID, "camera_outside"),
             daemon=True
         )
         t_outside.start()
@@ -657,7 +639,7 @@ if __name__ == "__main__":
     if config.CAMERA_INSIDE_ID >= 0:
         t_inside = threading.Thread(
             target=camera_thread,
-            args=(config.CAMERA_INSIDE_ID, "camera_inside", bg_sub_inside),
+            args=(config.CAMERA_INSIDE_ID, "camera_inside"),
             daemon=True
         )
         t_inside.start()

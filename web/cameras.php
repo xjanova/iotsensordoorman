@@ -39,7 +39,7 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
         </div>
         <div class="stream-container aspect-video relative">
             <?php if ($cam1Online): ?>
-            <img src="<?= FACE_SERVER_URL ?>/api/stream/outside" id="cam1Stream" class="w-full" alt="Camera 1">
+            <img src="<?= FACE_SERVER_URL ?>/api/snapshot/outside" id="cam1Stream" class="w-full" alt="Camera 1">
             <?php else: ?>
             <div class="w-full h-full flex items-center justify-center bg-black/50 aspect-video">
                 <div class="text-center">
@@ -78,7 +78,7 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
         </div>
         <div class="stream-container aspect-video relative">
             <?php if ($cam2Online): ?>
-            <img src="<?= FACE_SERVER_URL ?>/api/stream/inside" id="cam2Stream" class="w-full" alt="Camera 2">
+            <img src="<?= FACE_SERVER_URL ?>/api/snapshot/inside" id="cam2Stream" class="w-full" alt="Camera 2">
             <?php else: ?>
             <div class="w-full h-full flex items-center justify-center bg-black/50 aspect-video">
                 <div class="text-center">
@@ -178,6 +178,15 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
 <script>
 const CAM_SERVER = '<?= FACE_SERVER_URL ?>';
 
+// Refresh snapshot ทุก 3 วินาที (ไม่ใช้ MJPEG stream เพื่อประหยัด resource Pi)
+function refreshSnapshots() {
+    const ts = Date.now();
+    const cam1 = document.getElementById('cam1Stream');
+    const cam2 = document.getElementById('cam2Stream');
+    if (cam1) cam1.src = CAM_SERVER + '/api/snapshot/outside?t=' + ts;
+    if (cam2) cam2.src = CAM_SERVER + '/api/snapshot/inside?t=' + ts;
+}
+
 async function updateCameraStatus() {
     try {
         const data = await fetchAPI(CAM_SERVER + '/api/status');
@@ -212,9 +221,10 @@ async function updateCameraStatus() {
     } catch(e) {}
 }
 
-// Poll ทุก 10 วินาที (ไม่รัว)
+// Snapshot refresh ทุก 3 วินาที, status ทุก 10 วินาที
+setInterval(refreshSnapshots, 3000);
 setInterval(updateCameraStatus, 10000);
-setTimeout(updateCameraStatus, 2000);
+setTimeout(() => { refreshSnapshots(); updateCameraStatus(); }, 1000);
 </script>
 
 <?php include 'includes/footer.php'; ?>
