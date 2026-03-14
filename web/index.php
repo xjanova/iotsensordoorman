@@ -396,33 +396,37 @@ $recentLogs = $stmt->fetchAll();
 // Dashboard Logic (ใช้ PHP render ข้อมูลหลัก, JS เฉพาะ snapshot + door + clock)
 // ============================================================
 
-// Camera snapshots (refresh ทุก 3 วินาที)
-<?php if ($cam1Online || $cam2Online): ?>
-function refreshDashboardSnapshots() {
-    const ts = Date.now();
-    <?php if ($cam1Online): ?>
-    const outImg = new Image();
-    outImg.onload = () => {
-        document.getElementById('streamOutside').src = outImg.src;
-        document.getElementById('streamOutside').style.display = '';
-        document.getElementById('streamOutPlaceholder').style.display = 'none';
-    };
-    outImg.src = FACE_SERVER + '/api/snapshot/outside?t=' + ts;
-    <?php endif; ?>
+// Camera snapshots (refresh ทุก 5 วินาที)
+async function loadSnapshot(camId, imgId, placeholderId, dotId) {
+    try {
+        const resp = await fetch(FACE_SERVER + '/api/snapshot/' + camId + '?t=' + Date.now(), {signal: AbortSignal.timeout(5000)});
+        if (resp.ok && resp.headers.get('content-type')?.includes('image')) {
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const img = document.getElementById(imgId);
+            if (img.dataset.blobUrl) URL.revokeObjectURL(img.dataset.blobUrl);
+            img.dataset.blobUrl = url;
+            img.src = url;
+            img.style.display = '';
+            document.getElementById(placeholderId).style.display = 'none';
+            document.getElementById(dotId).className = 'w-2 h-2 bg-green-400 pulse-dot rounded-full';
+        } else {
+            throw new Error('no image');
+        }
+    } catch {
+        document.getElementById(imgId).style.display = 'none';
+        document.getElementById(placeholderId).style.display = '';
+        document.getElementById(placeholderId).querySelector('p').textContent = 'กล้องออฟไลน์';
+        document.getElementById(dotId).className = 'w-2 h-2 bg-red-400 rounded-full';
+    }
+}
 
-    <?php if ($cam2Online): ?>
-    const inImg = new Image();
-    inImg.onload = () => {
-        document.getElementById('streamInside').src = inImg.src;
-        document.getElementById('streamInside').style.display = '';
-        document.getElementById('streamInPlaceholder').style.display = 'none';
-    };
-    inImg.src = FACE_SERVER + '/api/snapshot/inside?t=' + ts;
-    <?php endif; ?>
+function refreshDashboardSnapshots() {
+    loadSnapshot('outside', 'streamOutside', 'streamOutPlaceholder', 'camOutDot');
+    loadSnapshot('inside', 'streamInside', 'streamInPlaceholder', 'camInDot');
 }
 refreshDashboardSnapshots();
 setInterval(refreshDashboardSnapshots, 5000);
-<?php endif; ?>
 
 // Door controls
 async function unlockDoor() {
