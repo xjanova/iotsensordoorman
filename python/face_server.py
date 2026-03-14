@@ -210,7 +210,7 @@ def camera_thread(camera_id, cam_name):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
         # Encode เป็น JPEG เก็บไว้ (ไม่ต้อง stream ตลอด)
-        _, jpeg_buf = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+        _, jpeg_buf = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 65])
         with cam_state["lock"]:
             cam_state["jpeg"] = jpeg_buf.tobytes()
             cam_state["faces"] = list(zip(last_names, last_confidences))

@@ -28,19 +28,19 @@ DB_NAME = os.environ.get("DB_NAME", "bunny_door")
 # Camera Settings (USB Cameras on Raspberry Pi)
 # ============================================================
 CAMERA_OUTSIDE_ID = int(os.environ.get("CAMERA_OUTSIDE_ID", "0"))   # กล้อง USB ด้านนอก (-1 = ปิด)
-CAMERA_INSIDE_ID = int(os.environ.get("CAMERA_INSIDE_ID", "1"))    # กล้อง USB ด้านใน (-1 = ปิด)
-CAMERA_WIDTH = 320
-CAMERA_HEIGHT = 240
-CAMERA_FPS = 10
+CAMERA_INSIDE_ID = int(os.environ.get("CAMERA_INSIDE_ID", "-1"))   # กล้อง USB ด้านใน (-1 = ปิด)
+CAMERA_WIDTH = 640                     # ความกว้าง (640 = สมดุลระหว่างคุณภาพ/RAM)
+CAMERA_HEIGHT = 480                    # ความสูง
+CAMERA_FPS = 10                        # FPS ของกล้อง
 
 # ============================================================
-# Face Recognition
+# Face Recognition (ปรับสำหรับ Pi 2GB RAM)
 # ============================================================
 IMAGES_PATH = "images/"                # โฟลเดอร์รูปใบหน้า
-FACE_CONFIDENCE_THRESHOLD = 0.6        # ค่า tolerance (ยิ่งต่ำ = ยิ่งเข้มงวด)
-FRAME_RESIZING = 0.25                  # ลดขนาดภาพเป็น 25% เพื่อเพิ่มความเร็ว
-PROCESS_EVERY_X_FRAMES = 15           # ประมวลผลทุก 15 เฟรม (ประหยัด CPU)
-FACE_MODEL = "hog"                     # "hog" (เร็ว, CPU) หรือ "cnn" (แม่นยำ, GPU)
+FACE_CONFIDENCE_THRESHOLD = 0.55       # tolerance (ลดจาก 0.6 → 0.55 เข้มงวดขึ้น ลดผิดพลาด)
+FRAME_RESIZING = 0.5                   # ย่อเป็น 50% → ตรวจจับที่ 320x240 (เดิม 25% = 80x60 เล็กเกินไป!)
+PROCESS_EVERY_X_FRAMES = 8            # ประมวลผลทุก 8 เฟรม (~1.6 วินาที) เร็วขึ้นกว่าเดิม
+FACE_MODEL = "hog"                     # "hog" = เร็ว ใช้ CPU (เหมาะกับ Pi)
 
 # ============================================================
 # ESP32 Communication
