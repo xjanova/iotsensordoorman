@@ -305,6 +305,43 @@ $componentNames = [
 
 </form>
 
+<!-- System Update Section -->
+<div class="glass rounded-2xl p-6 mt-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold flex items-center gap-2">
+            <i class="fas fa-cloud-arrow-down text-cyan-400"></i> อัพเดทระบบ
+        </h3>
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-500">เวอร์ชันปัจจุบัน:</span>
+            <span class="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-sm font-mono font-bold" id="currentVersion">v<?= APP_VERSION ?></span>
+            <span class="text-xs text-gray-500">(build <?= APP_BUILD ?>)</span>
+        </div>
+    </div>
+
+    <!-- Update Status -->
+    <div id="updateStatus" class="bg-white/5 rounded-xl p-4 mb-4">
+        <div class="flex items-center gap-3">
+            <i class="fas fa-circle-info text-gray-400"></i>
+            <span class="text-sm text-gray-400">กดปุ่ม "ตรวจสอบ" เพื่อเช็คเวอร์ชันล่าสุดจาก GitHub</span>
+        </div>
+    </div>
+
+    <!-- Update Log -->
+    <div id="updateLog" class="bg-black/40 rounded-xl p-4 mb-4 hidden max-h-40 overflow-y-auto">
+        <pre id="updateLogText" class="text-xs font-mono text-green-400 whitespace-pre-wrap"></pre>
+    </div>
+
+    <!-- Buttons -->
+    <div class="flex gap-3">
+        <button type="button" onclick="checkUpdate()" id="btnCheck" class="bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-2.5 rounded-xl transition text-sm flex items-center gap-2">
+            <i class="fas fa-magnifying-glass"></i> ตรวจสอบเวอร์ชันล่าสุด
+        </button>
+        <button type="button" onclick="pullUpdate()" id="btnUpdate" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl transition text-sm flex items-center gap-2 hidden">
+            <i class="fas fa-download"></i> อัพเดทเลย
+        </button>
+    </div>
+</div>
+
 <script>
 // ============================================================
 // Tab Switching
@@ -643,6 +680,99 @@ void beep(int times, int duration) {
         document.body.removeChild(ta);
         showToast('สร้างโค้ดสำเร็จ & คัดลอกไปยัง Clipboard แล้ว!', 'success', 4000);
     });
+}
+
+// ============================================================
+// System Update
+// ============================================================
+async function checkUpdate() {
+    const btn = document.getElementById('btnCheck');
+    const status = document.getElementById('updateStatus');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังตรวจสอบ...';
+
+    try {
+        const res = await fetch('api/update.php?action=check');
+        const data = await res.json();
+
+        if (data.success) {
+            const local = data.local;
+            const remote = data.remote;
+
+            if (data.has_update && remote) {
+                status.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-arrow-up text-green-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-green-400">มีเวอร์ชันใหม่!</p>
+                            <p class="text-xs text-gray-400">
+                                <span class="text-gray-500">ปัจจุบัน:</span> v${local?.version || '?'} (build ${local?.build || '?'})
+                                &rarr;
+                                <span class="text-green-400 font-bold">v${remote.version} (build ${remote.build})</span>
+                            </p>
+                            <p class="text-xs text-gray-500 mt-1">${esc(remote.changelog || '')}</p>
+                        </div>
+                    </div>`;
+                document.getElementById('btnUpdate').classList.remove('hidden');
+            } else {
+                status.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-check text-blue-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-blue-400">ระบบเป็นเวอร์ชันล่าสุดแล้ว</p>
+                            <p class="text-xs text-gray-400">v${local?.version || '?'} (build ${local?.build || '?'}) &mdash; ${local?.date || ''}</p>
+                        </div>
+                    </div>`;
+                document.getElementById('btnUpdate').classList.add('hidden');
+            }
+        } else {
+            status.innerHTML = `<div class="flex items-center gap-3"><i class="fas fa-exclamation-triangle text-yellow-400"></i><span class="text-sm text-yellow-400">ไม่สามารถตรวจสอบได้ ลองใหม่อีกครั้ง</span></div>`;
+        }
+    } catch (e) {
+        status.innerHTML = `<div class="flex items-center gap-3"><i class="fas fa-times-circle text-red-400"></i><span class="text-sm text-red-400">เกิดข้อผิดพลาด: ${esc(e.message)}</span></div>`;
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-magnifying-glass"></i> ตรวจสอบเวอร์ชันล่าสุด';
+}
+
+async function pullUpdate() {
+    const btn = document.getElementById('btnUpdate');
+    const log = document.getElementById('updateLog');
+    const logText = document.getElementById('updateLogText');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังอัพเดท...';
+    log.classList.remove('hidden');
+    logText.textContent = 'Running git pull origin main...\n';
+
+    try {
+        const res = await fetch('api/update.php?action=pull', { method: 'POST' });
+        const data = await res.json();
+
+        logText.textContent += (data.output || '') + '\n';
+
+        if (data.success) {
+            const nv = data.new_version;
+            logText.textContent += `\nUpdate successful! v${nv?.version || '?'} (build ${nv?.build || '?'})\n`;
+            showToast('อัพเดทสำเร็จ! v' + (nv?.version || '?') + ' — กำลัง reload...', 'success', 3000);
+            document.getElementById('currentVersion').textContent = 'v' + (nv?.version || '?');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            logText.textContent += '\nError: ' + (data.error || 'Unknown') + '\n';
+            showToast('อัพเดทล้มเหลว: ' + (data.error || ''), 'error');
+        }
+    } catch (e) {
+        logText.textContent += '\nException: ' + e.message + '\n';
+        showToast('เกิดข้อผิดพลาด', 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-download"></i> อัพเดทเลย';
 }
 </script>
 

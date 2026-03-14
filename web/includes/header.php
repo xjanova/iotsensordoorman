@@ -51,7 +51,7 @@
                 </div>
                 <div>
                     <h1 class="text-lg font-bold text-white">Bunny Door</h1>
-                    <p class="text-xs text-gray-400">Access Control v<?= APP_VERSION ?></p>
+                    <p class="text-xs text-gray-400">v<?= APP_VERSION ?> build <?= APP_BUILD ?></p>
                 </div>
             </div>
         </div>

@@ -28,8 +28,14 @@ define('FACE_SERVER_URL', getenv('FACE_SERVER_URL') ?: 'http://localhost:5000');
 
 // Application
 define('APP_NAME', 'Bunny Door System');
-define('APP_VERSION', '2.0');
 define('TIMEZONE', 'Asia/Bangkok');
+
+// Version from version.json
+$_versionFile = realpath(__DIR__ . '/../version.json');
+if (!$_versionFile) $_versionFile = realpath(__DIR__ . '/../../version.json');
+$_versionData = $_versionFile ? json_decode(file_get_contents($_versionFile), true) : [];
+define('APP_VERSION', $_versionData['version'] ?? '2.1.0');
+define('APP_BUILD', $_versionData['build'] ?? 1);
 
 date_default_timezone_set(TIMEZONE);
 

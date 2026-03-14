@@ -1,0 +1,6 @@
+{
+    "version": "2.1.0",
+    "build": 1,
+    "date": "2026-03-14",
+    "changelog": "Update GPIO pins, add system updater"
+}
