@@ -113,7 +113,7 @@ $recentLogs = $stmt->fetchAll();
                 <span class="w-2 h-2 <?= $cam1Online ? 'bg-green-400 pulse-dot' : 'bg-red-400' ?> rounded-full" id="camOutDot"></span>
                 <span class="font-medium">กล้องด้านนอก</span>
             </div>
-            <span class="text-xs <?= $cam1Online ? 'text-green-400' : 'text-red-400' ?>"><?= $cam1Online ? 'ONLINE' : 'OFFLINE' ?></span>
+            <span class="text-xs <?= $cam1Online ? 'text-green-400' : 'text-red-400' ?>" id="camOutStatus"><?= $cam1Online ? 'ONLINE' : 'OFFLINE' ?></span>
         </div>
         <div class="stream-container aspect-video">
             <img id="streamOutside" src="" alt="Camera Outside" class="w-full" style="display:none">
@@ -133,7 +133,7 @@ $recentLogs = $stmt->fetchAll();
                 <span class="w-2 h-2 <?= $cam2Online ? 'bg-green-400 pulse-dot' : 'bg-red-400' ?> rounded-full" id="camInDot"></span>
                 <span class="font-medium">กล้องด้านใน</span>
             </div>
-            <span class="text-xs <?= $cam2Online ? 'text-green-400' : 'text-red-400' ?>"><?= $cam2Online ? 'ONLINE' : 'OFFLINE' ?></span>
+            <span class="text-xs <?= $cam2Online ? 'text-green-400' : 'text-red-400' ?>" id="camInStatus"><?= $cam2Online ? 'ONLINE' : 'OFFLINE' ?></span>
         </div>
         <div class="stream-container aspect-video">
             <img id="streamInside" src="" alt="Camera Inside" class="w-full" style="display:none">
@@ -396,34 +396,44 @@ $recentLogs = $stmt->fetchAll();
 // Dashboard Logic (ใช้ PHP render ข้อมูลหลัก, JS เฉพาะ snapshot + door + clock)
 // ============================================================
 
-// Camera snapshots (refresh ทุก 5 วินาที)
-async function loadSnapshot(camId, imgId, placeholderId, dotId) {
-    try {
-        const resp = await fetch(FACE_SERVER + '/api/snapshot/' + camId + '?t=' + Date.now(), {signal: AbortSignal.timeout(5000)});
-        if (resp.ok && resp.headers.get('content-type')?.includes('image')) {
-            const blob = await resp.blob();
-            const url = URL.createObjectURL(blob);
-            const img = document.getElementById(imgId);
-            if (img.dataset.blobUrl) URL.revokeObjectURL(img.dataset.blobUrl);
-            img.dataset.blobUrl = url;
-            img.src = url;
-            img.style.display = '';
-            document.getElementById(placeholderId).style.display = 'none';
-            document.getElementById(dotId).className = 'w-2 h-2 bg-green-400 pulse-dot rounded-full';
-        } else {
-            throw new Error('no image');
-        }
-    } catch {
-        document.getElementById(imgId).style.display = 'none';
-        document.getElementById(placeholderId).style.display = '';
-        document.getElementById(placeholderId).querySelector('p').textContent = 'กล้องออฟไลน์';
-        document.getElementById(dotId).className = 'w-2 h-2 bg-red-400 rounded-full';
-    }
+// Camera snapshots (refresh ทุก 5 วินาที) — ใช้ Image tag (ไม่ติด CORS)
+function loadSnapshot(camId, imgId, placeholderId, dotId, statusId) {
+    const img = new Image();
+    const timeout = setTimeout(() => {
+        img.src = '';
+        setCamOffline(imgId, placeholderId, dotId, statusId);
+    }, 5000);
+
+    img.onload = () => {
+        clearTimeout(timeout);
+        document.getElementById(imgId).src = img.src;
+        document.getElementById(imgId).style.display = '';
+        document.getElementById(placeholderId).style.display = 'none';
+        document.getElementById(dotId).className = 'w-2 h-2 bg-green-400 pulse-dot rounded-full';
+        const st = document.getElementById(statusId);
+        st.textContent = 'ONLINE';
+        st.className = 'text-xs text-green-400';
+    };
+    img.onerror = () => {
+        clearTimeout(timeout);
+        setCamOffline(imgId, placeholderId, dotId, statusId);
+    };
+    img.src = FACE_SERVER + '/api/snapshot/' + camId + '?t=' + Date.now();
+}
+
+function setCamOffline(imgId, placeholderId, dotId, statusId) {
+    document.getElementById(imgId).style.display = 'none';
+    document.getElementById(placeholderId).style.display = '';
+    document.getElementById(placeholderId).querySelector('p').textContent = 'กล้องออฟไลน์';
+    document.getElementById(dotId).className = 'w-2 h-2 bg-red-400 rounded-full';
+    const st = document.getElementById(statusId);
+    st.textContent = 'OFFLINE';
+    st.className = 'text-xs text-red-400';
 }
 
 function refreshDashboardSnapshots() {
-    loadSnapshot('outside', 'streamOutside', 'streamOutPlaceholder', 'camOutDot');
-    loadSnapshot('inside', 'streamInside', 'streamInPlaceholder', 'camInDot');
+    loadSnapshot('outside', 'streamOutside', 'streamOutPlaceholder', 'camOutDot', 'camOutStatus');
+    loadSnapshot('inside', 'streamInside', 'streamInPlaceholder', 'camInDot', 'camInStatus');
 }
 refreshDashboardSnapshots();
 setInterval(refreshDashboardSnapshots, 5000);
@@ -489,7 +499,7 @@ function formatUptime(seconds) {
 // Fetch Pi health
 async function fetchPiHealth() {
     try {
-        const resp = await fetch(FACE_SERVER + '/api/system/health', {signal: AbortSignal.timeout(5000)});
+        const resp = await fetch('api/pi_health.php', {signal: AbortSignal.timeout(5000)});
         if (!resp.ok) throw new Error();
         const d = await resp.json();
 
