@@ -421,7 +421,7 @@ function refreshDashboardSnapshots() {
     <?php endif; ?>
 }
 refreshDashboardSnapshots();
-setInterval(refreshDashboardSnapshots, 3000);
+setInterval(refreshDashboardSnapshots, 5000);
 <?php endif; ?>
 
 // Door controls
