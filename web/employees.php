@@ -243,8 +243,8 @@ function renderTable(employees) {
             <td class="py-3 px-4">
                 <div class="flex items-center gap-3">
                     ${emp.face_image
-                        ? `<img src="uploads/faces/${esc(emp.face_image)}" class="w-8 h-8 rounded-full object-cover cursor-pointer hover:ring-2 ring-blue-500 transition" onclick="viewPhoto('uploads/faces/${esc(emp.face_image)}', '${esc(emp.first_name)} ${esc(emp.last_name)}')" onerror="this.outerHTML='<div class=\\'w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 text-xs font-bold\\'>${esc(emp.first_name).charAt(0)}</div>'">`
-                        : `<div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 text-xs font-bold">${esc(emp.first_name).charAt(0)}</div>`
+                        ? `<img src="uploads/faces/${esc(emp.face_image)}" class="w-10 h-10 rounded-xl object-cover cursor-pointer hover:ring-2 ring-blue-500 shadow-lg transition" onclick="viewPhoto('uploads/faces/${esc(emp.face_image)}', '${esc(emp.first_name)} ${esc(emp.last_name)}')" onerror="this.outerHTML='<div class=\\'w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 text-sm font-bold\\'>${esc(emp.first_name).charAt(0)}</div>'">`
+                        : `<div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-gray-400 text-sm font-bold">${esc(emp.first_name).charAt(0)}</div>`
                     }
                     <span>${esc(emp.first_name)} ${esc(emp.last_name)}</span>
                 </div>
