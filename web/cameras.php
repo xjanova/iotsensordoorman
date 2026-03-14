@@ -1,10 +1,21 @@
 <?php $pageTitle = 'กล้องวงจรปิด - Bunny Door System'; ?>
 <?php include 'includes/header.php'; ?>
 
+<?php
+// ดึงสถานะกล้องจาก DB
+$db = getDB();
+$camStatus = [];
+foreach ($db->query("SELECT component, status FROM system_status WHERE component LIKE 'camera_%'")->fetchAll() as $row) {
+    $camStatus[$row['component']] = $row['status'];
+}
+$cam1Online = ($camStatus['camera_outside'] ?? '') === 'ONLINE';
+$cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
+?>
+
 <div class="flex justify-between items-center mb-8">
     <div>
         <h2 class="text-2xl font-bold">กล้องวงจรปิด</h2>
-        <p class="text-gray-400 text-sm mt-1">ดูภาพสดจากกล้องทั้ง 2 ตัว พร้อมระบบตรวจจับใบหน้าแบบ Real-time</p>
+        <p class="text-gray-400 text-sm mt-1">ดูภาพสดจากกล้อง พร้อมระบบตรวจจับใบหน้าแบบ Real-time</p>
     </div>
 </div>
 
@@ -14,18 +25,29 @@
     <div class="glass rounded-2xl overflow-hidden">
         <div class="p-4 border-b border-white/10 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <span class="w-3 h-3 bg-green-400 rounded-full pulse-dot"></span>
+                <span class="w-3 h-3 <?= $cam1Online ? 'bg-green-400 pulse-dot' : 'bg-gray-500' ?> rounded-full"></span>
                 <div>
                     <h3 class="font-medium">กล้องด้านนอกประตู</h3>
-                    <p class="text-xs text-gray-400">Camera 1 - USB Port 0</p>
+                    <p class="text-xs text-gray-400">Camera 1 - <?= $cam1Online ? 'ออนไลน์' : 'ออฟไลน์' ?></p>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">LIVE</span>
-            </div>
+            <?php if ($cam1Online): ?>
+            <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">LIVE</span>
+            <?php else: ?>
+            <span class="text-xs bg-gray-500/20 text-gray-400 px-2 py-1 rounded">OFFLINE</span>
+            <?php endif; ?>
         </div>
         <div class="stream-container aspect-video relative">
-            <img src="" id="cam1Stream" class="w-full" alt="Camera 1">
+            <?php if ($cam1Online): ?>
+            <img src="<?= FACE_SERVER_URL ?>/api/stream/outside" id="cam1Stream" class="w-full" alt="Camera 1">
+            <?php else: ?>
+            <div class="w-full h-full flex items-center justify-center bg-black/50 aspect-video">
+                <div class="text-center">
+                    <i class="fas fa-video-slash text-4xl text-gray-600 mb-2"></i>
+                    <p class="text-gray-500 text-sm">กล้องด้านนอกออฟไลน์</p>
+                </div>
+            </div>
+            <?php endif; ?>
             <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                 <div class="flex justify-between items-end">
                     <div>
@@ -42,18 +64,29 @@
     <div class="glass rounded-2xl overflow-hidden">
         <div class="p-4 border-b border-white/10 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <span class="w-3 h-3 bg-green-400 rounded-full pulse-dot"></span>
+                <span class="w-3 h-3 <?= $cam2Online ? 'bg-green-400 pulse-dot' : 'bg-gray-500' ?> rounded-full"></span>
                 <div>
                     <h3 class="font-medium">กล้องด้านในประตู</h3>
-                    <p class="text-xs text-gray-400">Camera 2 - USB Port 1</p>
+                    <p class="text-xs text-gray-400">Camera 2 - <?= $cam2Online ? 'ออนไลน์' : 'ออฟไลน์' ?></p>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                <span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">LIVE</span>
-            </div>
+            <?php if ($cam2Online): ?>
+            <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">LIVE</span>
+            <?php else: ?>
+            <span class="text-xs bg-gray-500/20 text-gray-400 px-2 py-1 rounded">OFFLINE</span>
+            <?php endif; ?>
         </div>
         <div class="stream-container aspect-video relative">
-            <img src="" id="cam2Stream" class="w-full" alt="Camera 2">
+            <?php if ($cam2Online): ?>
+            <img src="<?= FACE_SERVER_URL ?>/api/stream/inside" id="cam2Stream" class="w-full" alt="Camera 2">
+            <?php else: ?>
+            <div class="w-full h-full flex items-center justify-center bg-black/50 aspect-video">
+                <div class="text-center">
+                    <i class="fas fa-video-slash text-4xl text-gray-600 mb-2"></i>
+                    <p class="text-gray-500 text-sm">กล้องด้านในออฟไลน์</p>
+                </div>
+            </div>
+            <?php endif; ?>
             <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                 <div class="flex justify-between items-end">
                     <div>
@@ -144,43 +177,44 @@
 
 <script>
 const CAM_SERVER = '<?= FACE_SERVER_URL ?>';
-document.getElementById('cam1Stream').src = CAM_SERVER + '/api/stream/outside';
-document.getElementById('cam2Stream').src = CAM_SERVER + '/api/stream/inside';
 
 async function updateCameraStatus() {
-    const data = await fetchAPI(CAM_SERVER + '/api/status');
-    if (!data) return;
+    try {
+        const data = await fetchAPI(CAM_SERVER + '/api/status');
+        if (!data) return;
 
-    const co = data.camera_outside;
-    const ci = data.camera_inside;
+        const co = data.camera_outside;
+        const ci = data.camera_inside;
 
-    document.getElementById('cam1Motion').textContent = 'Motion: ' + (co.motion ? 'DETECTED' : 'None');
-    document.getElementById('cam2Motion').textContent = 'Motion: ' + (ci.motion ? 'DETECTED' : 'None');
-    document.getElementById('cam1Faces').textContent = 'Faces: ' + (co.faces?.length || 0);
-    document.getElementById('cam2Faces').textContent = 'Faces: ' + (ci.faces?.length || 0);
+        document.getElementById('cam1Motion').textContent = 'Motion: ' + (co?.motion ? 'DETECTED' : 'None');
+        document.getElementById('cam2Motion').textContent = 'Motion: ' + (ci?.motion ? 'DETECTED' : 'None');
+        document.getElementById('cam1Faces').textContent = 'Faces: ' + (co?.faces?.length || 0);
+        document.getElementById('cam2Faces').textContent = 'Faces: ' + (ci?.faces?.length || 0);
 
-    const now = new Date().toLocaleTimeString('th-TH');
-    document.getElementById('cam1Time').textContent = now;
-    document.getElementById('cam2Time').textContent = now;
+        const now = new Date().toLocaleTimeString('th-TH');
+        document.getElementById('cam1Time').textContent = now;
+        document.getElementById('cam2Time').textContent = now;
 
-    // Detected faces list
-    const allFaces = [...(co.faces || []), ...(ci.faces || [])];
-    const facesDiv = document.getElementById('detectedFaces');
-    if (allFaces.length > 0) {
-        facesDiv.innerHTML = allFaces.map(([name, conf]) => `
-            <div class="flex items-center justify-between p-2 bg-white/5 rounded-lg">
-                <div class="flex items-center gap-2">
-                    <i class="fas ${name === 'Unknown' ? 'fa-user-xmark text-red-400' : 'fa-user-check text-green-400'}"></i>
-                    <span class="text-sm">${esc(name)}</span>
+        // Detected faces list
+        const allFaces = [...(co?.faces || []), ...(ci?.faces || [])];
+        const facesDiv = document.getElementById('detectedFaces');
+        if (allFaces.length > 0) {
+            facesDiv.innerHTML = allFaces.map(([name, conf]) => `
+                <div class="flex items-center justify-between p-2 bg-white/5 rounded-lg">
+                    <div class="flex items-center gap-2">
+                        <i class="fas ${name === 'Unknown' ? 'fa-user-xmark text-red-400' : 'fa-user-check text-green-400'}"></i>
+                        <span class="text-sm">${esc(name)}</span>
+                    </div>
+                    <span class="text-xs text-gray-400">${parseFloat(conf) || 0}%</span>
                 </div>
-                <span class="text-xs text-gray-400">${parseFloat(conf) || 0}%</span>
-            </div>
-        `).join('');
-    }
+            `).join('');
+        }
+    } catch(e) {}
 }
 
-setInterval(updateCameraStatus, 3000);
-updateCameraStatus();
+// Poll ทุก 10 วินาที (ไม่รัว)
+setInterval(updateCameraStatus, 10000);
+setTimeout(updateCameraStatus, 2000);
 </script>
 
 <?php include 'includes/footer.php'; ?>
