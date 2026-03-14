@@ -199,6 +199,139 @@ $recentLogs = $stmt->fetchAll();
     </div>
 </div>
 
+<!-- Hardware Health Monitor -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <!-- Raspberry Pi Monitor (2 cols) -->
+    <div class="lg:col-span-2 glass rounded-2xl p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="font-medium flex items-center gap-2">
+                <i class="fas fa-microchip text-green-400"></i> Raspberry Pi
+            </h3>
+            <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-500" id="piUptime">-</span>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400" id="piStatusBadge">OFFLINE</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <!-- CPU Temperature -->
+            <div class="text-center">
+                <div class="relative w-24 h-24 mx-auto mb-2">
+                    <svg class="w-24 h-24 -rotate-90" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+                        <circle id="tempRing" cx="60" cy="60" r="52" fill="none" stroke="#ef4444" stroke-width="8"
+                                stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span class="text-xl font-bold" id="piTemp">-</span>
+                        <span class="text-[10px] text-gray-400">°C</span>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400"><i class="fas fa-temperature-half text-red-400 mr-1"></i>อุณหภูมิ</p>
+            </div>
+
+            <!-- CPU Usage -->
+            <div class="text-center">
+                <div class="relative w-24 h-24 mx-auto mb-2">
+                    <svg class="w-24 h-24 -rotate-90" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+                        <circle id="cpuRing" cx="60" cy="60" r="52" fill="none" stroke="#3b82f6" stroke-width="8"
+                                stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span class="text-xl font-bold" id="piCpu">-</span>
+                        <span class="text-[10px] text-gray-400">%</span>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400"><i class="fas fa-gauge-high text-blue-400 mr-1"></i>CPU</p>
+            </div>
+
+            <!-- RAM Usage -->
+            <div class="text-center">
+                <div class="relative w-24 h-24 mx-auto mb-2">
+                    <svg class="w-24 h-24 -rotate-90" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+                        <circle id="ramRing" cx="60" cy="60" r="52" fill="none" stroke="#a855f7" stroke-width="8"
+                                stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span class="text-xl font-bold" id="piRam">-</span>
+                        <span class="text-[10px] text-gray-400">%</span>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400"><i class="fas fa-memory text-purple-400 mr-1"></i>RAM</p>
+                <p class="text-[10px] text-gray-500 mt-0.5" id="piRamDetail">-</p>
+            </div>
+
+            <!-- Disk Usage -->
+            <div class="text-center">
+                <div class="relative w-24 h-24 mx-auto mb-2">
+                    <svg class="w-24 h-24 -rotate-90" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+                        <circle id="diskRing" cx="60" cy="60" r="52" fill="none" stroke="#f59e0b" stroke-width="8"
+                                stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span class="text-xl font-bold" id="piDisk">-</span>
+                        <span class="text-[10px] text-gray-400">%</span>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400"><i class="fas fa-hard-drive text-yellow-400 mr-1"></i>Disk</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ESP32 Monitor (1 col) -->
+    <div class="glass rounded-2xl p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="font-medium flex items-center gap-2">
+                <i class="fas fa-wifi text-cyan-400"></i> ESP32
+            </h3>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400" id="espStatusBadge">OFFLINE</span>
+        </div>
+        <div class="space-y-4">
+            <!-- WiFi Signal Gauge -->
+            <div class="text-center">
+                <div class="relative w-24 h-24 mx-auto mb-2">
+                    <svg class="w-24 h-24 -rotate-90" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+                        <circle id="wifiRing" cx="60" cy="60" r="52" fill="none" stroke="#06b6d4" stroke-width="8"
+                                stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span class="text-xl font-bold" id="espRssi">-</span>
+                        <span class="text-[10px] text-gray-400">dBm</span>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400"><i class="fas fa-signal text-cyan-400 mr-1"></i>WiFi Signal</p>
+            </div>
+
+            <!-- ESP32 Info -->
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400"><i class="fas fa-door-closed mr-2 w-4 text-center"></i>ประตู</span>
+                    <span id="espDoor" class="text-gray-300">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400"><i class="fas fa-clock mr-2 w-4 text-center"></i>Uptime</span>
+                    <span id="espUptime" class="text-gray-300">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400"><i class="fas fa-network-wired mr-2 w-4 text-center"></i>IP</span>
+                    <span id="espIp" class="text-gray-300">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400"><i class="fas fa-eye mr-2 w-4 text-center"></i>PIR นอก</span>
+                    <span id="espPirOut" class="text-gray-300">-</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-400"><i class="fas fa-eye mr-2 w-4 text-center"></i>PIR ใน</span>
+                    <span id="espPirIn" class="text-gray-300">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Recent Logs -->
 <div class="glass rounded-2xl p-6">
     <div class="flex justify-between items-center mb-4">
@@ -320,8 +453,135 @@ function updateClock() {
 updateClock();
 setInterval(updateClock, 1000);
 
-// Auto-refresh page ทุก 30 วินาที เพื่ออัปเดตสถิติ/สถานะจาก DB
-setTimeout(() => location.reload(), 30000);
+// ============================================================
+// Hardware Health Monitor (Pi + ESP32)
+// ============================================================
+const CIRC = 327; // 2 * PI * 52
+
+function setRing(id, percent, color) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const offset = CIRC * (1 - Math.min(percent, 100) / 100);
+    el.setAttribute('stroke-dashoffset', offset);
+    if (color) el.setAttribute('stroke', color);
+}
+
+function colorByPercent(val, thresholds) {
+    // thresholds: [green, yellow, red] e.g. [50, 75] => <50 green, 50-75 yellow, >75 red
+    if (val < thresholds[0]) return '#22c55e';
+    if (val < thresholds[1]) return '#f59e0b';
+    return '#ef4444';
+}
+
+function formatUptime(seconds) {
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return d + 'ว ' + h + 'ชม';
+    if (h > 0) return h + 'ชม ' + m + 'น';
+    return m + ' นาที';
+}
+
+// Fetch Pi health
+async function fetchPiHealth() {
+    try {
+        const resp = await fetch(FACE_SERVER + '/api/system/health', {signal: AbortSignal.timeout(5000)});
+        if (!resp.ok) throw new Error();
+        const d = await resp.json();
+
+        // Temperature ring (max 85°C scale)
+        const temp = d.cpu_temp ?? 0;
+        const tempPct = Math.min(temp / 85 * 100, 100);
+        document.getElementById('piTemp').textContent = temp ? temp.toFixed(1) : '-';
+        setRing('tempRing', tempPct, colorByPercent(temp, [55, 70]));
+
+        // CPU ring
+        document.getElementById('piCpu').textContent = d.cpu_percent.toFixed(0);
+        setRing('cpuRing', d.cpu_percent, colorByPercent(d.cpu_percent, [50, 80]));
+
+        // RAM ring
+        document.getElementById('piRam').textContent = d.ram_percent.toFixed(0);
+        setRing('ramRing', d.ram_percent, colorByPercent(d.ram_percent, [60, 85]));
+        document.getElementById('piRamDetail').textContent = d.ram_used_mb + ' / ' + d.ram_total_mb + ' MB';
+
+        // Disk ring
+        document.getElementById('piDisk').textContent = d.disk_percent.toFixed(0);
+        setRing('diskRing', d.disk_percent, colorByPercent(d.disk_percent, [70, 90]));
+
+        // Uptime
+        document.getElementById('piUptime').textContent = 'Uptime: ' + formatUptime(d.uptime);
+
+        // Status badge
+        const badge = document.getElementById('piStatusBadge');
+        badge.textContent = 'ONLINE';
+        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400';
+    } catch {
+        const badge = document.getElementById('piStatusBadge');
+        badge.textContent = 'OFFLINE';
+        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400';
+    }
+}
+
+// Fetch ESP32 health
+async function fetchEspHealth() {
+    try {
+        const resp = await fetch(FACE_SERVER + '/api/esp32/health', {signal: AbortSignal.timeout(5000)});
+        if (!resp.ok) throw new Error();
+        const d = await resp.json();
+
+        const badge = document.getElementById('espStatusBadge');
+        if (!d.online) {
+            badge.textContent = 'OFFLINE';
+            badge.className = 'text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400';
+            setRing('wifiRing', 0);
+            return;
+        }
+
+        badge.textContent = 'ONLINE';
+        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400';
+
+        // WiFi signal ring (RSSI: -30 best, -90 worst)
+        const rssi = d.rssi ?? -90;
+        const wifiPct = Math.max(0, Math.min(100, (rssi + 90) / 60 * 100));
+        document.getElementById('espRssi').textContent = rssi;
+        setRing('wifiRing', wifiPct, wifiPct > 60 ? '#22c55e' : wifiPct > 30 ? '#f59e0b' : '#ef4444');
+
+        // Door status
+        const doorEl = document.getElementById('espDoor');
+        if (d.door === 'locked') {
+            doorEl.innerHTML = '<span class="text-red-400"><i class="fas fa-lock mr-1"></i>ล็อก</span>';
+        } else {
+            doorEl.innerHTML = '<span class="text-green-400"><i class="fas fa-lock-open mr-1"></i>เปิด</span>';
+        }
+
+        // Uptime
+        document.getElementById('espUptime').textContent = formatUptime(d.uptime_sec ?? 0);
+
+        // IP
+        document.getElementById('espIp').textContent = d.ip ?? '-';
+
+        // PIR sensors
+        document.getElementById('espPirOut').innerHTML = d.pir_outside
+            ? '<span class="text-yellow-400"><i class="fas fa-circle text-[8px] mr-1"></i>ตรวจจับ</span>'
+            : '<span class="text-gray-500">ปกติ</span>';
+        document.getElementById('espPirIn').innerHTML = d.pir_inside
+            ? '<span class="text-yellow-400"><i class="fas fa-circle text-[8px] mr-1"></i>ตรวจจับ</span>'
+            : '<span class="text-gray-500">ปกติ</span>';
+    } catch {
+        const badge = document.getElementById('espStatusBadge');
+        badge.textContent = 'OFFLINE';
+        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400';
+    }
+}
+
+// Poll both
+fetchPiHealth();
+fetchEspHealth();
+setInterval(fetchPiHealth, 5000);
+setInterval(fetchEspHealth, 5000);
+
+// Auto-refresh page ทุก 60 วินาที เพื่ออัปเดตสถิติ/สถานะจาก DB
+setTimeout(() => location.reload(), 60000);
 </script>
 
 <?php include 'includes/footer.php'; ?>

@@ -444,13 +444,18 @@ function resetPhotoArea() {
     currentUploadedFile = null;
 }
 
-function showAddModal() {
+async function showAddModal() {
     document.getElementById('modalTitle').textContent = 'เพิ่มพนักงาน';
     document.getElementById('employeeForm').reset();
     document.getElementById('formId').value = '';
     document.getElementById('formFaceImage').value = '';
     document.getElementById('formAuthorized').checked = true;
     resetPhotoArea();
+    // Auto-generate emp_code
+    try {
+        const res = await fetchAPI('api/employees.php?next_code=1');
+        if (res?.next_code) document.getElementById('formEmpCode').value = res.next_code;
+    } catch {}
     document.getElementById('employeeModal').classList.remove('hidden');
 }
 

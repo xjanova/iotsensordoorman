@@ -539,6 +539,61 @@ def api_stats():
 
 
 # ============================================================
+# System Health API (CPU, RAM, Temperature ของ Raspberry Pi)
+# ============================================================
+@app.route('/api/system/health')
+def api_system_health():
+    """ส่งข้อมูล CPU/RAM/Temperature ของ Raspberry Pi"""
+    import psutil
+
+    # CPU usage (%)
+    cpu_percent = psutil.cpu_percent(interval=0.5)
+
+    # RAM usage
+    mem = psutil.virtual_memory()
+    ram_total_mb = round(mem.total / (1024 * 1024))
+    ram_used_mb = round(mem.used / (1024 * 1024))
+    ram_percent = mem.percent
+
+    # CPU Temperature (Raspberry Pi)
+    cpu_temp = None
+    try:
+        with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
+            cpu_temp = round(int(f.read().strip()) / 1000, 1)
+    except Exception:
+        pass
+
+    # Disk usage
+    disk = psutil.disk_usage('/')
+    disk_percent = disk.percent
+
+    return jsonify({
+        "cpu_percent": cpu_percent,
+        "ram_total_mb": ram_total_mb,
+        "ram_used_mb": ram_used_mb,
+        "ram_percent": ram_percent,
+        "cpu_temp": cpu_temp,
+        "disk_percent": disk_percent,
+        "uptime": round(time.time() - psutil.boot_time()),
+    })
+
+
+# ============================================================
+# ESP32 Health API (proxy ดึงข้อมูลจาก ESP32)
+# ============================================================
+@app.route('/api/esp32/health')
+def api_esp32_health():
+    """ดึงข้อมูล ESP32 status (door, uptime, rssi, ip)"""
+    try:
+        resp = requests.get(config.ESP32_STATUS_URL, timeout=3)
+        data = resp.json()
+        data["online"] = True
+        return jsonify(data)
+    except Exception:
+        return jsonify({"online": False, "error": "ESP32 ไม่ตอบสนอง"})
+
+
+# ============================================================
 # Face Validation API (for photo upload)
 # ============================================================
 @app.route('/api/face/validate', methods=['POST'])

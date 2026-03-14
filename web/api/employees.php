@@ -23,6 +23,18 @@ try {
 
     switch ($method) {
         case 'GET':
+            // Generate next emp_code
+            if (isset($_GET['next_code'])) {
+                $stmt = $db->query("SELECT emp_code FROM employees WHERE emp_code LIKE 'EMP%' ORDER BY emp_code DESC LIMIT 1");
+                $last = $stmt->fetch();
+                if ($last && preg_match('/^EMP(\d+)$/', $last['emp_code'], $m)) {
+                    $next = 'EMP' . str_pad(intval($m[1]) + 1, 3, '0', STR_PAD_LEFT);
+                } else {
+                    $next = 'EMP001';
+                }
+                jsonResponse(['next_code' => $next]);
+            }
+
             $stmt = $db->query("SELECT * FROM employees ORDER BY emp_code");
             jsonResponse($stmt->fetchAll());
             break;
