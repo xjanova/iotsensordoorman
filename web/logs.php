@@ -88,9 +88,11 @@ async function loadLogs() {
     `).join('');
 }
 
-document.getElementById('filterDate').addEventListener('change', loadLogs);
-document.getElementById('filterDirection').addEventListener('change', loadLogs);
-loadLogs();
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('filterDate').addEventListener('change', loadLogs);
+    document.getElementById('filterDirection').addEventListener('change', loadLogs);
+    loadLogs();
+});
 </script>
 
 <?php include 'includes/footer.php'; ?>

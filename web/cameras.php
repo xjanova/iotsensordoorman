@@ -222,9 +222,12 @@ async function updateCameraStatus() {
 }
 
 // Snapshot refresh ทุก 3 วินาที, status ทุก 10 วินาที
-setInterval(refreshSnapshots, 3000);
-setInterval(updateCameraStatus, 10000);
-setTimeout(() => { refreshSnapshots(); updateCameraStatus(); }, 1000);
+document.addEventListener('DOMContentLoaded', () => {
+    refreshSnapshots();
+    updateCameraStatus();
+    setInterval(refreshSnapshots, 3000);
+    setInterval(updateCameraStatus, 10000);
+});
 </script>
 
 <?php include 'includes/footer.php'; ?>

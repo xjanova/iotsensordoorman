@@ -73,8 +73,10 @@ async function checkServerStatus() {
         text.textContent = 'Server Offline';
     }
 }
-setInterval(checkServerStatus, 10000);
-checkServerStatus();
+document.addEventListener('DOMContentLoaded', () => {
+    checkServerStatus();
+    setInterval(checkServerStatus, 10000);
+});
 
 // XSS protection - escape HTML in user data
 function esc(str) {

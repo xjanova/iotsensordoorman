@@ -94,7 +94,7 @@ async function resolveAlert(id) {
     loadAlerts('unresolved');
 }
 
-loadAlerts('unresolved');
+document.addEventListener('DOMContentLoaded', () => loadAlerts('unresolved'));
 </script>
 
 <?php include 'includes/footer.php'; ?>
