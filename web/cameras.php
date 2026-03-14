@@ -143,11 +143,12 @@
 </div>
 
 <script>
-document.getElementById('cam1Stream').src = FACE_SERVER + '/api/stream/outside';
-document.getElementById('cam2Stream').src = FACE_SERVER + '/api/stream/inside';
+const CAM_SERVER = '<?= FACE_SERVER_URL ?>';
+document.getElementById('cam1Stream').src = CAM_SERVER + '/api/stream/outside';
+document.getElementById('cam2Stream').src = CAM_SERVER + '/api/stream/inside';
 
 async function updateCameraStatus() {
-    const data = await fetchAPI(FACE_SERVER + '/api/status');
+    const data = await fetchAPI(CAM_SERVER + '/api/status');
     if (!data) return;
 
     const co = data.camera_outside;
