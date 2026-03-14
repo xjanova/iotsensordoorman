@@ -435,8 +435,10 @@ function refreshDashboardSnapshots() {
     loadSnapshot('outside', 'streamOutside', 'streamOutPlaceholder', 'camOutDot', 'camOutStatus');
     loadSnapshot('inside', 'streamInside', 'streamInPlaceholder', 'camInDot', 'camInStatus');
 }
-refreshDashboardSnapshots();
-setInterval(refreshDashboardSnapshots, 5000);
+document.addEventListener('DOMContentLoaded', () => {
+    refreshDashboardSnapshots();
+    setInterval(refreshDashboardSnapshots, 5000);
+});
 
 // Door controls
 async function unlockDoor() {
@@ -464,9 +466,6 @@ function updateClock() {
     document.getElementById('currentTime').textContent =
         new Date().toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'medium' });
 }
-updateClock();
-setInterval(updateClock, 1000);
-
 // ============================================================
 // Hardware Health Monitor (Pi + ESP32)
 // ============================================================
@@ -588,14 +587,18 @@ async function fetchEspHealth() {
     }
 }
 
-// Poll both
-fetchPiHealth();
-fetchEspHealth();
-setInterval(fetchPiHealth, 5000);
-setInterval(fetchEspHealth, 5000);
+// Poll both (รอ footer.php โหลด FACE_SERVER ก่อน)
+document.addEventListener('DOMContentLoaded', () => {
+    fetchPiHealth();
+    fetchEspHealth();
+    setInterval(fetchPiHealth, 5000);
+    setInterval(fetchEspHealth, 5000);
+    updateClock();
+    setInterval(updateClock, 1000);
 
-// Auto-refresh page ทุก 60 วินาที เพื่ออัปเดตสถิติ/สถานะจาก DB
-setTimeout(() => location.reload(), 60000);
+    // Auto-refresh page ทุก 60 วินาที
+    setTimeout(() => location.reload(), 60000);
+});
 </script>
 
 <?php include 'includes/footer.php'; ?>
