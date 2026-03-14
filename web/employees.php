@@ -395,18 +395,26 @@ function showFaceValidation(data) {
     }
 
     if (data.valid) {
-        // Face detected successfully
-        icon.innerHTML = '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20"><i class="fas fa-face-smile text-green-400 text-xs"></i></span>';
-        msg.className = 'text-xs text-center mt-1 leading-tight text-green-400';
-        let text = 'ตรวจพบใบหน้า ใช้งานได้';
-        if (data.face_ratio) text += ` (${data.face_ratio}%)`;
-        if (data.quality_notes && data.quality_notes.length > 0) {
-            msg.className = 'text-xs text-center mt-1 leading-tight text-yellow-400';
-            text = data.quality_notes[0];
+        const ratio = data.face_ratio || 0;
+        // ถ้าใบหน้าเล็กเกินไป (< 3%) = ใช้ไม่ได้
+        if (ratio < 3) {
+            icon.innerHTML = '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500/20"><i class="fas fa-face-frown text-red-400 text-xs"></i></span>';
+            msg.className = 'text-xs text-center mt-1 leading-tight text-red-400';
+            msg.textContent = `ใบหน้าเล็กเกินไป (${ratio}%) ถ่ายใกล้กว่านี้`;
+            showToast('รูปใช้ไม่ได้ — ใบหน้าเล็กเกินไป ควรถ่ายใกล้ๆ หน้าตรง', 'error');
+        } else if (ratio < 8 || (data.quality_notes && data.quality_notes.length > 0)) {
+            // คุณภาพพอใช้ แต่ไม่ดีนัก
             icon.innerHTML = '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500/20"><i class="fas fa-face-meh text-yellow-400 text-xs"></i></span>';
+            msg.className = 'text-xs text-center mt-1 leading-tight text-yellow-400';
+            msg.textContent = data.quality_notes?.[0] || `ใบหน้าค่อนข้างเล็ก (${ratio}%) แนะนำถ่ายใกล้ขึ้น`;
+            showToast('รูปใช้ได้แต่คุณภาพไม่ดีนัก อาจจดจำผิดพลาด', 'warning');
+        } else {
+            // คุณภาพดี
+            icon.innerHTML = '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20"><i class="fas fa-face-smile text-green-400 text-xs"></i></span>';
+            msg.className = 'text-xs text-center mt-1 leading-tight text-green-400';
+            msg.textContent = `ใบหน้าชัดเจน (${ratio}%) ใช้งานได้ดี`;
+            showToast('รูปใบหน้าคุณภาพดี ใช้งานได้!', 'success');
         }
-        msg.textContent = text;
-        showToast('ตรวจพบใบหน้าในรูปภาพ สามารถใช้งานได้', 'success');
     } else {
         // No face or multiple faces
         icon.innerHTML = '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500/20"><i class="fas fa-face-frown text-red-400 text-xs"></i></span>';
