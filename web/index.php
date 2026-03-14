@@ -1,6 +1,17 @@
 <?php $pageTitle = 'Dashboard - Bunny Door System'; ?>
 <?php include 'includes/header.php'; ?>
 
+<?php
+// ดึงสถานะกล้องจาก DB
+$db = getDB();
+$camStatus = [];
+foreach ($db->query("SELECT component, status FROM system_status WHERE component LIKE 'camera_%'")->fetchAll() as $row) {
+    $camStatus[$row['component']] = $row['status'];
+}
+$cam1Online = ($camStatus['camera_outside'] ?? '') === 'ONLINE';
+$cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
+?>
+
 <!-- Page Header -->
 <div class="flex justify-between items-center mb-8">
     <div>
@@ -76,17 +87,17 @@
     <div class="glass rounded-2xl overflow-hidden card-hover">
         <div class="p-4 border-b border-white/10 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 bg-green-400 rounded-full pulse-dot" id="camOutDot"></span>
+                <span class="w-2 h-2 <?= $cam1Online ? 'bg-green-400 pulse-dot' : 'bg-red-400' ?> rounded-full" id="camOutDot"></span>
                 <span class="font-medium">กล้องด้านนอก</span>
             </div>
-            <span class="text-xs text-gray-400">Camera 1</span>
+            <span class="text-xs <?= $cam1Online ? 'text-green-400' : 'text-red-400' ?>"><?= $cam1Online ? 'ONLINE' : 'OFFLINE' ?></span>
         </div>
         <div class="stream-container aspect-video">
             <img id="streamOutside" src="" alt="Camera Outside" class="w-full" style="display:none">
             <div id="streamOutPlaceholder" class="absolute inset-0 flex items-center justify-center bg-gray-800">
                 <div class="text-center text-gray-500">
                     <i class="fas fa-video-slash text-3xl mb-2"></i>
-                    <p class="text-sm">กล้องไม่พร้อมใช้งาน</p>
+                    <p class="text-sm"><?= $cam1Online ? 'กำลังโหลด...' : 'กล้องออฟไลน์' ?></p>
                 </div>
             </div>
         </div>
@@ -96,17 +107,17 @@
     <div class="glass rounded-2xl overflow-hidden card-hover">
         <div class="p-4 border-b border-white/10 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 bg-green-400 rounded-full pulse-dot" id="camInDot"></span>
+                <span class="w-2 h-2 <?= $cam2Online ? 'bg-green-400 pulse-dot' : 'bg-red-400' ?> rounded-full" id="camInDot"></span>
                 <span class="font-medium">กล้องด้านใน</span>
             </div>
-            <span class="text-xs text-gray-400">Camera 2</span>
+            <span class="text-xs <?= $cam2Online ? 'text-green-400' : 'text-red-400' ?>"><?= $cam2Online ? 'ONLINE' : 'OFFLINE' ?></span>
         </div>
         <div class="stream-container aspect-video">
             <img id="streamInside" src="" alt="Camera Inside" class="w-full" style="display:none">
             <div id="streamInPlaceholder" class="absolute inset-0 flex items-center justify-center bg-gray-800">
                 <div class="text-center text-gray-500">
                     <i class="fas fa-video-slash text-3xl mb-2"></i>
-                    <p class="text-sm">กล้องไม่พร้อมใช้งาน</p>
+                    <p class="text-sm"><?= $cam2Online ? 'กำลังโหลด...' : 'กล้องออฟไลน์' ?></p>
                 </div>
             </div>
         </div>
