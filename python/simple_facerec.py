@@ -32,6 +32,13 @@ class SimpleFaceRec:
         self.tolerance = tolerance
         self._lock = threading.Lock()
 
+    def reload_images(self, images_path: str) -> int:
+        """ล้างข้อมูลเก่าแล้วโหลดใหม่ทั้งหมด"""
+        with self._lock:
+            self.known_face_encodings.clear()
+            self.known_face_names.clear()
+        return self.load_encoding_images(images_path)
+
     def load_encoding_images(self, images_path: str) -> int:
         """
         โหลดรูปภาพจากโฟลเดอร์แล้วเข้ารหัสใบหน้า

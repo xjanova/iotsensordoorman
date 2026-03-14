@@ -661,20 +661,25 @@ def api_capture_save():
     # Encode เป็น JPEG แล้วส่ง base64 กลับ (ให้ PHP proxy บันทึกไฟล์เอง)
     import re, base64
     safe_code = re.sub(r'[^A-Za-z0-9\-]', '', emp_code) or 'capture'
-    filename = f"{safe_code}_{int(time.time())}.jpg"
+    filename = f"{safe_code}.jpg"
+    web_filename = f"{safe_code}_{int(time.time())}.jpg"
 
     _, jpg_buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
     img_base64 = base64.b64encode(jpg_buf.tobytes()).decode('utf-8')
 
-    # บันทึกไว้บน Pi ด้วย (สำหรับ face recognition images)
+    # บันทึกไว้บน Pi — ใช้ emp_code.jpg เพื่อให้ face recognition จำชื่อได้
     save_dir = os.path.join(os.path.dirname(__file__), 'images')
     os.makedirs(save_dir, exist_ok=True)
     filepath = os.path.join(save_dir, filename)
     cv2.imwrite(filepath, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
+    # Reload face encodings อัตโนมัติ
+    loaded = sfr.reload_images(config.IMAGES_PATH)
+    print(f"[Capture] Saved {filename} → reloaded {loaded} faces")
+
     return jsonify({
         "success": True,
-        "filename": filename,
+        "filename": web_filename,
         "face_ratio": face_ratio,
         "face_size": {"width": face_w, "height": face_h},
         "valid": True,
@@ -756,6 +761,21 @@ def api_face_validate():
         "message": "พบใบหน้า 1 ใบหน้า สามารถใช้งานได้" + (
             " (คำแนะนำ: " + ", ".join(quality_notes) + ")" if quality_notes else ""
         )
+    })
+
+
+# ============================================================
+# Face Reload API
+# ============================================================
+@app.route('/api/face/reload', methods=['POST'])
+def api_face_reload():
+    """โหลดใบหน้าใหม่จากโฟลเดอร์ images/ (เรียกหลังเพิ่ม/ลบรูป)"""
+    loaded = sfr.reload_images(config.IMAGES_PATH)
+    return jsonify({
+        "success": True,
+        "faces_loaded": loaded,
+        "known_names": sfr.known_face_names,
+        "message": f"โหลดใบหน้าใหม่สำเร็จ {loaded} ใบหน้า"
     })
 
 
