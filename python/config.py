@@ -27,8 +27,8 @@ DB_NAME = os.environ.get("DB_NAME", "bunny_door")
 # ============================================================
 # Camera Settings (USB Cameras on Raspberry Pi)
 # ============================================================
-CAMERA_OUTSIDE_ID = 0     # กล้อง USB ตัวที่ 1 (ด้านนอก)
-CAMERA_INSIDE_ID = 1      # กล้อง USB ตัวที่ 2 (ด้านใน)
+CAMERA_OUTSIDE_ID = int(os.environ.get("CAMERA_OUTSIDE_ID", "0"))   # กล้อง USB ด้านนอก (-1 = ปิด)
+CAMERA_INSIDE_ID = int(os.environ.get("CAMERA_INSIDE_ID", "1"))    # กล้อง USB ด้านใน (-1 = ปิด)
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
 CAMERA_FPS = 30

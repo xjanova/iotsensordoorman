@@ -638,20 +638,26 @@ if __name__ == "__main__":
     update_system_status("face_server", "ONLINE")
     update_system_status("raspberry_pi", "ONLINE")
 
-    # เริ่ม camera threads
-    t_outside = threading.Thread(
-        target=camera_thread,
-        args=(config.CAMERA_OUTSIDE_ID, "camera_outside", bg_sub_outside),
-        daemon=True
-    )
-    t_inside = threading.Thread(
-        target=camera_thread,
-        args=(config.CAMERA_INSIDE_ID, "camera_inside", bg_sub_inside),
-        daemon=True
-    )
+    # เริ่ม camera threads (ข้ามถ้า ID = -1)
+    if config.CAMERA_OUTSIDE_ID >= 0:
+        t_outside = threading.Thread(
+            target=camera_thread,
+            args=(config.CAMERA_OUTSIDE_ID, "camera_outside", bg_sub_outside),
+            daemon=True
+        )
+        t_outside.start()
+    else:
+        print("[Camera] camera_outside disabled (ID=-1)")
 
-    t_outside.start()
-    t_inside.start()
+    if config.CAMERA_INSIDE_ID >= 0:
+        t_inside = threading.Thread(
+            target=camera_thread,
+            args=(config.CAMERA_INSIDE_ID, "camera_inside", bg_sub_inside),
+            daemon=True
+        )
+        t_inside.start()
+    else:
+        print("[Camera] camera_inside disabled (ID=-1)")
 
     print(f"[Server] Starting Flask API on {config.API_HOST}:{config.API_PORT}")
 
