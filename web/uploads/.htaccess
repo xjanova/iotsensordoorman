@@ -1,0 +1,12 @@
+# Allow only image files
+<FilesMatch "\.(jpg|jpeg|png|webp|gif)$">
+    Require all granted
+</FilesMatch>
+
+# Block everything else
+<FilesMatch "\.php$">
+    Require all denied
+</FilesMatch>
+
+# Disable PHP execution
+php_flag engine off

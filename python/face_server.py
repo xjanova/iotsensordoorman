@@ -552,6 +552,81 @@ def api_stats():
 
 
 # ============================================================
+# Face Validation API (for photo upload)
+# ============================================================
+@app.route('/api/face/validate', methods=['POST'])
+def api_face_validate():
+    """ตรวจสอบว่ารูปที่อัพโหลดมีใบหน้าหรือไม่ และใบหน้าใช้งานได้ดีหรือไม่"""
+    if 'photo' not in request.files:
+        return jsonify({"error": "No photo provided"}), 400
+
+    file = request.files['photo']
+    file_bytes = np.frombuffer(file.read(), np.uint8)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+    if img is None:
+        return jsonify({
+            "valid": False,
+            "faces_found": 0,
+            "message": "ไม่สามารถอ่านไฟล์รูปภาพได้"
+        })
+
+    rgb_img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    # Detect faces
+    face_locations = face_recognition.face_locations(rgb_img, model="hog")
+    face_count = len(face_locations)
+
+    if face_count == 0:
+        return jsonify({
+            "valid": False,
+            "faces_found": 0,
+            "message": "ไม่พบใบหน้าในรูปภาพ กรุณาอัพโหลดรูปที่เห็นใบหน้าชัดเจน"
+        })
+
+    if face_count > 1:
+        return jsonify({
+            "valid": False,
+            "faces_found": face_count,
+            "message": f"พบ {face_count} ใบหน้าในรูป กรุณาอัพโหลดรูปที่มีเพียง 1 ใบหน้า"
+        })
+
+    # Check face encoding quality
+    face_encodings = face_recognition.face_encodings(rgb_img, face_locations)
+    if not face_encodings:
+        return jsonify({
+            "valid": False,
+            "faces_found": 1,
+            "message": "ตรวจพบใบหน้าแต่ไม่สามารถวิเคราะห์ได้ กรุณาใช้รูปที่ชัดเจนกว่านี้"
+        })
+
+    # Calculate face size ratio
+    top, right, bottom, left = face_locations[0]
+    face_height = bottom - top
+    face_width = right - left
+    img_height, img_width = img.shape[:2]
+    face_ratio = (face_height * face_width) / (img_height * img_width)
+
+    # Quality checks
+    quality_notes = []
+    if face_ratio < 0.02:
+        quality_notes.append("ใบหน้าเล็กเกินไป ควรถ่ายใกล้กว่านี้")
+    if face_height < 80 or face_width < 80:
+        quality_notes.append("ความละเอียดใบหน้าต่ำ อาจส่งผลต่อการจดจำ")
+
+    return jsonify({
+        "valid": True,
+        "faces_found": 1,
+        "face_size": {"width": face_width, "height": face_height},
+        "face_ratio": round(face_ratio * 100, 1),
+        "quality_notes": quality_notes,
+        "message": "พบใบหน้า 1 ใบหน้า สามารถใช้งานได้" + (
+            " (คำแนะนำ: " + ", ".join(quality_notes) + ")" if quality_notes else ""
+        )
+    })
+
+
+# ============================================================
 # Main
 # ============================================================
 if __name__ == "__main__":
