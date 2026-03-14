@@ -546,8 +546,8 @@ def api_system_health():
     """ส่งข้อมูล CPU/RAM/Temperature ของ Raspberry Pi"""
     import psutil
 
-    # CPU usage (%)
-    cpu_percent = psutil.cpu_percent(interval=0.5)
+    # CPU usage (%) — non-blocking, ใช้ค่าเฉลี่ยจาก call ก่อนหน้า
+    cpu_percent = psutil.cpu_percent(interval=None)
 
     # RAM usage
     mem = psutil.virtual_memory()
