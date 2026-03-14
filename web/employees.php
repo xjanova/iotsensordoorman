@@ -573,7 +573,7 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-loadEmployees();
+document.addEventListener('DOMContentLoaded', loadEmployees);
 </script>
 
 <?php include 'includes/footer.php'; ?>
