@@ -366,13 +366,12 @@ function generateAndCopyCode() {
  * โค้ดนี้ถูกสร้างอัตโนมัติจากหน้าตั้งค่าระบบ
  * วันที่สร้าง: ${new Date().toLocaleString('th-TH')}
  * ============================================================
- * การต่อสาย:
+ * การต่อสาย (ตรงกับบอร์ดเดิม):
+ *   Relay        -> GPIO 4  (เดิม)
+ *   LED Status   -> GPIO 2  (เดิม)
  *   PIR Outside  -> GPIO 27
  *   PIR Inside   -> GPIO 26
- *   Relay        -> GPIO 25
  *   Buzzer       -> GPIO 33
- *   LED Green    -> GPIO 32
- *   LED Red      -> GPIO 14
  *   Emergency Btn -> GPIO 13 (Pull-up)
  * ============================================================
  */
@@ -394,10 +393,9 @@ const char* SERVER_URL    = "${esc(s.server_url || 'http://192.168.1.50:5000')}"
 // ============================================================
 #define PIN_PIR_OUTSIDE    27
 #define PIN_PIR_INSIDE     26
-#define PIN_RELAY          25
+#define PIN_RELAY          4      // เดิม GPIO 4
 #define PIN_BUZZER         33
-#define PIN_LED_GREEN      32
-#define PIN_LED_RED        14
+#define PIN_LED_STATUS     2      // เดิม GPIO 2
 #define PIN_EMERGENCY_BTN  13
 
 // ============================================================
@@ -438,8 +436,7 @@ void setup() {
     pinMode(PIN_PIR_INSIDE, INPUT);
     pinMode(PIN_RELAY, OUTPUT);
     pinMode(PIN_BUZZER, OUTPUT);
-    pinMode(PIN_LED_GREEN, OUTPUT);
-    pinMode(PIN_LED_RED, OUTPUT);
+    pinMode(PIN_LED_STATUS, OUTPUT);
     pinMode(PIN_EMERGENCY_BTN, INPUT_PULLUP);
 
     lockDoor();
@@ -501,8 +498,7 @@ void unlockDoor() {
     doorLocked = false;
     doorUnlockTime = millis();
     digitalWrite(PIN_RELAY, RELAY_UNLOCK);
-    digitalWrite(PIN_LED_GREEN, HIGH);
-    digitalWrite(PIN_LED_RED, LOW);
+    digitalWrite(PIN_LED_STATUS, HIGH);
     beep(1, 200);
     Serial.println("[DOOR] Unlocked");
 }
@@ -510,8 +506,7 @@ void unlockDoor() {
 void lockDoor() {
     doorLocked = true;
     digitalWrite(PIN_RELAY, RELAY_LOCK);
-    digitalWrite(PIN_LED_GREEN, LOW);
-    digitalWrite(PIN_LED_RED, HIGH);
+    digitalWrite(PIN_LED_STATUS, LOW);
     Serial.println("[DOOR] Locked");
 }
 

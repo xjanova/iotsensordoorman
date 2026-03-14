@@ -331,7 +331,7 @@
                     <td class="py-3 px-3">ต่อขา OUT ของ PIR ตัวที่ 2 (ในห้อง)</td>
                 </tr>
                 <tr class="border-b border-white/5">
-                    <td class="py-3 px-3"><span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-mono text-xs">GPIO 25</span></td>
+                    <td class="py-3 px-3"><span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-mono text-xs">GPIO 4</span></td>
                     <td class="py-3 px-3 font-medium text-white">Relay Module (IN)</td>
                     <td class="py-3 px-3"><span class="bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded text-xs">OUTPUT</span></td>
                     <td class="py-3 px-3">HIGH = ปลดล็อกประตู / LOW = ล็อก</td>
@@ -343,16 +343,10 @@
                     <td class="py-3 px-3">เสียงแจ้งเตือน (อนุญาต / ปฏิเสธ)</td>
                 </tr>
                 <tr class="border-b border-white/5">
-                    <td class="py-3 px-3"><span class="bg-green-500/20 text-green-400 px-2 py-0.5 rounded font-mono text-xs">GPIO 32</span></td>
-                    <td class="py-3 px-3 font-medium text-white">LED สีเขียว</td>
+                    <td class="py-3 px-3"><span class="bg-green-500/20 text-green-400 px-2 py-0.5 rounded font-mono text-xs">GPIO 2</span></td>
+                    <td class="py-3 px-3 font-medium text-white">LED สถานะ</td>
                     <td class="py-3 px-3"><span class="bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded text-xs">OUTPUT</span></td>
-                    <td class="py-3 px-3">ติดเมื่ออนุญาตเข้า (ผ่าน R 220&Omega;)</td>
-                </tr>
-                <tr class="border-b border-white/5">
-                    <td class="py-3 px-3"><span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-mono text-xs">GPIO 14</span></td>
-                    <td class="py-3 px-3 font-medium text-white">LED สีแดง</td>
-                    <td class="py-3 px-3"><span class="bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded text-xs">OUTPUT</span></td>
-                    <td class="py-3 px-3">ติดเมื่อปฏิเสธ / ล็อก (ผ่าน R 220&Omega;)</td>
+                    <td class="py-3 px-3">ติดเมื่อประตูปลดล็อก (LED บนบอร์ด)</td>
                 </tr>
                 <tr>
                     <td class="py-3 px-3"><span class="bg-gray-500/20 text-gray-400 px-2 py-0.5 rounded font-mono text-xs">GPIO 13</span></td>
@@ -499,7 +493,7 @@
                     <div class="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
                         <span class="bg-green-600 text-white px-2 py-0.5 rounded font-mono text-xs w-14 text-center">IN</span>
                         <i class="fas fa-long-arrow-alt-right text-gray-500"></i>
-                        <span class="font-mono text-green-300">GPIO 25</span>
+                        <span class="font-mono text-green-300">GPIO 4</span>
                     </div>
                 </div>
             </div>
@@ -529,7 +523,7 @@
             <!-- Diagram ง่าย -->
             <div class="bg-black/40 rounded-xl p-4 font-mono text-xs text-gray-300 leading-relaxed">
                 <div class="text-gray-500 mb-1">// แผนภาพวงจร Relay</div>
-                <div class="text-green-400">ESP32 GPIO 25 ──&gt; [Relay IN]</div>
+                <div class="text-green-400">ESP32 GPIO 4 ──&gt; [Relay IN]</div>
                 <div class="text-red-400">ESP32 5V ────────&gt; [Relay VCC]</div>
                 <div class="text-gray-400">ESP32 GND ───────&gt; [Relay GND]</div>
                 <div class="text-yellow-400 mt-2">Adapter 12V (+) ─&gt; [Relay COM]</div>
@@ -548,27 +542,13 @@
         </h3>
         <div class="space-y-3 text-sm text-gray-300">
             <div class="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-                <div class="font-medium text-green-400 text-xs mb-2">LED สีเขียว (อนุญาตเข้า)</div>
+                <div class="font-medium text-green-400 text-xs mb-2">LED สถานะ (บนบอร์ด ESP32)</div>
                 <div class="flex items-center gap-2">
-                    <span class="font-mono text-xs">GPIO 32</span>
+                    <span class="font-mono text-xs">GPIO 2</span>
                     <span class="text-gray-500">&rarr;</span>
-                    <span class="text-xs">R 220&Omega;</span>
-                    <span class="text-gray-500">&rarr;</span>
-                    <span class="text-xs">LED (+) ขายาว</span>
-                    <span class="text-gray-500">&rarr;</span>
-                    <span class="text-xs">LED (-) ขาสั้น &rarr; GND</span>
-                </div>
-            </div>
-            <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                <div class="font-medium text-red-400 text-xs mb-2">LED สีแดง (ปฏิเสธ/ล็อก)</div>
-                <div class="flex items-center gap-2">
-                    <span class="font-mono text-xs">GPIO 14</span>
-                    <span class="text-gray-500">&rarr;</span>
-                    <span class="text-xs">R 220&Omega;</span>
-                    <span class="text-gray-500">&rarr;</span>
-                    <span class="text-xs">LED (+) ขายาว</span>
-                    <span class="text-gray-500">&rarr;</span>
-                    <span class="text-xs">LED (-) ขาสั้น &rarr; GND</span>
+                    <span class="text-xs">LED บนบอร์ด (Built-in)</span>
+                    <span class="text-gray-500">|</span>
+                    <span class="text-xs">ติด = ประตูเปิด / ดับ = ล็อก</span>
                 </div>
             </div>
             <div class="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
@@ -631,10 +611,9 @@
   <span class="text-yellow-400">PIR นอก</span> (OUT) ──── │  <span class="text-yellow-400">GPIO 27</span>                       5V │ ──── <span class="text-red-400">PIR VCC (x2)</span>
   <span class="text-yellow-400">PIR ใน</span>  (OUT) ──── │  <span class="text-yellow-400">GPIO 26</span>                      GND │ ──── <span class="text-gray-400">GND ร่วมทั้งหมด</span>
                     │                                     │
- <span class="text-red-400">Relay</span> (IN) ──────── │  <span class="text-red-400">GPIO 25</span>                          │
+ <span class="text-red-400">Relay</span> (IN) ──────── │  <span class="text-red-400">GPIO 4</span>                           │
  <span class="text-purple-400">Buzzer</span> (+) ─────── │  <span class="text-purple-400">GPIO 33</span>                          │
- <span class="text-green-400">LED เขียว</span> (+) ──── │  <span class="text-green-400">GPIO 32</span>  (ผ่าน R220&Omega;)          │
- <span class="text-red-300">LED แดง</span> (+) ────── │  <span class="text-red-300">GPIO 14</span>  (ผ่าน R220&Omega;)          │
+ <span class="text-green-400">LED สถานะ</span> ──────── │  <span class="text-green-400">GPIO 2</span>   (Built-in LED)          │
  <span class="text-gray-400">ปุ่ม Emergency</span> ──── │  <span class="text-gray-400">GPIO 13</span>  (PULLUP)              │
                     └─────────────────────────────────────┘
 

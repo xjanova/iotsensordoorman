@@ -8,13 +8,12 @@
  * - สื่อสารกับ Raspberry Pi ผ่าน HTTP (Wi-Fi)
  * - ปุ่ม Emergency Exit
  * ============================================================
- * การต่อสาย:
+ * การต่อสาย (ตรงกับบอร์ดเดิม):
+ *   Relay        -> GPIO 4  (เดิม)
+ *   LED Status   -> GPIO 2  (เดิม)
  *   PIR Outside  -> GPIO 27
  *   PIR Inside   -> GPIO 26
- *   Relay        -> GPIO 25
  *   Buzzer       -> GPIO 33
- *   LED Green    -> GPIO 32
- *   LED Red      -> GPIO 14
  *   Emergency Btn -> GPIO 13 (Pull-up)
  * ============================================================
  */
@@ -36,10 +35,9 @@ const char* SERVER_URL    = "http://192.168.1.50:5000";  // Raspberry Pi IP
 // ============================================================
 #define PIN_PIR_OUTSIDE    27    // เซ็นเซอร์ PIR ด้านนอกประตู
 #define PIN_PIR_INSIDE     26    // เซ็นเซอร์ PIR ด้านในประตู
-#define PIN_RELAY          25    // Relay -> กลอนแม่เหล็ก
+#define PIN_RELAY          4     // Relay -> กลอนแม่เหล็ก (เดิม GPIO 4)
 #define PIN_BUZZER         33    // Buzzer แจ้งเตือน
-#define PIN_LED_GREEN      32    // LED สีเขียว (อนุญาต)
-#define PIN_LED_RED        14    // LED สีแดง (ไม่อนุญาต)
+#define PIN_LED_STATUS     2     // LED สถานะ (เดิม GPIO 2)
 #define PIN_EMERGENCY_BTN  13    // ปุ่ม Emergency Exit
 
 // ============================================================
@@ -77,8 +75,7 @@ void setup() {
     pinMode(PIN_PIR_INSIDE, INPUT);
     pinMode(PIN_RELAY, OUTPUT);
     pinMode(PIN_BUZZER, OUTPUT);
-    pinMode(PIN_LED_GREEN, OUTPUT);
-    pinMode(PIN_LED_RED, OUTPUT);
+    pinMode(PIN_LED_STATUS, OUTPUT);
     pinMode(PIN_EMERGENCY_BTN, INPUT_PULLUP);
 
     // Initial state: door locked
@@ -152,8 +149,7 @@ void unlockDoor() {
     doorLocked = false;
     doorUnlockTime = millis();
     digitalWrite(PIN_RELAY, HIGH);    // Relay ON -> ปลดล็อก
-    digitalWrite(PIN_LED_GREEN, HIGH);
-    digitalWrite(PIN_LED_RED, LOW);
+    digitalWrite(PIN_LED_STATUS, HIGH);
     beep(1, 200);
     Serial.println("[DOOR] Unlocked");
 }
@@ -161,8 +157,7 @@ void unlockDoor() {
 void lockDoor() {
     doorLocked = true;
     digitalWrite(PIN_RELAY, LOW);     // Relay OFF -> ล็อก
-    digitalWrite(PIN_LED_GREEN, LOW);
-    digitalWrite(PIN_LED_RED, HIGH);
+    digitalWrite(PIN_LED_STATUS, LOW);
     Serial.println("[DOOR] Locked");
 }
 
