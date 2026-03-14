@@ -658,11 +658,16 @@ def api_capture_save():
     if not face_encodings:
         return jsonify({"error": "ตรวจพบใบหน้าแต่ไม่สามารถวิเคราะห์ได้ ลองปรับแสง", "valid": False}), 400
 
-    # บันทึกไฟล์
-    import re
+    # Encode เป็น JPEG แล้วส่ง base64 กลับ (ให้ PHP proxy บันทึกไฟล์เอง)
+    import re, base64
     safe_code = re.sub(r'[^A-Za-z0-9\-]', '', emp_code) or 'capture'
     filename = f"{safe_code}_{int(time.time())}.jpg"
-    save_dir = os.path.join(os.path.dirname(__file__), '..', 'web', 'uploads', 'faces')
+
+    _, jpg_buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    img_base64 = base64.b64encode(jpg_buf.tobytes()).decode('utf-8')
+
+    # บันทึกไว้บน Pi ด้วย (สำหรับ face recognition images)
+    save_dir = os.path.join(os.path.dirname(__file__), 'images')
     os.makedirs(save_dir, exist_ok=True)
     filepath = os.path.join(save_dir, filename)
     cv2.imwrite(filepath, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
@@ -674,7 +679,8 @@ def api_capture_save():
         "face_size": {"width": face_w, "height": face_h},
         "valid": True,
         "quality_notes": ["ใบหน้าเล็ก ลองเข้าใกล้กว่านี้"] if face_ratio < 5 else [],
-        "message": "ถ่ายภาพสำเร็จ" + (f" (ใบหน้า {face_ratio}%)" if face_ratio else "")
+        "message": "ถ่ายภาพสำเร็จ" + (f" (ใบหน้า {face_ratio}%)" if face_ratio else ""),
+        "image_base64": img_base64
     })
 
 

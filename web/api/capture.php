@@ -51,7 +51,7 @@ if ($method === 'POST') {
 
     $response = @file_get_contents($url, false, $ctx);
     if ($response === false) {
-        jsonResponse(['error' => 'Face Server ไม่ตอบสนอง'], 503);
+        jsonResponse(['error' => 'Face Server ไม่ตอบสนอง — ตรวจสอบว่า Raspberry Pi เปิดอยู่และ face_server ทำงาน'], 503);
     }
 
     // ดึง HTTP status code
@@ -59,9 +59,24 @@ if ($method === 'POST') {
     preg_match('/(\d{3})/', $statusLine, $m);
     $code = intval($m[1] ?? 200);
 
+    $data = json_decode($response, true);
+
+    // ถ้าสำเร็จ: ดึง image_base64 มาบันทึกเป็นไฟล์บน Laragon
+    if ($code === 200 && !empty($data['image_base64']) && !empty($data['filename'])) {
+        $uploadDir = __DIR__ . '/../uploads/faces/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+        $filepath = $uploadDir . $data['filename'];
+        file_put_contents($filepath, base64_decode($data['image_base64']));
+
+        // ลบ base64 ออกจาก response (ไม่ต้องส่งไป browser)
+        unset($data['image_base64']);
+    }
+
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
-    echo $response;
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
