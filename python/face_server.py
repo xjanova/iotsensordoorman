@@ -13,8 +13,10 @@ Bunny Door System - Face Recognition + API Server
 import cv2
 import numpy as np
 import os
+import sys
 import time
 import json
+import signal
 import threading
 import requests
 import mysql.connector
@@ -157,6 +159,8 @@ def update_system_status(component, status, ip=None):
 # ============================================================
 # Camera Processing Thread
 # ============================================================
+_camera_captures = {}  # เก็บ VideoCapture objects สำหรับ cleanup
+
 def camera_thread(camera_id, cam_name, bg_subtractor):
     """Thread สำหรับประมวลผลกล้องแต่ละตัว"""
     print(f"[Camera] Starting {cam_name} (ID: {camera_id})")
@@ -167,6 +171,7 @@ def camera_thread(camera_id, cam_name, bg_subtractor):
         update_system_status(cam_name, "OFFLINE")
         return
 
+    _camera_captures[cam_name] = cap  # เก็บไว้สำหรับ cleanup
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
     update_system_status(cam_name, "ONLINE")
@@ -661,10 +666,22 @@ if __name__ == "__main__":
 
     print(f"[Server] Starting Flask API on {config.API_HOST}:{config.API_PORT}")
 
+    def cleanup(signum=None, frame=None):
+        print("\n[Server] Shutting down...")
+        system_state["running"] = False
+        # Release กล้องทั้งหมด
+        for name, cap in _camera_captures.items():
+            if cap.isOpened():
+                cap.release()
+                print(f"[Camera] {name} released")
+        update_system_status("face_server", "OFFLINE")
+        update_system_status("raspberry_pi", "OFFLINE")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, cleanup)
+    signal.signal(signal.SIGTERM, cleanup)
+
     try:
         app.run(host=config.API_HOST, port=config.API_PORT, threaded=True)
     except KeyboardInterrupt:
-        print("\n[Server] Shutting down...")
-        system_state["running"] = False
-        update_system_status("face_server", "OFFLINE")
-        update_system_status("raspberry_pi", "OFFLINE")
+        cleanup()
