@@ -157,7 +157,7 @@ def camera_thread(camera_id, cam_name):
     """Thread สำหรับประมวลผลกล้องแต่ละตัว (Lite mode สำหรับ Pi 2GB)"""
     print(f"[Camera] Starting {cam_name} (ID: {camera_id})")
 
-    cap = cv2.VideoCapture(camera_id)
+    cap = cv2.VideoCapture(camera_id, cv2.CAP_V4L2)
     if not cap.isOpened():
         print(f"[Camera] Failed to open {cam_name}")
         update_system_status(cam_name, "OFFLINE")
