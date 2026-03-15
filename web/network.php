@@ -288,6 +288,18 @@ async function detectNetwork() {
         document.getElementById('espIP').textContent = espIP || 'ไม่ทราบ';
         document.getElementById('inputEspIP').value = espIP;
 
+        // Test ESP32 connection if IP is known
+        if (espIP) {
+            try {
+                const espRes = await fetchAPI(`api/network.php?action=test&ip=${espIP}&port=80&type=esp32`);
+                updateEspStatus(espRes.online);
+            } catch (e) {
+                updateEspStatus(false);
+            }
+        } else {
+            updateEspStatus(false);
+        }
+
         // WiFi
         document.getElementById('inputWifiSSID').value = res.esp32.wifi_ssid || '';
 
