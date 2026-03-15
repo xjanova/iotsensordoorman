@@ -161,30 +161,30 @@ $recentLogs = $stmt->fetchAll();
         <div class="space-y-3 mt-4">
             <div class="flex justify-between items-center text-sm">
                 <span class="text-gray-400">Face Server</span>
-                <span class="flex items-center gap-1">
-                    <span class="w-2 h-2 <?= $faceServerOnline ? 'bg-green-400' : 'bg-red-400' ?> rounded-full"></span>
-                    <?= $faceServerOnline ? 'Online' : 'Offline' ?>
+                <span class="flex items-center gap-1" id="statusFaceServer">
+                    <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
+                    <span class="text-gray-500">ตรวจสอบ...</span>
                 </span>
             </div>
             <div class="flex justify-between items-center text-sm">
                 <span class="text-gray-400">ESP32</span>
-                <span class="flex items-center gap-1">
-                    <span class="w-2 h-2 <?= $esp32Online ? 'bg-green-400' : 'bg-red-400' ?> rounded-full"></span>
-                    <?= $esp32Online ? 'Online' : 'Offline' ?>
+                <span class="flex items-center gap-1" id="statusEsp32">
+                    <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
+                    <span class="text-gray-500">ตรวจสอบ...</span>
                 </span>
             </div>
             <div class="flex justify-between items-center text-sm">
                 <span class="text-gray-400">กล้องนอก</span>
-                <span class="flex items-center gap-1">
-                    <span class="w-2 h-2 <?= $cam1Online ? 'bg-green-400' : 'bg-red-400' ?> rounded-full"></span>
-                    <?= $cam1Online ? 'Online' : 'Offline' ?>
+                <span class="flex items-center gap-1" id="statusCamOut">
+                    <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
+                    <span class="text-gray-500">ตรวจสอบ...</span>
                 </span>
             </div>
             <div class="flex justify-between items-center text-sm">
                 <span class="text-gray-400">กล้องใน</span>
-                <span class="flex items-center gap-1">
-                    <span class="w-2 h-2 <?= $cam2Online ? 'bg-green-400' : 'bg-red-400' ?> rounded-full"></span>
-                    <?= $cam2Online ? 'Online' : 'Offline' ?>
+                <span class="flex items-center gap-1" id="statusCamIn">
+                    <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
+                    <span class="text-gray-500">ตรวจสอบ...</span>
                 </span>
             </div>
         </div>
@@ -413,10 +413,15 @@ function loadSnapshot(camId, imgId, placeholderId, dotId, statusId) {
         const st = document.getElementById(statusId);
         st.textContent = 'ONLINE';
         st.className = 'text-xs text-green-400';
+        // Update door card camera status
+        if (camId === 'outside') setDeviceOnline('statusCamOut', true);
+        if (camId === 'inside') setDeviceOnline('statusCamIn', true);
     };
     img.onerror = () => {
         clearTimeout(timeout);
         setCamOffline(imgId, placeholderId, dotId, statusId);
+        if (camId === 'outside') setDeviceOnline('statusCamOut', false);
+        if (camId === 'inside') setDeviceOnline('statusCamIn', false);
     };
     img.src = FACE_SERVER + '/api/snapshot/' + camId + '?t=' + Date.now();
 }
@@ -528,14 +533,45 @@ async function fetchPiHealth() {
         const badge = document.getElementById('piStatusBadge');
         badge.textContent = 'ONLINE';
         badge.className = 'text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400';
+
+        // Update door card: Face Server = online (Pi is responding)
+        setDeviceOnline('statusFaceServer', true);
     } catch {
         const badge = document.getElementById('piStatusBadge');
         badge.textContent = 'OFFLINE';
         badge.className = 'text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400';
+        setDeviceOnline('statusFaceServer', false);
+    }
+}
+
+// Helper: update device status in door card
+function setDeviceOnline(id, online) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (online) {
+        el.innerHTML = '<span class="w-2 h-2 bg-green-400 pulse-dot rounded-full"></span><span class="text-green-400">Online</span>';
+    } else {
+        el.innerHTML = '<span class="w-2 h-2 bg-red-400 rounded-full"></span><span class="text-red-400">Offline</span>';
+    }
+}
+
+// Update door icon based on real status
+function updateDoorIcon(doorStatus) {
+    if (doorStatus === 'locked') {
+        document.getElementById('doorIcon').className = 'w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-red-500/20';
+        document.getElementById('doorIconInner').className = 'fas fa-lock text-4xl text-red-400';
+        document.getElementById('doorStatusText').textContent = 'ประตูล็อก';
+        document.getElementById('doorStatusText').className = 'text-xl font-bold text-red-400';
+    } else {
+        document.getElementById('doorIcon').className = 'w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-green-500/20';
+        document.getElementById('doorIconInner').className = 'fas fa-lock-open text-4xl text-green-400';
+        document.getElementById('doorStatusText').textContent = 'ประตูเปิด';
+        document.getElementById('doorStatusText').className = 'text-xl font-bold text-green-400';
     }
 }
 
 // Fetch ESP32 health
+let _espOnline = false;
 async function fetchEspHealth() {
     try {
         const resp = await fetch(FACE_SERVER + '/api/esp32/health', {signal: AbortSignal.timeout(5000)});
@@ -543,15 +579,22 @@ async function fetchEspHealth() {
         const d = await resp.json();
 
         const badge = document.getElementById('espStatusBadge');
+        _espOnline = d.online;
+
         if (!d.online) {
             badge.textContent = 'OFFLINE';
             badge.className = 'text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400';
             setRing('wifiRing', 0);
+            setDeviceOnline('statusEsp32', false);
+            // PIR unknown when offline
+            document.getElementById('espPirOut').innerHTML = '<span class="text-gray-600">ไม่ทราบ</span>';
+            document.getElementById('espPirIn').innerHTML = '<span class="text-gray-600">ไม่ทราบ</span>';
             return;
         }
 
         badge.textContent = 'ONLINE';
         badge.className = 'text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400';
+        setDeviceOnline('statusEsp32', true);
 
         // WiFi signal ring (RSSI: -30 best, -90 worst)
         const rssi = d.rssi ?? -90;
@@ -559,13 +602,14 @@ async function fetchEspHealth() {
         document.getElementById('espRssi').textContent = rssi;
         setRing('wifiRing', wifiPct, wifiPct > 60 ? '#22c55e' : wifiPct > 30 ? '#f59e0b' : '#ef4444');
 
-        // Door status
+        // Door status — update both ESP32 card and door card
         const doorEl = document.getElementById('espDoor');
         if (d.door === 'locked') {
             doorEl.innerHTML = '<span class="text-red-400"><i class="fas fa-lock mr-1"></i>ล็อก</span>';
         } else {
             doorEl.innerHTML = '<span class="text-green-400"><i class="fas fa-lock-open mr-1"></i>เปิด</span>';
         }
+        updateDoorIcon(d.door);
 
         // Uptime
         document.getElementById('espUptime').textContent = formatUptime(d.uptime_sec ?? 0);
@@ -575,15 +619,16 @@ async function fetchEspHealth() {
 
         // PIR sensors
         document.getElementById('espPirOut').innerHTML = d.pir_outside
-            ? '<span class="text-yellow-400"><i class="fas fa-circle text-[8px] mr-1"></i>ตรวจจับ</span>'
-            : '<span class="text-gray-500">ปกติ</span>';
+            ? '<span class="text-yellow-400"><i class="fas fa-circle text-[8px] mr-1"></i>ตรวจจับการเคลื่อนไหว</span>'
+            : '<span class="text-gray-500"><i class="fas fa-minus text-[8px] mr-1"></i>ไม่มีการเคลื่อนไหว</span>';
         document.getElementById('espPirIn').innerHTML = d.pir_inside
-            ? '<span class="text-yellow-400"><i class="fas fa-circle text-[8px] mr-1"></i>ตรวจจับ</span>'
-            : '<span class="text-gray-500">ปกติ</span>';
+            ? '<span class="text-yellow-400"><i class="fas fa-circle text-[8px] mr-1"></i>ตรวจจับการเคลื่อนไหว</span>'
+            : '<span class="text-gray-500"><i class="fas fa-minus text-[8px] mr-1"></i>ไม่มีการเคลื่อนไหว</span>';
     } catch {
         const badge = document.getElementById('espStatusBadge');
         badge.textContent = 'OFFLINE';
         badge.className = 'text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400';
+        setDeviceOnline('statusEsp32', false);
     }
 }
 
