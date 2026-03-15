@@ -45,7 +45,7 @@ FACE_MODEL = "hog"                     # "hog" = เร็ว ใช้ CPU (เ
 # ============================================================
 # ESP32 Communication
 # ============================================================
-ESP32_IP = "192.168.1.100"
+ESP32_IP = os.environ.get("ESP32_IP", "192.168.1.123")
 ESP32_PORT = 80
 ESP32_UNLOCK_URL = f"http://{ESP32_IP}:{ESP32_PORT}/api/door/unlock"
 ESP32_LOCK_URL = f"http://{ESP32_IP}:{ESP32_PORT}/api/door/lock"
