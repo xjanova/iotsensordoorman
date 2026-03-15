@@ -358,7 +358,7 @@ $recentLogs = $stmt->fetchAll();
                 <?php foreach ($recentLogs as $log): ?>
                 <tr class="border-b border-white/5 hover:bg-white/5">
                     <td class="py-3 px-2 text-gray-300"><?= date('H:i:s', strtotime($log['created_at'])) ?></td>
-                    <td class="py-3 px-2"><?= $log['first_name'] ? esc($log['first_name']) . ' ' . esc($log['last_name']) : '<span class="text-red-400">ไม่รู้จัก</span>' ?></td>
+                    <td class="py-3 px-2"><?= $log['first_name'] ? htmlspecialchars($log['first_name']) . ' ' . htmlspecialchars($log['last_name']) : '<span class="text-red-400">ไม่รู้จัก</span>' ?></td>
                     <td class="py-3 px-2">
                         <?php if ($log['direction'] === 'IN'): ?>
                         <span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs">เข้า</span>
