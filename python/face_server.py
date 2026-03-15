@@ -255,16 +255,18 @@ def camera_thread(camera_id, cam_name):
 # Face Processing Logic
 # ============================================================
 # Debounce: ป้องกันการ process ซ้ำในเวลาสั้น
-_last_action_time = {}  # {"person_name": timestamp}
+_last_action_time = {}  # {"person_name_cam": timestamp}
+_last_direction = {}    # {"person_name": {"dir": "IN"/"OUT", "time": timestamp}}
 DEBOUNCE_SECONDS = 10
+CROSS_CAM_GRACE_SECONDS = 30  # ต้องรอ 30 วิ ก่อน log ทิศทางตรงข้าม (กันซ้ำ IN/OUT)
 
 def process_detected_faces(frame, faces, names, confidences, camera_id, cam_name):
-    """ประมวลผลใบหน้าที่ตรวจพบ (มี debounce)"""
+    """ประมวลผลใบหน้าที่ตรวจพบ (มี debounce + cross-camera direction logic)"""
     direction = "IN" if cam_name == "camera_outside" else "OUT"
     now = time.time()
 
     for (top, right, bottom, left), name, conf in zip(faces, names, confidences):
-        # Debounce check
+        # Debounce: ไม่ process ซ้ำจากกล้องเดิมในเวลาสั้น
         debounce_key = f"{name}_{cam_name}"
         if debounce_key in _last_action_time and (now - _last_action_time[debounce_key]) < DEBOUNCE_SECONDS:
             continue
@@ -281,13 +283,22 @@ def process_detected_faces(frame, faces, names, confidences, camera_id, cam_name
                 log_access(None, direction, "FACE", 0, camera_id, None, snapshot, 0)
             continue
 
+        # Cross-camera direction check:
+        # ถ้าเพิ่ง log ทิศทางตรงข้ามไม่นาน → ข้าม (เช่น เพิ่ง IN ไม่ถึง 30 วิ แต่เห็นกล้องใน → ไม่ log OUT)
+        last = _last_direction.get(name)
+        if last and last["dir"] != direction and (now - last["time"]) < CROSS_CAM_GRACE_SECONDS:
+            print(f"[Direction] Skip {name} {direction} — just logged {last['dir']} {now - last['time']:.0f}s ago")
+            continue
+
         _last_action_time[debounce_key] = now
+        _last_direction[name] = {"dir": direction, "time": now}
 
         # ค้นหาพนักงานในฐานข้อมูล
         employee = get_employee_by_name(name)
         if employee and employee["is_authorized"]:
             snapshot = save_snapshot(frame, name, camera_id)
             log_access(employee["id"], direction, "FACE", conf, camera_id, None, snapshot, 1)
+            print(f"[Access] {name} → {direction} (conf={conf}%, cam={cam_name})")
 
             # สั่งเปิดประตู (ถ้าเป็นกล้องด้านนอก = ขาเข้า)
             if direction == "IN":
@@ -370,13 +381,38 @@ def snapshot_inside():
 
 @app.route('/api/status')
 def api_status():
+    # ดึงชื่อกล้องจาก v4l2-ctl (cache ไว้)
+    import subprocess
+    cam_names = {}
+    try:
+        result = subprocess.run(['v4l2-ctl', '--list-devices'], capture_output=True, text=True, timeout=3)
+        current_name = None
+        for line in result.stdout.split('\n'):
+            line = line.rstrip()
+            if line and not line.startswith('\t') and not line.startswith(' '):
+                current_name = line.rstrip(':')
+            elif line.strip().startswith('/dev/video'):
+                dev_id = line.strip().replace('/dev/video', '')
+                if dev_id.isdigit():
+                    cam_names.setdefault(int(dev_id), current_name)
+    except Exception:
+        pass
+
     return jsonify({
         "door": system_state["door_status"],
         "camera_outside": {
+            "id": config.CAMERA_OUTSIDE_ID,
+            "active": "camera_outside" in _camera_captures,
+            "has_frame": system_state["camera_outside"]["jpeg"] is not None,
+            "device_name": cam_names.get(config.CAMERA_OUTSIDE_ID, ''),
             "motion": system_state["camera_outside"]["motion"],
             "faces": system_state["camera_outside"]["faces"]
         },
         "camera_inside": {
+            "id": config.CAMERA_INSIDE_ID,
+            "active": "camera_inside" in _camera_captures,
+            "has_frame": system_state["camera_inside"]["jpeg"] is not None,
+            "device_name": cam_names.get(config.CAMERA_INSIDE_ID, ''),
             "motion": system_state["camera_inside"]["motion"],
             "faces": system_state["camera_inside"]["faces"]
         },

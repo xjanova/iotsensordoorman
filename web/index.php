@@ -110,17 +110,17 @@ $recentLogs = $stmt->fetchAll();
     <div class="glass rounded-2xl overflow-hidden card-hover">
         <div class="p-4 border-b border-white/10 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 <?= $cam1Online ? 'bg-green-400 pulse-dot' : 'bg-red-400' ?> rounded-full" id="camOutDot"></span>
-                <span class="font-medium">กล้องด้านนอก</span>
+                <span class="w-2 h-2 bg-gray-500 rounded-full" id="camOutDot"></span>
+                <span class="font-medium" id="camOutTitle">กล้องด้านนอก</span>
             </div>
-            <span class="text-xs <?= $cam1Online ? 'text-green-400' : 'text-red-400' ?>" id="camOutStatus"><?= $cam1Online ? 'ONLINE' : 'OFFLINE' ?></span>
+            <span class="text-xs text-gray-500" id="camOutStatus">ตรวจสอบ...</span>
         </div>
         <div class="stream-container aspect-video">
             <img id="streamOutside" src="" alt="Camera Outside" class="w-full" style="display:none">
             <div id="streamOutPlaceholder" class="absolute inset-0 flex items-center justify-center bg-gray-800">
                 <div class="text-center text-gray-500">
                     <i class="fas fa-video-slash text-3xl mb-2"></i>
-                    <p class="text-sm"><?= $cam1Online ? 'กำลังโหลด...' : 'กล้องออฟไลน์' ?></p>
+                    <p class="text-sm">กำลังตรวจสอบ...</p>
                 </div>
             </div>
         </div>
@@ -130,17 +130,17 @@ $recentLogs = $stmt->fetchAll();
     <div class="glass rounded-2xl overflow-hidden card-hover">
         <div class="p-4 border-b border-white/10 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 <?= $cam2Online ? 'bg-green-400 pulse-dot' : 'bg-red-400' ?> rounded-full" id="camInDot"></span>
-                <span class="font-medium">กล้องด้านใน</span>
+                <span class="w-2 h-2 bg-gray-500 rounded-full" id="camInDot"></span>
+                <span class="font-medium" id="camInTitle">กล้องด้านใน</span>
             </div>
-            <span class="text-xs <?= $cam2Online ? 'text-green-400' : 'text-red-400' ?>" id="camInStatus"><?= $cam2Online ? 'ONLINE' : 'OFFLINE' ?></span>
+            <span class="text-xs text-gray-500" id="camInStatus">ตรวจสอบ...</span>
         </div>
         <div class="stream-container aspect-video">
             <img id="streamInside" src="" alt="Camera Inside" class="w-full" style="display:none">
             <div id="streamInPlaceholder" class="absolute inset-0 flex items-center justify-center bg-gray-800">
                 <div class="text-center text-gray-500">
                     <i class="fas fa-video-slash text-3xl mb-2"></i>
-                    <p class="text-sm"><?= $cam2Online ? 'กำลังโหลด...' : 'กล้องออฟไลน์' ?></p>
+                    <p class="text-sm">กำลังตรวจสอบ...</p>
                 </div>
             </div>
         </div>
@@ -396,6 +396,68 @@ $recentLogs = $stmt->fetchAll();
 // Dashboard Logic (ใช้ PHP render ข้อมูลหลัก, JS เฉพาะ snapshot + door + clock)
 // ============================================================
 
+// Camera config state
+let _camConfig = { outside: null, inside: null };
+
+// ดึง camera config จาก face_server แล้วอัพเดท UI
+async function fetchCameraConfig() {
+    try {
+        const data = await fetchAPI(FACE_SERVER + '/api/status');
+        if (!data) return;
+
+        const co = data.camera_outside;
+        const ci = data.camera_inside;
+        _camConfig.outside = co;
+        _camConfig.inside = ci;
+
+        // อัพเดทชื่อกล้อง + สถานะในหัวการ์ด
+        updateCamCard('outside', co, 'camOutTitle', 'camOutDot', 'camOutStatus', 'streamOutside', 'streamOutPlaceholder');
+        updateCamCard('inside', ci, 'camInTitle', 'camInDot', 'camInStatus', 'streamInside', 'streamInPlaceholder');
+    } catch {}
+}
+
+function updateCamCard(side, cfg, titleId, dotId, statusId, imgId, placeholderId) {
+    const titleEl = document.getElementById(titleId);
+    const dotEl = document.getElementById(dotId);
+    const statusEl = document.getElementById(statusId);
+    const imgEl = document.getElementById(imgId);
+    const phEl = document.getElementById(placeholderId);
+
+    const label = side === 'outside' ? 'ด้านนอก' : 'ด้านใน';
+
+    // กล้องไม่ได้กำหนด (ID = -1)
+    if (!cfg || cfg.id < 0) {
+        titleEl.textContent = 'กล้อง' + label;
+        dotEl.className = 'w-2 h-2 bg-yellow-400 rounded-full';
+        statusEl.textContent = 'ไม่ได้กำหนด';
+        statusEl.className = 'text-xs text-yellow-400';
+        imgEl.style.display = 'none';
+        phEl.style.display = '';
+        phEl.querySelector('p').innerHTML = 'ยังไม่ได้กำหนดกล้อง<br><a href="settings.php" class="text-blue-400 underline text-xs">ไปตั้งค่า</a>';
+        phEl.querySelector('i').className = 'fas fa-camera-rotate text-3xl mb-2';
+        setDeviceOnline('statusCam' + (side === 'outside' ? 'Out' : 'In'), false);
+        return;
+    }
+
+    // กล้องกำหนดแล้ว — แสดงชื่ออุปกรณ์
+    const devName = cfg.device_name || 'video' + cfg.id;
+    titleEl.textContent = 'กล้อง' + label + ' (' + devName + ')';
+
+    if (cfg.active && cfg.has_frame) {
+        // กล้อง active มี frame → โหลด snapshot
+        loadSnapshot(side, imgId, placeholderId, dotId, statusId);
+    } else {
+        // กล้อง assigned แต่ยังไม่มี frame
+        dotEl.className = 'w-2 h-2 bg-red-400 rounded-full';
+        statusEl.textContent = 'OFFLINE';
+        statusEl.className = 'text-xs text-red-400';
+        imgEl.style.display = 'none';
+        phEl.style.display = '';
+        phEl.querySelector('p').textContent = 'กล้องออฟไลน์';
+        setDeviceOnline('statusCam' + (side === 'outside' ? 'Out' : 'In'), false);
+    }
+}
+
 // Camera snapshots (refresh ทุก 5 วินาที) — ใช้ Image tag (ไม่ติด CORS)
 function loadSnapshot(camId, imgId, placeholderId, dotId, statusId) {
     const img = new Image();
@@ -413,7 +475,6 @@ function loadSnapshot(camId, imgId, placeholderId, dotId, statusId) {
         const st = document.getElementById(statusId);
         st.textContent = 'ONLINE';
         st.className = 'text-xs text-green-400';
-        // Update door card camera status
         if (camId === 'outside') setDeviceOnline('statusCamOut', true);
         if (camId === 'inside') setDeviceOnline('statusCamIn', true);
     };
@@ -437,11 +498,17 @@ function setCamOffline(imgId, placeholderId, dotId, statusId) {
 }
 
 function refreshDashboardSnapshots() {
-    loadSnapshot('outside', 'streamOutside', 'streamOutPlaceholder', 'camOutDot', 'camOutStatus');
-    loadSnapshot('inside', 'streamInside', 'streamInPlaceholder', 'camInDot', 'camInStatus');
+    // โหลด snapshot เฉพาะกล้องที่กำหนดไว้แล้ว (ID >= 0)
+    if (_camConfig.outside && _camConfig.outside.id >= 0) {
+        loadSnapshot('outside', 'streamOutside', 'streamOutPlaceholder', 'camOutDot', 'camOutStatus');
+    }
+    if (_camConfig.inside && _camConfig.inside.id >= 0) {
+        loadSnapshot('inside', 'streamInside', 'streamInPlaceholder', 'camInDot', 'camInStatus');
+    }
 }
 document.addEventListener('DOMContentLoaded', () => {
-    refreshDashboardSnapshots();
+    fetchCameraConfig();
+    setTimeout(refreshDashboardSnapshots, 2000); // รอ config โหลดก่อน
     setInterval(refreshDashboardSnapshots, 5000);
 });
 

@@ -1,53 +1,38 @@
 <?php $pageTitle = 'กล้องวงจรปิด - Bunny Door System'; ?>
 <?php include 'includes/header.php'; ?>
 
-<?php
-// ดึงสถานะกล้องจาก DB
-$db = getDB();
-$camStatus = [];
-foreach ($db->query("SELECT component, status FROM system_status WHERE component LIKE 'camera_%'")->fetchAll() as $row) {
-    $camStatus[$row['component']] = $row['status'];
-}
-$cam1Online = ($camStatus['camera_outside'] ?? '') === 'ONLINE';
-$cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
-?>
-
 <div class="flex justify-between items-center mb-8">
     <div>
         <h2 class="text-2xl font-bold">กล้องวงจรปิด</h2>
         <p class="text-gray-400 text-sm mt-1">ดูภาพสดจากกล้อง พร้อมระบบตรวจจับใบหน้าแบบ Real-time</p>
     </div>
+    <a href="settings.php" class="text-sm text-blue-400 hover:underline flex items-center gap-1">
+        <i class="fas fa-cog"></i> ตั้งค่ากล้อง
+    </a>
 </div>
 
 <!-- Camera Grid -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-    <!-- Camera 1: Outside -->
-    <div class="glass rounded-2xl overflow-hidden">
+    <!-- Camera Outside -->
+    <div class="glass rounded-2xl overflow-hidden" id="camOutCard">
         <div class="p-4 border-b border-white/10 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <span class="w-3 h-3 <?= $cam1Online ? 'bg-green-400 pulse-dot' : 'bg-gray-500' ?> rounded-full"></span>
+                <span class="w-3 h-3 bg-gray-500 rounded-full" id="cam1Dot"></span>
                 <div>
-                    <h3 class="font-medium">กล้องด้านนอกประตู</h3>
-                    <p class="text-xs text-gray-400">Camera 1 - <?= $cam1Online ? 'ออนไลน์' : 'ออฟไลน์' ?></p>
+                    <h3 class="font-medium" id="cam1Title">กล้องด้านนอกประตู</h3>
+                    <p class="text-xs text-gray-400" id="cam1Sub">กำลังตรวจสอบ...</p>
                 </div>
             </div>
-            <?php if ($cam1Online): ?>
-            <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">LIVE</span>
-            <?php else: ?>
-            <span class="text-xs bg-gray-500/20 text-gray-400 px-2 py-1 rounded">OFFLINE</span>
-            <?php endif; ?>
+            <span class="text-xs bg-gray-500/20 text-gray-400 px-2 py-1 rounded" id="cam1Badge">...</span>
         </div>
         <div class="stream-container aspect-video relative">
-            <?php if ($cam1Online): ?>
-            <img src="<?= FACE_SERVER_URL ?>/api/snapshot/outside" id="cam1Stream" class="w-full" alt="Camera 1">
-            <?php else: ?>
-            <div class="w-full h-full flex items-center justify-center bg-black/50 aspect-video">
+            <img id="cam1Stream" src="" class="w-full" alt="Camera Outside" style="display:none">
+            <div id="cam1Placeholder" class="w-full h-full flex items-center justify-center bg-black/50 aspect-video">
                 <div class="text-center">
-                    <i class="fas fa-video-slash text-4xl text-gray-600 mb-2"></i>
-                    <p class="text-gray-500 text-sm">กล้องด้านนอกออฟไลน์</p>
+                    <i class="fas fa-spinner fa-spin text-4xl text-gray-600 mb-2"></i>
+                    <p class="text-gray-500 text-sm">กำลังตรวจสอบ...</p>
                 </div>
             </div>
-            <?php endif; ?>
             <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                 <div class="flex justify-between items-end">
                     <div>
@@ -60,33 +45,26 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
         </div>
     </div>
 
-    <!-- Camera 2: Inside -->
-    <div class="glass rounded-2xl overflow-hidden">
+    <!-- Camera Inside -->
+    <div class="glass rounded-2xl overflow-hidden" id="camInCard">
         <div class="p-4 border-b border-white/10 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <span class="w-3 h-3 <?= $cam2Online ? 'bg-green-400 pulse-dot' : 'bg-gray-500' ?> rounded-full"></span>
+                <span class="w-3 h-3 bg-gray-500 rounded-full" id="cam2Dot"></span>
                 <div>
-                    <h3 class="font-medium">กล้องด้านในประตู</h3>
-                    <p class="text-xs text-gray-400">Camera 2 - <?= $cam2Online ? 'ออนไลน์' : 'ออฟไลน์' ?></p>
+                    <h3 class="font-medium" id="cam2Title">กล้องด้านในประตู</h3>
+                    <p class="text-xs text-gray-400" id="cam2Sub">กำลังตรวจสอบ...</p>
                 </div>
             </div>
-            <?php if ($cam2Online): ?>
-            <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">LIVE</span>
-            <?php else: ?>
-            <span class="text-xs bg-gray-500/20 text-gray-400 px-2 py-1 rounded">OFFLINE</span>
-            <?php endif; ?>
+            <span class="text-xs bg-gray-500/20 text-gray-400 px-2 py-1 rounded" id="cam2Badge">...</span>
         </div>
         <div class="stream-container aspect-video relative">
-            <?php if ($cam2Online): ?>
-            <img src="<?= FACE_SERVER_URL ?>/api/snapshot/inside" id="cam2Stream" class="w-full" alt="Camera 2">
-            <?php else: ?>
-            <div class="w-full h-full flex items-center justify-center bg-black/50 aspect-video">
+            <img id="cam2Stream" src="" class="w-full" alt="Camera Inside" style="display:none">
+            <div id="cam2Placeholder" class="w-full h-full flex items-center justify-center bg-black/50 aspect-video">
                 <div class="text-center">
-                    <i class="fas fa-video-slash text-4xl text-gray-600 mb-2"></i>
-                    <p class="text-gray-500 text-sm">กล้องด้านในออฟไลน์</p>
+                    <i class="fas fa-spinner fa-spin text-4xl text-gray-600 mb-2"></i>
+                    <p class="text-gray-500 text-sm">กำลังตรวจสอบ...</p>
                 </div>
             </div>
-            <?php endif; ?>
             <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                 <div class="flex justify-between items-end">
                     <div>
@@ -176,57 +154,146 @@ $cam2Online = ($camStatus['camera_inside'] ?? '') === 'ONLINE';
 </div>
 
 <script>
-const CAM_SERVER = '<?= FACE_SERVER_URL ?>';
+let _camOutEnabled = false;
+let _camInEnabled = false;
 
-// Refresh snapshot ทุก 3 วินาที (ไม่ใช้ MJPEG stream เพื่อประหยัด resource Pi)
+// ดึง config กล้องจาก face_server แล้วอัพเดท UI
+async function fetchCamConfig() {
+    try {
+        const data = await fetchAPI(FACE_SERVER + '/api/status');
+        if (!data) throw new Error();
+
+        updateCamUI(1, 'outside', data.camera_outside);
+        updateCamUI(2, 'inside', data.camera_inside);
+
+        // อัพเดท motion/faces
+        updateCamStatus(data);
+    } catch {
+        // Face server offline
+        setCamError(1, 'Face Server ออฟไลน์');
+        setCamError(2, 'Face Server ออฟไลน์');
+    }
+}
+
+function updateCamUI(num, side, cfg) {
+    const dotEl = document.getElementById('cam' + num + 'Dot');
+    const titleEl = document.getElementById('cam' + num + 'Title');
+    const subEl = document.getElementById('cam' + num + 'Sub');
+    const badgeEl = document.getElementById('cam' + num + 'Badge');
+    const imgEl = document.getElementById('cam' + num + 'Stream');
+    const phEl = document.getElementById('cam' + num + 'Placeholder');
+    const label = side === 'outside' ? 'ด้านนอก' : 'ด้านใน';
+
+    if (!cfg || cfg.id < 0) {
+        // ไม่ได้กำหนดกล้อง
+        titleEl.textContent = 'กล้อง' + label + 'ประตู';
+        subEl.innerHTML = '<span class="text-yellow-400">ยังไม่ได้กำหนดกล้อง</span> — <a href="settings.php" class="text-blue-400 underline">ไปตั้งค่า</a>';
+        dotEl.className = 'w-3 h-3 bg-yellow-400 rounded-full';
+        badgeEl.textContent = 'ไม่ได้กำหนด';
+        badgeEl.className = 'text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded';
+        imgEl.style.display = 'none';
+        phEl.style.display = '';
+        phEl.querySelector('i').className = 'fas fa-camera-rotate text-4xl text-yellow-600 mb-2';
+        phEl.querySelector('p').innerHTML = 'ยังไม่ได้กำหนดกล้อง<br><a href="settings.php" class="text-blue-400 underline text-xs">ไปตั้งค่า</a>';
+        if (side === 'outside') _camOutEnabled = false;
+        else _camInEnabled = false;
+        return;
+    }
+
+    // กล้องกำหนดแล้ว
+    const devName = cfg.device_name || '/dev/video' + cfg.id;
+    titleEl.textContent = 'กล้อง' + label + 'ประตู';
+    subEl.textContent = devName + ' (video' + cfg.id + ')';
+
+    if (cfg.active && cfg.has_frame) {
+        dotEl.className = 'w-3 h-3 bg-green-400 pulse-dot rounded-full';
+        badgeEl.textContent = 'LIVE';
+        badgeEl.className = 'text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded';
+        if (side === 'outside') _camOutEnabled = true;
+        else _camInEnabled = true;
+    } else {
+        dotEl.className = 'w-3 h-3 bg-red-400 rounded-full';
+        badgeEl.textContent = 'OFFLINE';
+        badgeEl.className = 'text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded';
+        imgEl.style.display = 'none';
+        phEl.style.display = '';
+        phEl.querySelector('i').className = 'fas fa-video-slash text-4xl text-gray-600 mb-2';
+        phEl.querySelector('p').textContent = 'กล้องออฟไลน์';
+        if (side === 'outside') _camOutEnabled = false;
+        else _camInEnabled = false;
+    }
+}
+
+function setCamError(num, msg) {
+    const dotEl = document.getElementById('cam' + num + 'Dot');
+    const badgeEl = document.getElementById('cam' + num + 'Badge');
+    const phEl = document.getElementById('cam' + num + 'Placeholder');
+    dotEl.className = 'w-3 h-3 bg-red-400 rounded-full';
+    badgeEl.textContent = 'ERROR';
+    badgeEl.className = 'text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded';
+    document.getElementById('cam' + num + 'Stream').style.display = 'none';
+    phEl.style.display = '';
+    phEl.querySelector('i').className = 'fas fa-exclamation-triangle text-4xl text-red-600 mb-2';
+    phEl.querySelector('p').textContent = msg;
+}
+
+function updateCamStatus(data) {
+    const co = data.camera_outside;
+    const ci = data.camera_inside;
+
+    document.getElementById('cam1Motion').textContent = 'Motion: ' + (co?.motion ? 'DETECTED' : 'None');
+    document.getElementById('cam2Motion').textContent = 'Motion: ' + (ci?.motion ? 'DETECTED' : 'None');
+    document.getElementById('cam1Faces').textContent = 'Faces: ' + (co?.faces?.length || 0);
+    document.getElementById('cam2Faces').textContent = 'Faces: ' + (ci?.faces?.length || 0);
+
+    const now = new Date().toLocaleTimeString('th-TH');
+    document.getElementById('cam1Time').textContent = now;
+    document.getElementById('cam2Time').textContent = now;
+
+    // Detected faces list
+    const allFaces = [...(co?.faces || []), ...(ci?.faces || [])];
+    const facesDiv = document.getElementById('detectedFaces');
+    if (allFaces.length > 0) {
+        facesDiv.innerHTML = allFaces.map(([name, conf]) => `
+            <div class="flex items-center justify-between p-2 bg-white/5 rounded-lg">
+                <div class="flex items-center gap-2">
+                    <i class="fas ${name === 'Unknown' ? 'fa-user-xmark text-red-400' : 'fa-user-check text-green-400'}"></i>
+                    <span class="text-sm">${esc(name)}</span>
+                </div>
+                <span class="text-xs text-gray-400">${parseFloat(conf) || 0}%</span>
+            </div>
+        `).join('');
+    } else {
+        facesDiv.innerHTML = '<p class="text-gray-500 text-sm">ไม่มีใบหน้าที่ตรวจพบ</p>';
+    }
+}
+
+// Refresh snapshot เฉพาะกล้องที่เปิดอยู่
 function refreshSnapshots() {
     const ts = Date.now();
-    const cam1 = document.getElementById('cam1Stream');
-    const cam2 = document.getElementById('cam2Stream');
-    if (cam1) cam1.src = CAM_SERVER + '/api/snapshot/outside?t=' + ts;
-    if (cam2) cam2.src = CAM_SERVER + '/api/snapshot/inside?t=' + ts;
+    if (_camOutEnabled) {
+        const img1 = document.getElementById('cam1Stream');
+        const ph1 = document.getElementById('cam1Placeholder');
+        const tmpImg = new Image();
+        tmpImg.onload = () => { img1.src = tmpImg.src; img1.style.display = ''; ph1.style.display = 'none'; };
+        tmpImg.onerror = () => { img1.style.display = 'none'; ph1.style.display = ''; };
+        tmpImg.src = FACE_SERVER + '/api/snapshot/outside?t=' + ts;
+    }
+    if (_camInEnabled) {
+        const img2 = document.getElementById('cam2Stream');
+        const ph2 = document.getElementById('cam2Placeholder');
+        const tmpImg = new Image();
+        tmpImg.onload = () => { img2.src = tmpImg.src; img2.style.display = ''; ph2.style.display = 'none'; };
+        tmpImg.onerror = () => { img2.style.display = 'none'; ph2.style.display = ''; };
+        tmpImg.src = FACE_SERVER + '/api/snapshot/inside?t=' + ts;
+    }
 }
 
-async function updateCameraStatus() {
-    try {
-        const data = await fetchAPI(CAM_SERVER + '/api/status');
-        if (!data) return;
-
-        const co = data.camera_outside;
-        const ci = data.camera_inside;
-
-        document.getElementById('cam1Motion').textContent = 'Motion: ' + (co?.motion ? 'DETECTED' : 'None');
-        document.getElementById('cam2Motion').textContent = 'Motion: ' + (ci?.motion ? 'DETECTED' : 'None');
-        document.getElementById('cam1Faces').textContent = 'Faces: ' + (co?.faces?.length || 0);
-        document.getElementById('cam2Faces').textContent = 'Faces: ' + (ci?.faces?.length || 0);
-
-        const now = new Date().toLocaleTimeString('th-TH');
-        document.getElementById('cam1Time').textContent = now;
-        document.getElementById('cam2Time').textContent = now;
-
-        // Detected faces list
-        const allFaces = [...(co?.faces || []), ...(ci?.faces || [])];
-        const facesDiv = document.getElementById('detectedFaces');
-        if (allFaces.length > 0) {
-            facesDiv.innerHTML = allFaces.map(([name, conf]) => `
-                <div class="flex items-center justify-between p-2 bg-white/5 rounded-lg">
-                    <div class="flex items-center gap-2">
-                        <i class="fas ${name === 'Unknown' ? 'fa-user-xmark text-red-400' : 'fa-user-check text-green-400'}"></i>
-                        <span class="text-sm">${esc(name)}</span>
-                    </div>
-                    <span class="text-xs text-gray-400">${parseFloat(conf) || 0}%</span>
-                </div>
-            `).join('');
-        }
-    } catch(e) {}
-}
-
-// Snapshot refresh ทุก 3 วินาที, status ทุก 10 วินาที
 document.addEventListener('DOMContentLoaded', () => {
-    refreshSnapshots();
-    updateCameraStatus();
+    fetchCamConfig();
+    setTimeout(refreshSnapshots, 2000);
     setInterval(refreshSnapshots, 3000);
-    setInterval(updateCameraStatus, 10000);
+    setInterval(fetchCamConfig, 10000);
 });
 </script>
 
