@@ -8,29 +8,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') jsonResponse(['ok' => true]);
 
 try {
     $db = getDB();
-    $limit = min(max(intval($_GET['limit'] ?? 100), 1), 1000);
-    $date = $_GET['date'] ?? null;
 
-    $sql = "SELECT al.*, e.first_name, e.last_name, e.emp_code, e.department
-            FROM access_logs al
-            LEFT JOIN employees e ON al.employee_id = e.id";
+    $limit = min(max(intval($_GET['limit'] ?? 20), 1), 500);
+    $page = max(intval($_GET['page'] ?? 1), 1);
+    $offset = ($page - 1) * $limit;
+
+    $date = $_GET['date'] ?? null;
+    $dateFrom = $_GET['date_from'] ?? null;
+    $dateTo = $_GET['date_to'] ?? null;
+    $direction = $_GET['direction'] ?? null;
+    $authorized = $_GET['authorized'] ?? null;
+    $employee = $_GET['employee'] ?? null;
+    $search = $_GET['search'] ?? null;
+
+    $where = [];
     $params = [];
 
     if ($date) {
-        // Validate date format (YYYY-MM-DD)
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
             jsonResponse(['error' => 'รูปแบบวันที่ไม่ถูกต้อง (YYYY-MM-DD)'], 400);
         }
-        $sql .= " WHERE DATE(al.created_at) = ?";
+        $where[] = "DATE(al.created_at) = ?";
         $params[] = $date;
     }
 
-    $sql .= " ORDER BY al.created_at DESC LIMIT ?";
+    if ($dateFrom) {
+        $where[] = "al.created_at >= ?";
+        $params[] = $dateFrom . ' 00:00:00';
+    }
+
+    if ($dateTo) {
+        $where[] = "al.created_at <= ?";
+        $params[] = $dateTo . ' 23:59:59';
+    }
+
+    if ($direction && in_array($direction, ['IN', 'OUT'])) {
+        $where[] = "al.direction = ?";
+        $params[] = $direction;
+    }
+
+    if ($authorized !== null && $authorized !== '') {
+        $where[] = "al.is_authorized = ?";
+        $params[] = intval($authorized);
+    }
+
+    if ($employee && $employee !== 'all') {
+        if ($employee === 'unknown') {
+            $where[] = "al.employee_id IS NULL";
+        } else {
+            $where[] = "al.employee_id = ?";
+            $params[] = intval($employee);
+        }
+    }
+
+    if ($search) {
+        $where[] = "(e.first_name LIKE ? OR e.last_name LIKE ? OR e.emp_code LIKE ?)";
+        $searchTerm = '%' . $search . '%';
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+        $params[] = $searchTerm;
+    }
+
+    $whereSQL = $where ? ' WHERE ' . implode(' AND ', $where) : '';
+
+    // Count total
+    $countStmt = $db->prepare("SELECT COUNT(*) as total FROM access_logs al LEFT JOIN employees e ON al.employee_id = e.id" . $whereSQL);
+    $countStmt->execute($params);
+    $total = $countStmt->fetch()['total'];
+
+    // Fetch data
+    $sql = "SELECT al.*, e.first_name, e.last_name, e.emp_code, e.department
+            FROM access_logs al
+            LEFT JOIN employees e ON al.employee_id = e.id"
+            . $whereSQL
+            . " ORDER BY al.created_at DESC LIMIT ? OFFSET ?";
     $params[] = $limit;
+    $params[] = $offset;
 
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
-    jsonResponse($stmt->fetchAll());
+
+    jsonResponse([
+        'data' => $stmt->fetchAll(),
+        'pagination' => [
+            'page' => $page,
+            'limit' => $limit,
+            'total' => intval($total),
+            'total_pages' => max(1, ceil($total / $limit)),
+        ],
+    ]);
 } catch (PDOException $e) {
     error_log("[API access_logs] " . $e->getMessage());
     jsonResponse(['error' => 'เกิดข้อผิดพลาดของฐานข้อมูล'], 500);
