@@ -632,6 +632,130 @@ def api_config_esp32():
 
 
 # ============================================================
+# Camera Detection API (สแกนกล้อง USB ที่เสียบอยู่)
+# ============================================================
+@app.route('/api/cameras/detect')
+def api_cameras_detect():
+    """สแกนหากล้อง USB ทั้งหมดที่เชื่อมต่อ พร้อมแสดงตัวอย่างภาพ"""
+    import subprocess
+    cameras = []
+
+    # ใช้ v4l2-ctl ดูรายการอุปกรณ์
+    try:
+        result = subprocess.run(
+            ['v4l2-ctl', '--list-devices'],
+            capture_output=True, text=True, timeout=5
+        )
+        v4l2_output = result.stdout
+    except Exception:
+        v4l2_output = ""
+
+    # parse ชื่ออุปกรณ์จาก v4l2-ctl output
+    device_names = {}
+    current_name = None
+    for line in v4l2_output.split('\n'):
+        line = line.rstrip()
+        if line and not line.startswith('\t') and not line.startswith(' '):
+            current_name = line.rstrip(':')
+        elif line.strip().startswith('/dev/video'):
+            dev_id = line.strip().replace('/dev/video', '')
+            if dev_id.isdigit():
+                device_names[int(dev_id)] = current_name
+
+    # สแกน /dev/video0 ถึง /dev/video9
+    for i in range(10):
+        dev_path = f'/dev/video{i}'
+        if not os.path.exists(dev_path):
+            continue
+
+        cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
+        if not cap.isOpened():
+            continue
+
+        # ลองอ่านเฟรม
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+        ret, frame = cap.read()
+        cap.release()
+
+        if not ret or frame is None:
+            continue
+
+        # encode เป็น base64 thumbnail
+        import base64
+        _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+        thumb = base64.b64encode(buf).decode('utf-8')
+
+        # ดูว่ากำลังใช้เป็นกล้องไหนอยู่
+        assigned = None
+        if i == config.CAMERA_OUTSIDE_ID:
+            assigned = 'outside'
+        elif i == config.CAMERA_INSIDE_ID:
+            assigned = 'inside'
+
+        cameras.append({
+            'id': i,
+            'device': dev_path,
+            'name': device_names.get(i, f'Camera {i}'),
+            'thumbnail': thumb,
+            'assigned': assigned,
+            'can_read': True
+        })
+
+    return jsonify({
+        'cameras': cameras,
+        'current_outside': config.CAMERA_OUTSIDE_ID,
+        'current_inside': config.CAMERA_INSIDE_ID
+    })
+
+
+@app.route('/api/cameras/assign', methods=['POST'])
+def api_cameras_assign():
+    """กำหนดว่ากล้อง ID ไหนเป็นด้านนอก/ด้านใน แล้ว restart camera threads"""
+    data = request.json
+    if not data:
+        return jsonify({"error": "No JSON body"}), 400
+
+    outside_id = int(data.get('outside', -1))
+    inside_id = int(data.get('inside', -1))
+
+    # อัพเดท config runtime
+    config.CAMERA_OUTSIDE_ID = outside_id
+    config.CAMERA_INSIDE_ID = inside_id
+
+    # อัพเดท .env file
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    lines = []
+    found_out = False
+    found_in = False
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                if line.strip().startswith('CAMERA_OUTSIDE_ID='):
+                    lines.append(f'CAMERA_OUTSIDE_ID={outside_id}\n')
+                    found_out = True
+                elif line.strip().startswith('CAMERA_INSIDE_ID='):
+                    lines.append(f'CAMERA_INSIDE_ID={inside_id}\n')
+                    found_in = True
+                else:
+                    lines.append(line)
+    if not found_out:
+        lines.append(f'CAMERA_OUTSIDE_ID={outside_id}\n')
+    if not found_in:
+        lines.append(f'CAMERA_INSIDE_ID={inside_id}\n')
+    with open(env_path, 'w') as f:
+        f.writelines(lines)
+
+    print(f"[Config] Camera assigned: outside={outside_id}, inside={inside_id}")
+    return jsonify({
+        "success": True,
+        "outside": outside_id,
+        "inside": inside_id,
+        "message": "กรุณา restart face_server เพื่อใช้กล้องใหม่"
+    })
+
+
+# ============================================================
 # Camera Capture API (ถ่ายภาพจากกล้องตัวเดียวกับที่สแกน)
 # ============================================================
 @app.route('/api/capture/photo')

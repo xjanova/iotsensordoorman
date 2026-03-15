@@ -374,33 +374,40 @@ $componentNames = [
 
 <!-- Tab 3: Camera & Processing -->
 <div id="spanel-camera" class="settings-panel hidden">
+
+<!-- Camera Detection -->
+<div class="glass rounded-2xl p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold flex items-center gap-2">
+            <i class="fas fa-video text-pink-400"></i> กล้อง USB ที่ตรวจพบ
+        </h3>
+        <button type="button" onclick="detectCameras()" class="text-xs text-blue-400 hover:text-blue-300 transition flex items-center gap-1" id="btnDetectCam">
+            <i class="fas fa-rotate"></i> สแกนกล้องใหม่
+        </button>
+    </div>
+
+    <div id="cameraDetectResult" class="text-sm text-gray-500 mb-4">
+        <div class="flex items-center gap-2">
+            <i class="fas fa-spinner fa-spin"></i> กำลังสแกนกล้อง...
+        </div>
+    </div>
+
+    <div id="cameraGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+    <div id="cameraAssignBtn" class="mt-4 hidden">
+        <button type="button" onclick="assignCameras()" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl transition text-sm flex items-center gap-2">
+            <i class="fas fa-check"></i> บันทึกการกำหนดกล้อง
+        </button>
+        <p class="text-xs text-yellow-400 mt-2"><i class="fas fa-exclamation-triangle mr-1"></i> หลังบันทึก ต้อง restart face_server บน Pi เพื่อใช้กล้องใหม่</p>
+    </div>
+</div>
+
+<!-- Camera Processing Settings -->
 <div class="glass rounded-2xl p-6">
     <h3 class="font-bold mb-6 flex items-center gap-2">
-        <i class="fas fa-video text-pink-400"></i> ตั้งค่ากล้อง & การประมวลผล
+        <i class="fas fa-cogs text-purple-400"></i> ตั้งค่าการประมวลผล
     </h3>
     <div class="space-y-4">
-        <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-            <div>
-                <p class="text-sm font-medium">Camera ID กล้องด้านนอก</p>
-                <p class="text-xs text-gray-500">หมายเลข /dev/video ของกล้องนอก (0, 2, 4...)</p>
-            </div>
-            <div class="flex items-center gap-2">
-                <input type="number" name="camera_outside_id" value="<?= htmlspecialchars($settings['camera_outside_id'] ?? '0') ?>"
-                       class="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white w-24 text-right focus:outline-none focus:border-blue-500" min="0" max="10">
-            </div>
-        </div>
-
-        <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-            <div>
-                <p class="text-sm font-medium">Camera ID กล้องด้านใน</p>
-                <p class="text-xs text-gray-500">หมายเลข /dev/video ของกล้องใน (0, 2, 4...)</p>
-            </div>
-            <div class="flex items-center gap-2">
-                <input type="number" name="camera_inside_id" value="<?= htmlspecialchars($settings['camera_inside_id'] ?? '1') ?>"
-                       class="bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white w-24 text-right focus:outline-none focus:border-blue-500" min="0" max="10">
-            </div>
-        </div>
-
         <div class="flex items-center justify-between p-4 bg-white/5 rounded-xl">
             <div>
                 <p class="text-sm font-medium">ประมวลผลทุกกี่เฟรม</p>
@@ -991,6 +998,118 @@ async function pullUpdate() {
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-download"></i> อัพเดทเลย';
 }
+
+// ============================================================
+// Camera Detection & Assignment
+// ============================================================
+let _detectedCameras = [];
+let _prevCameraCount = -1;
+
+async function detectCameras() {
+    const grid = document.getElementById('cameraGrid');
+    const result = document.getElementById('cameraDetectResult');
+    const assignBtn = document.getElementById('cameraAssignBtn');
+
+    result.innerHTML = '<div class="flex items-center gap-2"><i class="fas fa-spinner fa-spin text-blue-400"></i> กำลังสแกนกล้อง USB ที่เชื่อมต่อ...</div>';
+    grid.innerHTML = '';
+    assignBtn.classList.add('hidden');
+
+    try {
+        const resp = await fetch(FACE_SERVER + '/api/cameras/detect', {signal: AbortSignal.timeout(15000)});
+        if (!resp.ok) throw new Error('Pi ไม่ตอบสนอง');
+        const data = await resp.json();
+        _detectedCameras = data.cameras || [];
+
+        // ตรวจว่าจำนวนกล้องเปลี่ยนไหม (สำหรับ auto-poll)
+        if (_prevCameraCount >= 0 && _prevCameraCount !== _detectedCameras.length) {
+            showToast(`ตรวจพบการเปลี่ยนแปลง: ${_detectedCameras.length} กล้อง (ก่อนหน้า ${_prevCameraCount})`, 'info');
+        }
+        _prevCameraCount = _detectedCameras.length;
+
+        if (_detectedCameras.length === 0) {
+            result.innerHTML = '<div class="flex items-center gap-2 text-yellow-400"><i class="fas fa-exclamation-triangle"></i> ไม่พบกล้อง USB — ลองเสียบกล้องแล้วกดสแกนอีกครั้ง</div>';
+            return;
+        }
+
+        result.innerHTML = `<div class="flex items-center gap-2 text-green-400"><i class="fas fa-check-circle"></i> พบ ${_detectedCameras.length} กล้อง — เลือกกำหนดตำแหน่ง (ด้านนอก / ด้านใน)</div>`;
+
+        _detectedCameras.forEach(cam => {
+            const card = document.createElement('div');
+            card.className = 'bg-white/5 rounded-xl p-4 border border-white/10';
+            card.innerHTML = `
+                <div class="mb-3">
+                    <img src="data:image/jpeg;base64,${cam.thumbnail}" class="w-full rounded-lg aspect-video object-cover" alt="Camera ${cam.id}">
+                </div>
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <p class="text-sm font-medium">${cam.device}</p>
+                        <p class="text-xs text-gray-500">${cam.name}</p>
+                    </div>
+                    <span class="text-xs px-2 py-0.5 rounded-full ${cam.can_read ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
+                        ${cam.can_read ? 'ใช้งานได้' : 'ใช้ไม่ได้'}
+                    </span>
+                </div>
+                <select id="camAssign_${cam.id}" class="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500 mt-2">
+                    <option value="">ไม่ใช้งาน</option>
+                    <option value="outside" ${cam.assigned === 'outside' ? 'selected' : ''}>กล้องด้านนอก</option>
+                    <option value="inside" ${cam.assigned === 'inside' ? 'selected' : ''}>กล้องด้านใน</option>
+                </select>
+            `;
+            grid.appendChild(card);
+        });
+
+        assignBtn.classList.remove('hidden');
+    } catch (e) {
+        result.innerHTML = `<div class="flex items-center gap-2 text-red-400"><i class="fas fa-times-circle"></i> สแกนไม่ได้: ${e.message}</div>`;
+    }
+}
+
+async function assignCameras() {
+    let outsideId = -1;
+    let insideId = -1;
+
+    _detectedCameras.forEach(cam => {
+        const sel = document.getElementById(`camAssign_${cam.id}`);
+        if (sel) {
+            if (sel.value === 'outside') outsideId = cam.id;
+            if (sel.value === 'inside') insideId = cam.id;
+        }
+    });
+
+    try {
+        const resp = await fetch(FACE_SERVER + '/api/cameras/assign', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ outside: outsideId, inside: insideId })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            showToast('บันทึกการกำหนดกล้องสำเร็จ — กรุณา restart face_server บน Pi', 'success');
+        } else {
+            showToast(data.error || 'เกิดข้อผิดพลาด', 'error');
+        }
+    } catch (e) {
+        showToast('ไม่สามารถบันทึก: ' + e.message, 'error');
+    }
+}
+
+// Auto-poll ทุก 5 วินาทีเพื่อตรวจจับกล้องใหม่เมื่ออยู่ tab กล้อง
+let _cameraPollInterval = null;
+const origSwitchTab = switchSettingsTab;
+switchSettingsTab = function(tab) {
+    origSwitchTab(tab);
+    if (tab === 'camera') {
+        detectCameras();
+        if (!_cameraPollInterval) {
+            _cameraPollInterval = setInterval(detectCameras, 8000);
+        }
+    } else {
+        if (_cameraPollInterval) {
+            clearInterval(_cameraPollInterval);
+            _cameraPollInterval = null;
+        }
+    }
+};
 </script>
 
 <?php include 'includes/footer.php'; ?>

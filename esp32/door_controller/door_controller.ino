@@ -26,7 +26,7 @@
 // ============================================================
 // Configuration
 // ============================================================
-const char* WIFI_SSID     = "Tee_2.4G";
+const char* WIFI_SSID     = "TEE_2.4G";
 const char* WIFI_PASSWORD = "tee246246";
 const char* SERVER_URL    = "http://192.168.1.121:5000";  // Raspberry Pi IP
 
