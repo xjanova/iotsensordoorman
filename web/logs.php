@@ -400,36 +400,49 @@ function showSnapshot(path, name, time) {
 
     img.style.display = 'none';
     loading.style.display = '';
+    loading.innerHTML = '<i class="fas fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">กำลังโหลดรูป...</p>';
     modal.style.display = 'flex';
 
-    // ลองโหลดรูปจาก Laragon ก่อน (path = "snapshots/2026-03/cam1_xxx.jpg")
-    // ถ้ามี / แสดงว่าเป็น path บน Laragon
-    let imgUrl;
+    const ts = Date.now();
+
     if (path.includes('/')) {
-        imgUrl = path + '?t=' + Date.now();
+        // path ใหม่ (snapshots/2026-03/xxx.jpg) → โหลดจาก Laragon
+        tryLoadImage(path + '?t=' + ts, img, loading, null);
     } else {
-        // path เก่า (ชื่อไฟล์เดี่ยว) → ลองดึงจาก face_server
-        imgUrl = FACE_SERVER + '/api/snapshots/' + path + '?t=' + Date.now();
+        // path เก่า (ชื่อไฟล์เดี่ยว) → ลอง Laragon ก่อน แล้ว fallback ไป Pi
+        const laragonUrl = 'snapshots/' + path + '?t=' + ts;
+        const piUrl = FACE_SERVER + '/api/snapshots/' + path + '?t=' + ts;
+        tryLoadImage(laragonUrl, img, loading, piUrl);
     }
 
+    document.addEventListener('keydown', _snapEscHandler);
+}
+
+function tryLoadImage(url, imgEl, loadingEl, fallbackUrl) {
     const testImg = new Image();
     testImg.onload = () => {
-        img.src = testImg.src;
-        img.style.display = '';
-        loading.style.display = 'none';
+        imgEl.src = testImg.src;
+        imgEl.style.display = '';
+        loadingEl.style.display = 'none';
     };
     testImg.onerror = () => {
-        // Fallback: ลองจาก face_server ถ้า path เดิม
-        if (path.includes('/')) {
-            loading.innerHTML = '<i class="fas fa-image-slash text-3xl text-red-400 mb-2"></i><p class="text-sm text-red-400">ไม่พบรูปภาพ</p>';
+        if (fallbackUrl) {
+            // ลอง fallback (Pi)
+            const fallbackImg = new Image();
+            fallbackImg.onload = () => {
+                imgEl.src = fallbackImg.src;
+                imgEl.style.display = '';
+                loadingEl.style.display = 'none';
+            };
+            fallbackImg.onerror = () => {
+                loadingEl.innerHTML = '<i class="fas fa-image text-3xl text-red-400 mb-2"></i><p class="text-sm text-red-400">ไม่พบรูปภาพ</p>';
+            };
+            fallbackImg.src = fallbackUrl;
         } else {
-            loading.innerHTML = '<i class="fas fa-image-slash text-3xl text-red-400 mb-2"></i><p class="text-sm text-red-400">ไม่พบรูปภาพ</p>';
+            loadingEl.innerHTML = '<i class="fas fa-image text-3xl text-red-400 mb-2"></i><p class="text-sm text-red-400">ไม่พบรูปภาพ</p>';
         }
     };
-    testImg.src = imgUrl;
-
-    // ปิดด้วย ESC
-    document.addEventListener('keydown', _snapEscHandler);
+    testImg.src = url;
 }
 
 function _snapEscHandler(e) {

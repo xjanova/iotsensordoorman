@@ -473,6 +473,21 @@ def index():
     return jsonify({"system": "Bunny Door System", "status": "running"})
 
 
+@app.route('/api/snapshots/<path:filename>')
+def serve_snapshot_file(filename):
+    """ส่งรูป snapshot เก่าที่ยังอยู่บน Pi (backward compatibility)"""
+    from flask import send_from_directory, abort
+    safe_name = os.path.basename(filename)
+    if safe_name != filename or '..' in filename:
+        abort(400)
+    snap_dir = os.path.abspath(config.SNAPSHOT_DIR)
+    filepath = os.path.join(snap_dir, safe_name)
+    if not os.path.isfile(filepath):
+        abort(404)
+    return send_from_directory(snap_dir, safe_name, mimetype='image/jpeg',
+                               max_age=86400)
+
+
 @app.route('/api/snapshot/outside')
 def snapshot_outside():
     """ส่ง JPEG snapshot ล่าสุดจากกล้องด้านนอก"""
