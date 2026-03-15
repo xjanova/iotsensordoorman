@@ -25,6 +25,7 @@ from flask import Flask, Response, jsonify, request
 from flask_cors import CORS
 import face_recognition
 from simple_facerec import SimpleFaceRec
+import logging
 import config
 
 # ============================================================
@@ -32,6 +33,33 @@ import config
 # ============================================================
 app = Flask(__name__)
 CORS(app)
+
+# ============================================================
+# File-based Logging (สำหรับดูผ่านเว็บ)
+# ============================================================
+LOG_FILE = os.path.join(os.path.dirname(__file__), 'face_server.log')
+_log_handler = logging.FileHandler(LOG_FILE, encoding='utf-8')
+_log_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S'))
+_log_handler.setLevel(logging.DEBUG)
+
+# หัก stdout ของ print ไปเก็บใน log file ด้วย
+class _TeeWriter:
+    def __init__(self, original, log_file):
+        self.original = original
+        self.log_file = log_file
+    def write(self, msg):
+        self.original.write(msg)
+        if msg.strip():
+            try:
+                with open(self.log_file, 'a', encoding='utf-8') as f:
+                    f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} [INFO] {msg.strip()}\n")
+            except Exception:
+                pass
+    def flush(self):
+        self.original.flush()
+
+sys.stdout = _TeeWriter(sys.__stdout__, LOG_FILE)
+sys.stderr = _TeeWriter(sys.__stderr__, LOG_FILE)
 
 # Face Recognition
 sfr = SimpleFaceRec(
@@ -753,6 +781,115 @@ def api_cameras_assign():
         "inside": inside_id,
         "message": "กรุณา restart face_server เพื่อใช้กล้องใหม่"
     })
+
+
+# ============================================================
+# ============================================================
+# Web Terminal API (สั่งคำสั่งบน Pi ผ่านเว็บ)
+# ============================================================
+# คำสั่งที่อนุญาต (whitelist เพื่อความปลอดภัย)
+_ALLOWED_COMMANDS = [
+    'ls', 'pwd', 'whoami', 'hostname', 'uptime', 'df', 'free',
+    'cat', 'head', 'tail', 'wc', 'date', 'uname',
+    'ps', 'top', 'htop', 'vcgencmd', 'ip', 'ifconfig', 'ping',
+    'v4l2-ctl', 'lsusb', 'lsblk', 'systemctl',
+    'pip', 'pip3', 'python', 'python3',
+    'git', 'cd', 'echo', 'grep', 'find', 'which',
+    'startbunny', 'pkill', 'kill',
+]
+
+@app.route('/api/terminal', methods=['POST'])
+def api_terminal():
+    """รันคำสั่งบน Pi ผ่านเว็บ (จำกัดคำสั่งที่อนุญาต)"""
+    data = request.json
+    if not data or not data.get('command'):
+        return jsonify({"error": "กรุณาระบุคำสั่ง"}), 400
+
+    cmd = data['command'].strip()
+    if not cmd:
+        return jsonify({"error": "คำสั่งว่าง"}), 400
+
+    # ตรวจสอบคำสั่งแรก (base command)
+    base_cmd = cmd.split()[0].split('/')[-1]  # ดึงเฉพาะชื่อคำสั่ง
+    if base_cmd not in _ALLOWED_COMMANDS:
+        return jsonify({
+            "error": f"คำสั่ง '{base_cmd}' ไม่ได้รับอนุญาต",
+            "allowed": _ALLOWED_COMMANDS
+        }), 403
+
+    # ห้ามใช้ rm, dd, mkfs, fdisk เด็ดขาด
+    dangerous = ['rm ', 'rm\t', 'dd ', 'mkfs', 'fdisk', 'format', 'shutdown', 'reboot', 'halt', '> /dev']
+    for d in dangerous:
+        if d in cmd:
+            return jsonify({"error": f"คำสั่งอันตราย: {d.strip()}"}), 403
+
+    try:
+        import subprocess
+        result = subprocess.run(
+            cmd, shell=True,
+            capture_output=True, text=True,
+            timeout=30,
+            cwd=os.path.expanduser('~/bunny-door')
+        )
+        return jsonify({
+            "success": True,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "returncode": result.returncode
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({"error": "คำสั่งใช้เวลานานเกิน 30 วินาที"}), 408
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================================
+# Server Log API (ดู/ลบ log ผ่านเว็บ)
+# ============================================================
+@app.route('/api/logs/server')
+def api_logs_server():
+    """ดู log ของ face_server"""
+    lines = int(request.args.get('lines', 200))
+    search = request.args.get('search', '').lower()
+    level = request.args.get('level', '')  # INFO, ERROR, WARNING
+
+    if not os.path.exists(LOG_FILE):
+        return jsonify({"logs": [], "total_lines": 0, "file_size": 0})
+
+    file_size = os.path.getsize(LOG_FILE)
+    with open(LOG_FILE, 'r', encoding='utf-8', errors='replace') as f:
+        all_lines = f.readlines()
+
+    total_lines = len(all_lines)
+
+    # กรอง
+    filtered = all_lines
+    if level:
+        filtered = [l for l in filtered if f'[{level}]' in l]
+    if search:
+        filtered = [l for l in filtered if search in l.lower()]
+
+    # เอาเฉพาะ N บรรทัดท้าย
+    result = filtered[-lines:]
+
+    return jsonify({
+        "logs": [l.rstrip('\n') for l in result],
+        "total_lines": total_lines,
+        "filtered_lines": len(filtered),
+        "file_size": file_size,
+        "file_size_mb": round(file_size / 1024 / 1024, 2)
+    })
+
+
+@app.route('/api/logs/server/clear', methods=['POST'])
+def api_logs_clear():
+    """ลบ log file"""
+    try:
+        with open(LOG_FILE, 'w', encoding='utf-8') as f:
+            f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} [INFO] Log cleared via web interface\n")
+        return jsonify({"success": True, "message": "ลบ log เรียบร้อย"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ============================================================

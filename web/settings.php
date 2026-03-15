@@ -187,6 +187,12 @@ $componentNames = [
     <button onclick="switchSettingsTab('camera')" id="stab-camera" class="stab-btn flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition text-gray-400 hover:text-white">
         <i class="fas fa-video"></i> กล้อง & ประมวลผล
     </button>
+    <button onclick="switchSettingsTab('logs')" id="stab-logs" class="stab-btn flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition text-gray-400 hover:text-white">
+        <i class="fas fa-scroll"></i> Server Log
+    </button>
+    <button onclick="switchSettingsTab('terminal')" id="stab-terminal" class="stab-btn flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition text-gray-400 hover:text-white">
+        <i class="fas fa-terminal"></i> Terminal
+    </button>
 </div>
 
 <form id="settingsForm" onsubmit="saveSettings(event)">
@@ -420,6 +426,107 @@ $componentNames = [
             </div>
         </div>
     </div>
+</div>
+</div>
+
+<!-- Tab 4: Server Log -->
+<div id="spanel-logs" class="settings-panel hidden">
+<div class="glass rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold flex items-center gap-2">
+            <i class="fas fa-terminal text-green-400"></i> Face Server Log
+        </h3>
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-500" id="logFileInfo">-</span>
+            <button type="button" onclick="fetchServerLogs()" class="text-xs text-blue-400 hover:text-blue-300 transition flex items-center gap-1">
+                <i class="fas fa-rotate"></i> รีเฟรช
+            </button>
+            <button type="button" onclick="clearServerLogs()" class="text-xs text-red-400 hover:text-red-300 transition flex items-center gap-1">
+                <i class="fas fa-trash"></i> ลบ Log
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-2 mb-4">
+        <select id="logLevel" onchange="fetchServerLogs()" class="bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500">
+            <option value="">ทุก Level</option>
+            <option value="INFO">INFO</option>
+            <option value="WARNING">WARNING</option>
+            <option value="ERROR">ERROR</option>
+        </select>
+        <input type="text" id="logSearch" placeholder="ค้นหา..." onkeyup="if(event.key==='Enter')fetchServerLogs()"
+               class="bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500 w-48">
+        <select id="logLines" onchange="fetchServerLogs()" class="bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs focus:outline-none focus:border-blue-500">
+            <option value="100">100 บรรทัด</option>
+            <option value="200" selected>200 บรรทัด</option>
+            <option value="500">500 บรรทัด</option>
+            <option value="1000">1000 บรรทัด</option>
+        </select>
+        <label class="flex items-center gap-1 text-xs text-gray-400">
+            <input type="checkbox" id="logAutoScroll" checked class="rounded"> Auto-scroll
+        </label>
+    </div>
+
+    <!-- Log Output -->
+    <div class="bg-black/60 rounded-xl p-4 overflow-auto font-mono text-xs leading-5" id="logOutput" style="max-height: 500px; min-height: 200px;">
+        <p class="text-gray-600">กดแท็บ "Server Log" เพื่อโหลด...</p>
+    </div>
+
+    <div class="flex items-center justify-between mt-3">
+        <p class="text-xs text-gray-600" id="logStats">-</p>
+        <label class="flex items-center gap-1 text-xs text-gray-400">
+            <input type="checkbox" id="logAutoRefresh" onchange="toggleLogAutoRefresh()"> Auto-refresh ทุก 3 วินาที
+        </label>
+    </div>
+</div>
+</div>
+
+<!-- Tab 5: Terminal -->
+<div id="spanel-terminal" class="settings-panel hidden">
+<div class="glass rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold flex items-center gap-2">
+            <i class="fas fa-terminal text-green-400"></i> Raspberry Pi Terminal
+        </h3>
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-500">cwd: ~/bunny-door</span>
+            <button type="button" onclick="clearTerminal()" class="text-xs text-red-400 hover:text-red-300 transition flex items-center gap-1">
+                <i class="fas fa-trash"></i> ล้างจอ
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Commands -->
+    <div class="flex flex-wrap gap-2 mb-4">
+        <button type="button" onclick="runQuickCmd('git status')" class="bg-white/10 hover:bg-white/20 text-xs px-3 py-1.5 rounded-lg transition">git status</button>
+        <button type="button" onclick="runQuickCmd('git pull')" class="bg-white/10 hover:bg-white/20 text-xs px-3 py-1.5 rounded-lg transition">git pull</button>
+        <button type="button" onclick="runQuickCmd('ps aux | grep face_server')" class="bg-white/10 hover:bg-white/20 text-xs px-3 py-1.5 rounded-lg transition">ps face_server</button>
+        <button type="button" onclick="runQuickCmd('free -h')" class="bg-white/10 hover:bg-white/20 text-xs px-3 py-1.5 rounded-lg transition">free -h</button>
+        <button type="button" onclick="runQuickCmd('df -h')" class="bg-white/10 hover:bg-white/20 text-xs px-3 py-1.5 rounded-lg transition">df -h</button>
+        <button type="button" onclick="runQuickCmd('uptime')" class="bg-white/10 hover:bg-white/20 text-xs px-3 py-1.5 rounded-lg transition">uptime</button>
+        <button type="button" onclick="runQuickCmd('vcgencmd measure_temp')" class="bg-white/10 hover:bg-white/20 text-xs px-3 py-1.5 rounded-lg transition">CPU Temp</button>
+        <button type="button" onclick="runQuickCmd('v4l2-ctl --list-devices')" class="bg-white/10 hover:bg-white/20 text-xs px-3 py-1.5 rounded-lg transition">กล้อง USB</button>
+        <button type="button" onclick="runQuickCmd('lsusb')" class="bg-white/10 hover:bg-white/20 text-xs px-3 py-1.5 rounded-lg transition">lsusb</button>
+        <button type="button" onclick="runQuickCmd('ip addr show')" class="bg-white/10 hover:bg-white/20 text-xs px-3 py-1.5 rounded-lg transition">IP Address</button>
+    </div>
+
+    <!-- Terminal Output -->
+    <div class="bg-black/80 rounded-xl p-4 overflow-auto font-mono text-xs leading-5" id="terminalOutput" style="max-height: 400px; min-height: 200px;">
+        <p class="text-green-400">root1@raspberrypi:~/bunny-door$ <span class="text-gray-500">พร้อมใช้งาน — พิมพ์คำสั่งด้านล่าง</span></p>
+    </div>
+
+    <!-- Command Input -->
+    <div class="flex gap-2 mt-3">
+        <span class="text-green-400 text-sm font-mono flex items-center">$</span>
+        <input type="text" id="terminalInput" placeholder="พิมพ์คำสั่ง..."
+               class="flex-1 bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-green-500"
+               onkeydown="if(event.key==='Enter'){runTerminalCmd(); event.preventDefault();}">
+        <button type="button" onclick="runTerminalCmd()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm transition">
+            <i class="fas fa-play"></i> รัน
+        </button>
+    </div>
+    <p class="text-xs text-gray-600 mt-2"><i class="fas fa-shield-halved mr-1"></i> จำกัดเฉพาะคำสั่งที่ปลอดภัย — ห้าม rm, dd, shutdown</p>
 </div>
 </div>
 
@@ -1093,6 +1200,147 @@ async function assignCameras() {
     }
 }
 
+// ============================================================
+// Pi Web Terminal
+// ============================================================
+let _cmdHistory = [];
+let _cmdIndex = -1;
+
+async function runTerminalCmd() {
+    const input = document.getElementById('terminalInput');
+    const cmd = input.value.trim();
+    if (!cmd) return;
+    input.value = '';
+    _cmdHistory.unshift(cmd);
+    _cmdIndex = -1;
+    runQuickCmd(cmd);
+}
+
+async function runQuickCmd(cmd) {
+    const output = document.getElementById('terminalOutput');
+    output.innerHTML += `\n<span class="text-green-400">root1@raspberrypi:~/bunny-door$</span> <span class="text-white">${escapeHtml(cmd)}</span>\n`;
+    output.innerHTML += '<span class="text-gray-500">กำลังรัน...</span>\n';
+    output.scrollTop = output.scrollHeight;
+
+    try {
+        const resp = await fetch(FACE_SERVER + '/api/terminal', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ command: cmd }),
+            signal: AbortSignal.timeout(35000)
+        });
+        const data = await resp.json();
+
+        // ลบ "กำลังรัน..."
+        const lines = output.innerHTML.split('\n');
+        lines.pop(); // remove trailing
+        lines.pop(); // remove "กำลังรัน..."
+        output.innerHTML = lines.join('\n');
+
+        if (data.error) {
+            output.innerHTML += `\n<span class="text-red-400">${escapeHtml(data.error)}</span>\n`;
+        } else {
+            if (data.stdout) output.innerHTML += `\n<span class="text-gray-200">${escapeHtml(data.stdout)}</span>`;
+            if (data.stderr) output.innerHTML += `<span class="text-yellow-400">${escapeHtml(data.stderr)}</span>`;
+            if (data.returncode !== 0) {
+                output.innerHTML += `<span class="text-red-400">[exit code: ${data.returncode}]</span>\n`;
+            }
+        }
+    } catch (e) {
+        output.innerHTML += `\n<span class="text-red-400">Error: ${escapeHtml(e.message)}</span>\n`;
+    }
+
+    output.scrollTop = output.scrollHeight;
+}
+
+function clearTerminal() {
+    document.getElementById('terminalOutput').innerHTML = '<span class="text-green-400">root1@raspberrypi:~/bunny-door$</span> <span class="text-gray-500">Terminal ถูกล้าง</span>';
+}
+
+// Keyboard: arrow up/down for history
+document.addEventListener('keydown', (e) => {
+    const input = document.getElementById('terminalInput');
+    if (document.activeElement !== input || _cmdHistory.length === 0) return;
+    if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _cmdIndex = Math.min(_cmdIndex + 1, _cmdHistory.length - 1);
+        input.value = _cmdHistory[_cmdIndex] || '';
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _cmdIndex = Math.max(_cmdIndex - 1, -1);
+        input.value = _cmdIndex >= 0 ? _cmdHistory[_cmdIndex] : '';
+    }
+});
+
+// ============================================================
+// Server Log Viewer
+// ============================================================
+let _logInterval = null;
+
+async function fetchServerLogs() {
+    const level = document.getElementById('logLevel')?.value || '';
+    const search = document.getElementById('logSearch')?.value || '';
+    const lines = document.getElementById('logLines')?.value || 200;
+    const output = document.getElementById('logOutput');
+
+    try {
+        const params = new URLSearchParams({ lines, level, search });
+        const resp = await fetch(FACE_SERVER + '/api/logs/server?' + params, {signal: AbortSignal.timeout(5000)});
+        if (!resp.ok) throw new Error('ไม่สามารถดึง log ได้');
+        const data = await resp.json();
+
+        // สีตาม level
+        const colored = data.logs.map(line => {
+            if (line.includes('[ERROR]')) return `<span class="text-red-400">${escapeHtml(line)}</span>`;
+            if (line.includes('[WARNING]')) return `<span class="text-yellow-400">${escapeHtml(line)}</span>`;
+            if (line.includes('[Camera]')) return `<span class="text-cyan-400">${escapeHtml(line)}</span>`;
+            if (line.includes('[PIR]') || line.includes('[DOOR]')) return `<span class="text-green-400">${escapeHtml(line)}</span>`;
+            if (line.includes('[ESP32]')) return `<span class="text-yellow-300">${escapeHtml(line)}</span>`;
+            return `<span class="text-gray-300">${escapeHtml(line)}</span>`;
+        });
+
+        output.innerHTML = colored.join('\n') || '<span class="text-gray-600">ไม่มี log</span>';
+
+        // Auto-scroll
+        if (document.getElementById('logAutoScroll')?.checked) {
+            output.scrollTop = output.scrollHeight;
+        }
+
+        // Stats
+        document.getElementById('logFileInfo').textContent = `${data.file_size_mb} MB`;
+        document.getElementById('logStats').textContent = `แสดง ${data.logs.length} / ${data.filtered_lines} บรรทัด (ทั้งหมด ${data.total_lines})`;
+    } catch (e) {
+        output.innerHTML = `<span class="text-red-400">ไม่สามารถดึง log: ${escapeHtml(e.message)}</span>`;
+    }
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function clearServerLogs() {
+    if (!confirm('ต้องการลบ log ทั้งหมด?')) return;
+    try {
+        const resp = await fetch(FACE_SERVER + '/api/logs/server/clear', { method: 'POST' });
+        const data = await resp.json();
+        if (data.success) {
+            showToast('ลบ log เรียบร้อย', 'success');
+            fetchServerLogs();
+        }
+    } catch (e) {
+        showToast('ลบไม่ได้: ' + e.message, 'error');
+    }
+}
+
+function toggleLogAutoRefresh() {
+    if (document.getElementById('logAutoRefresh')?.checked) {
+        _logInterval = setInterval(fetchServerLogs, 3000);
+    } else {
+        clearInterval(_logInterval);
+        _logInterval = null;
+    }
+}
+
 // Auto-poll ทุก 5 วินาทีเพื่อตรวจจับกล้องใหม่เมื่ออยู่ tab กล้อง
 let _cameraPollInterval = null;
 const origSwitchTab = switchSettingsTab;
@@ -1107,6 +1355,16 @@ switchSettingsTab = function(tab) {
         if (_cameraPollInterval) {
             clearInterval(_cameraPollInterval);
             _cameraPollInterval = null;
+        }
+    }
+    if (tab === 'logs') {
+        fetchServerLogs();
+    } else {
+        if (_logInterval) {
+            clearInterval(_logInterval);
+            _logInterval = null;
+            const cb = document.getElementById('logAutoRefresh');
+            if (cb) cb.checked = false;
         }
     }
 };
