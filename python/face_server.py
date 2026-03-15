@@ -666,7 +666,15 @@ def api_config_esp32():
 def api_cameras_detect():
     """สแกนหากล้อง USB ทั้งหมดที่เชื่อมต่อ พร้อมแสดงตัวอย่างภาพ"""
     import subprocess
+    import base64
     cameras = []
+
+    # สร้าง reverse map: camera_id -> cam_name สำหรับกล้องที่เปิดอยู่แล้ว
+    active_cameras = {}
+    if config.CAMERA_OUTSIDE_ID >= 0 and "camera_outside" in _camera_captures:
+        active_cameras[config.CAMERA_OUTSIDE_ID] = "camera_outside"
+    if config.CAMERA_INSIDE_ID >= 0 and "camera_inside" in _camera_captures:
+        active_cameras[config.CAMERA_INSIDE_ID] = "camera_inside"
 
     # ใช้ v4l2-ctl ดูรายการอุปกรณ์
     try:
@@ -679,16 +687,24 @@ def api_cameras_detect():
         v4l2_output = ""
 
     # parse ชื่ออุปกรณ์จาก v4l2-ctl output
+    # เก็บเฉพาะ device แรกของแต่ละกล้อง (ตัวที่สองเป็น metadata)
     device_names = {}
+    capture_devices = set()  # เก็บเฉพาะ device ID ที่เป็น capture จริง (ตัวแรก)
     current_name = None
+    first_dev_found = False
     for line in v4l2_output.split('\n'):
         line = line.rstrip()
         if line and not line.startswith('\t') and not line.startswith(' '):
             current_name = line.rstrip(':')
+            first_dev_found = False
         elif line.strip().startswith('/dev/video'):
             dev_id = line.strip().replace('/dev/video', '')
             if dev_id.isdigit():
-                device_names[int(dev_id)] = current_name
+                dev_num = int(dev_id)
+                device_names[dev_num] = current_name
+                if not first_dev_found:
+                    capture_devices.add(dev_num)
+                    first_dev_found = True
 
     # สแกน /dev/video0 ถึง /dev/video9
     for i in range(10):
@@ -696,23 +712,42 @@ def api_cameras_detect():
         if not os.path.exists(dev_path):
             continue
 
-        cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
-        if not cap.isOpened():
+        # ข้ามถ้าไม่ใช่ capture device (metadata node)
+        if capture_devices and i not in capture_devices:
             continue
 
-        # ลองอ่านเฟรม
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
-        ret, frame = cap.read()
-        cap.release()
+        thumb = None
 
-        if not ret or frame is None:
+        # ถ้ากล้องนี้เปิดอยู่แล้วใน camera_thread → ใช้ frame จาก system_state
+        if i in active_cameras:
+            cam_name = active_cameras[i]
+            cam_state = system_state[cam_name]
+            with cam_state["lock"]:
+                jpeg = cam_state["jpeg"]
+            if jpeg:
+                # ย่อ thumbnail จาก jpeg ที่มีอยู่แล้ว
+                nparr = np.frombuffer(jpeg, np.uint8)
+                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                if frame is not None:
+                    small = cv2.resize(frame, (320, 240))
+                    _, buf = cv2.imencode('.jpg', small, [cv2.IMWRITE_JPEG_QUALITY, 50])
+                    thumb = base64.b64encode(buf).decode('utf-8')
+        else:
+            # กล้องไม่ได้ใช้อยู่ → เปิดใหม่เพื่อถ่ายตัวอย่าง
+            cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
+            if not cap.isOpened():
+                continue
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+            ret, frame = cap.read()
+            cap.release()
+            if not ret or frame is None:
+                continue
+            _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+            thumb = base64.b64encode(buf).decode('utf-8')
+
+        if thumb is None:
             continue
-
-        # encode เป็น base64 thumbnail
-        import base64
-        _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
-        thumb = base64.b64encode(buf).decode('utf-8')
 
         # ดูว่ากำลังใช้เป็นกล้องไหนอยู่
         assigned = None
