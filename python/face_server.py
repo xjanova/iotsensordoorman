@@ -27,6 +27,7 @@ import face_recognition
 from simple_facerec import SimpleFaceRec
 import logging
 import config
+from PIL import Image, ImageDraw, ImageFont
 
 # ============================================================
 # Initialize
@@ -68,6 +69,83 @@ sfr = SimpleFaceRec(
     frame_resizing=config.FRAME_RESIZING
 )
 sfr.load_encoding_images(config.IMAGES_PATH)
+
+# ============================================================
+# Name Display Cache: filename → "ชื่อ นามสกุล" จาก DB
+# ============================================================
+_name_display_cache = {}  # {"somchai_j": "สมชาย ใจดี", ...}
+_name_cache_loaded = False
+
+def load_name_display_cache():
+    """โหลดชื่อแสดงผลจาก DB (face_image → first_name + last_name)"""
+    global _name_display_cache, _name_cache_loaded
+    db = None
+    try:
+        db = get_db()
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT face_image, first_name, last_name, emp_code FROM employees WHERE is_authorized = 1")
+        rows = cursor.fetchall()
+        cursor.close()
+        new_cache = {}
+        for row in rows:
+            if row['face_image']:
+                # face_image อาจเป็น "somchai_j.jpg" หรือ "somchai_j"
+                key = os.path.splitext(row['face_image'])[0]
+                display = f"{row['first_name']} {row['last_name']}".strip()
+                if not display:
+                    display = row['emp_code'] or key
+                new_cache[key] = display
+        _name_display_cache = new_cache
+        _name_cache_loaded = True
+        print(f"[NameCache] โหลด {len(new_cache)} ชื่อพนักงาน")
+    except Exception as e:
+        print(f"[NameCache Error] {e}")
+    finally:
+        if db:
+            try: db.close()
+            except: pass
+
+def get_display_name(filename_name):
+    """แปลงชื่อไฟล์เป็นชื่อแสดงผล (ถ้ามีใน cache)"""
+    if filename_name == "Unknown":
+        return "ไม่รู้จัก"
+    return _name_display_cache.get(filename_name, filename_name)
+
+# Thai font สำหรับวาดข้อความบน frame
+_thai_font = None
+def get_thai_font(size=18):
+    """โหลด Thai font (ลอง Noto Sans Thai ก่อน, fallback ไป DejaVu/default)"""
+    global _thai_font
+    if _thai_font and _thai_font.size == size:
+        return _thai_font
+    font_paths = [
+        "/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansThai-Bold.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansThai-Regular.ttf",
+        "/usr/share/fonts/truetype/thai/TlwgMono.ttf",
+        "/usr/share/fonts/truetype/thai/Norasi.ttf",
+        "/usr/share/fonts/truetype/tlwg/TlwgMono.ttf",
+        "/usr/share/fonts/truetype/tlwg/Norasi.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]
+    for fp in font_paths:
+        if os.path.exists(fp):
+            _thai_font = ImageFont.truetype(fp, size)
+            print(f"[Font] ใช้ฟอนต์: {fp}")
+            return _thai_font
+    _thai_font = ImageFont.load_default()
+    print("[Font] ใช้ฟอนต์ default (ไม่รองรับภาษาไทย)")
+    return _thai_font
+
+def draw_thai_text(frame, text, position, color_bgr, font_size=18):
+    """วาดข้อความภาษาไทยบน OpenCV frame ด้วย PIL"""
+    pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(pil_img)
+    font = get_thai_font(font_size)
+    # แปลง BGR → RGB สำหรับ PIL
+    color_rgb = (color_bgr[2], color_bgr[1], color_bgr[0])
+    draw.text(position, text, font=font, fill=color_rgb)
+    return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
 # State (ไม่ใช้ BackgroundSubtractor เพื่อประหยัด RAM)
 system_state = {
@@ -226,22 +304,26 @@ def camera_thread(camera_id, cam_name):
                     cam_name=cam_name
                 )
 
-        # วาดกรอบใบหน้า (เฉพาะเมื่อมี)
+        # วาดกรอบใบหน้า (เฉพาะเมื่อมี) — ใช้ชื่อจริงจาก DB
         display_frame = frame
+        display_names = []
         if last_faces:
             display_frame = frame.copy()
             for (top, right, bottom, left), name, conf in zip(last_faces, last_names, last_confidences):
                 color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
                 cv2.rectangle(display_frame, (left, top), (right, bottom), color, 2)
-                label = f"{name} ({conf}%)" if conf > 0 else "Unknown"
-                cv2.putText(display_frame, label, (left, top - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                disp_name = get_display_name(name)
+                display_names.append(disp_name)
+                label = f"{disp_name} ({conf}%)" if conf > 0 else "ไม่รู้จัก"
+                # ใช้ PIL วาดข้อความไทย
+                display_frame = draw_thai_text(display_frame, label, (left, top - 22), color, font_size=16)
 
         # Encode เป็น JPEG เก็บไว้ (ไม่ต้อง stream ตลอด)
         _, jpeg_buf = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 65])
+        face_display = list(zip(display_names if display_names else last_names, last_confidences))
         with cam_state["lock"]:
             cam_state["jpeg"] = jpeg_buf.tobytes()
-            cam_state["faces"] = list(zip(last_names, last_confidences))
+            cam_state["faces"] = face_display
 
         # หน่วงเวลา ~5 FPS เพื่อประหยัด CPU
         time.sleep(0.2)
@@ -1159,6 +1241,16 @@ if __name__ == "__main__":
     # อัปเดตสถานะ
     update_system_status("face_server", "ONLINE")
     update_system_status("raspberry_pi", "ONLINE")
+
+    # โหลด name display cache จาก DB
+    load_name_display_cache()
+
+    # Refresh name cache ทุก 5 นาที (กรณีเพิ่มพนักงานใหม่)
+    def _name_cache_refresh_loop():
+        while system_state["running"]:
+            time.sleep(300)  # 5 นาที
+            load_name_display_cache()
+    threading.Thread(target=_name_cache_refresh_loop, daemon=True).start()
 
     # เริ่ม camera threads (ข้ามถ้า ID = -1)
     if config.CAMERA_OUTSIDE_ID >= 0:
