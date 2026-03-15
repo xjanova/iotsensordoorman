@@ -443,20 +443,15 @@ async function saveAllIPs() {
         messages.push('web/.env FAILED');
     }
 
-    // 2. Save ESP32 settings in DB
+    // 2. Save ESP32 settings in DB + notify Pi
     try {
         const res = await postAPI('api/network.php?action=save_esp32', {
-            server_url: `http://${piIP}:5000`
+            server_url: `http://${piIP}:5000`,
+            esp32_ip: espIP,
+            wifi_ssid: document.getElementById('inputWifiSSID')?.value || ''
         });
         if (res.success) messages.push('ESP32 settings');
     } catch (e) {}
-
-    // 3. Save ESP32 IP in settings
-    if (espIP) {
-        try {
-            await postAPI('api/settings.php', { esp32_ip: espIP });
-        } catch (e) {}
-    }
 
     if (success) {
         status.innerHTML = '<i class="fas fa-check-circle text-green-400"></i> <span class="text-green-400">บันทึกสำเร็จ!</span>';

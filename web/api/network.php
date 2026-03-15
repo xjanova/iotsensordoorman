@@ -174,16 +174,36 @@ switch ($action) {
 
         $input = json_decode(file_get_contents('php://input'), true);
         $serverUrl = trim($input['server_url'] ?? '');
-
-        if (empty($serverUrl)) {
-            jsonResponse(['error' => 'กรุณาระบุ Server URL'], 400);
-        }
+        $esp32Ip = trim($input['esp32_ip'] ?? '');
+        $wifiSsid = trim($input['wifi_ssid'] ?? '');
 
         $db = getDB();
-        $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('server_url', ?) ON DUPLICATE KEY UPDATE setting_value = ?");
-        $stmt->execute([$serverUrl, $serverUrl]);
+        $upsert = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
 
-        jsonResponse(['success' => true, 'message' => "อัพเดท ESP32 Server URL เป็น {$serverUrl}"]);
+        if ($serverUrl) {
+            $upsert->execute(['server_url', $serverUrl, $serverUrl]);
+        }
+        if ($esp32Ip) {
+            $upsert->execute(['esp32_ip', $esp32Ip, $esp32Ip]);
+
+            // แจ้ง Pi ให้อัพเดท ESP32 IP ด้วย
+            $piUrl = FACE_SERVER_URL;
+            $ch = curl_init("{$piUrl}/api/config/esp32");
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode(['ip' => $esp32Ip]),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 3,
+            ]);
+            curl_exec($ch);
+            curl_close($ch);
+        }
+        if ($wifiSsid) {
+            $upsert->execute(['wifi_ssid', $wifiSsid, $wifiSsid]);
+        }
+
+        jsonResponse(['success' => true, 'message' => "อัพเดทการตั้งค่า ESP32 สำเร็จ"]);
         break;
 
     // ============================================================

@@ -593,6 +593,44 @@ def api_esp32_health():
         return jsonify({"online": False, "error": "ESP32 ไม่ตอบสนอง"})
 
 
+@app.route('/api/config/esp32', methods=['POST'])
+def api_config_esp32():
+    """อัพเดท ESP32 IP (เรียกจาก network page)"""
+    data = request.json
+    if not data or not data.get('ip'):
+        return jsonify({"error": "กรุณาระบุ IP"}), 400
+
+    new_ip = data['ip']
+    new_port = data.get('port', 80)
+
+    # อัพเดท config runtime
+    config.ESP32_IP = new_ip
+    config.ESP32_PORT = new_port
+    config.ESP32_UNLOCK_URL = f"http://{new_ip}:{new_port}/api/door/unlock"
+    config.ESP32_LOCK_URL = f"http://{new_ip}:{new_port}/api/door/lock"
+    config.ESP32_STATUS_URL = f"http://{new_ip}:{new_port}/api/status"
+
+    # อัพเดท .env file
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    lines = []
+    found = False
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                if line.strip().startswith('ESP32_IP='):
+                    lines.append(f'ESP32_IP={new_ip}\n')
+                    found = True
+                else:
+                    lines.append(line)
+    if not found:
+        lines.append(f'ESP32_IP={new_ip}\n')
+    with open(env_path, 'w') as f:
+        f.writelines(lines)
+
+    print(f"[Config] ESP32 IP updated to {new_ip}")
+    return jsonify({"success": True, "esp32_ip": new_ip})
+
+
 # ============================================================
 # Camera Capture API (ถ่ายภาพจากกล้องตัวเดียวกับที่สแกน)
 # ============================================================
