@@ -38,6 +38,8 @@
         .stream-container img { width: 100%; height: auto; display: block; }
         .stat-card { position: relative; overflow: hidden; }
         .stat-card::before { content:''; position:absolute; top:-50%; right:-50%; width:100%; height:100%; background:radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%); }
+        select option { background-color: #1e293b; color: #e2e8f0; }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); }
     </style>
 </head>
 <body class="bg-brand-900 text-gray-100 min-h-screen">
