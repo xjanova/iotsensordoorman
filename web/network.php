@@ -662,7 +662,25 @@ void lockDoor() {
 // Wi-Fi
 // ============================================================
 void connectWiFi() {
-    Serial.printf("Connecting to %s", WIFI_SSID);
+    // Scan WiFi networks first
+    Serial.println("\\n[WiFi] Scanning networks...");
+    int n = WiFi.scanNetworks();
+    if (n == 0) {
+        Serial.println("[WiFi] No networks found!");
+    } else {
+        Serial.printf("[WiFi] Found %d networks:\\n", n);
+        for (int i = 0; i < n; i++) {
+            Serial.printf("  %d) %-20s  CH:%d  RSSI:%d dBm  %s\\n",
+                i + 1,
+                WiFi.SSID(i).c_str(),
+                WiFi.channel(i),
+                WiFi.RSSI(i),
+                (WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? "Open" : "Encrypted");
+        }
+    }
+    WiFi.scanDelete();
+
+    Serial.printf("\\n[WiFi] Connecting to %s", WIFI_SSID);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     int attempts = 0;
     while (WiFi.status() != WL_CONNECTED && attempts < 30) {
