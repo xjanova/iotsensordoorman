@@ -161,10 +161,11 @@ $employees = $db->query("SELECT id, emp_code, first_name, last_name FROM employe
                     <th class="text-left py-4 px-4">ความมั่นใจ</th>
                     <th class="text-left py-4 px-4">กล้อง</th>
                     <th class="text-center py-4 px-4">กลอน</th>
+                    <th class="text-center py-4 px-4">รูปถ่าย</th>
                 </tr>
             </thead>
             <tbody id="logsTable">
-                <tr><td colspan="8" class="text-center text-gray-500 py-8">กำลังโหลด...</td></tr>
+                <tr><td colspan="9" class="text-center text-gray-500 py-8">กำลังโหลด...</td></tr>
             </tbody>
         </table>
     </div>
@@ -180,6 +181,28 @@ $employees = $db->query("SELECT id, emp_code, first_name, last_name FROM employe
         <button onclick="goPage(1)" id="btnNext" class="bg-white/5 hover:bg-white/10 text-gray-400 px-4 py-2 rounded-lg text-sm transition disabled:opacity-30" disabled>
             ถัดไป <i class="fas fa-chevron-right ml-1"></i>
         </button>
+    </div>
+</div>
+
+<!-- Snapshot Modal -->
+<div id="snapshotModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" style="display:none;" onclick="if(event.target===this)closeSnapshot()">
+    <div class="glass rounded-2xl overflow-hidden max-w-2xl w-full mx-4 shadow-2xl">
+        <div class="p-4 border-b border-white/10 flex items-center justify-between">
+            <div>
+                <h3 class="font-medium" id="snapTitle">รูปถ่ายขณะเข้า-ออก</h3>
+                <p class="text-xs text-gray-400" id="snapSubtitle"></p>
+            </div>
+            <button onclick="closeSnapshot()" class="text-gray-400 hover:text-white transition">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+        </div>
+        <div class="p-2 bg-black flex items-center justify-center" style="min-height: 300px;">
+            <img id="snapImage" src="" alt="Snapshot" class="max-w-full max-h-[70vh] object-contain">
+            <div id="snapLoading" class="text-center text-gray-500">
+                <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
+                <p class="text-sm">กำลังโหลดรูป...</p>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -208,12 +231,12 @@ function getFilterParams() {
 
 async function loadLogs() {
     const tbody = document.getElementById('logsTable');
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin text-xl"></i></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin text-xl"></i></td></tr>';
 
     const result = await fetchAPI('api/access_logs.php?' + getFilterParams());
 
     if (!result || !result.data) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-red-400 py-8">เกิดข้อผิดพลาด</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-red-400 py-8">เกิดข้อผิดพลาด</td></tr>';
         return;
     }
 
@@ -251,7 +274,7 @@ async function loadLogs() {
     }
 
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-500 py-12"><i class="fas fa-inbox text-3xl mb-2"></i><br>ไม่มีข้อมูล</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-gray-500 py-12"><i class="fas fa-inbox text-3xl mb-2"></i><br>ไม่มีข้อมูล</td></tr>';
         return;
     }
 
@@ -288,6 +311,13 @@ async function loadLogs() {
                 ${log.is_authorized == 1
                     ? '<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs"><i class="fas fa-lock-open mr-1"></i>เปิด</span>'
                     : '<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded text-xs"><i class="fas fa-lock mr-1"></i>ล็อก</span>'}
+            </td>
+            <td class="py-3 px-4 text-center">
+                ${log.snapshot_path
+                    ? `<button onclick="showSnapshot('${esc(log.snapshot_path)}', '${esc(log.first_name || 'ไม่รู้จัก')}', '${formatDateTime(log.created_at)}')"
+                         class="bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 px-2 py-1 rounded text-xs transition">
+                         <i class="fas fa-image mr-1"></i>ดูรูป</button>`
+                    : '<span class="text-gray-600 text-xs">-</span>'}
             </td>
         </tr>
     `).join('');
@@ -358,6 +388,60 @@ function resetFilterValues() {
 document.getElementById('filterSearch').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') applyFilters();
 });
+
+// Snapshot modal
+function showSnapshot(path, name, time) {
+    const modal = document.getElementById('snapshotModal');
+    const img = document.getElementById('snapImage');
+    const loading = document.getElementById('snapLoading');
+
+    document.getElementById('snapTitle').textContent = name || 'รูปถ่าย';
+    document.getElementById('snapSubtitle').textContent = time || '';
+
+    img.style.display = 'none';
+    loading.style.display = '';
+    modal.style.display = 'flex';
+
+    // ลองโหลดรูปจาก Laragon ก่อน (path = "snapshots/2026-03/cam1_xxx.jpg")
+    // ถ้ามี / แสดงว่าเป็น path บน Laragon
+    let imgUrl;
+    if (path.includes('/')) {
+        imgUrl = path + '?t=' + Date.now();
+    } else {
+        // path เก่า (ชื่อไฟล์เดี่ยว) → ลองดึงจาก face_server
+        imgUrl = FACE_SERVER + '/api/snapshots/' + path + '?t=' + Date.now();
+    }
+
+    const testImg = new Image();
+    testImg.onload = () => {
+        img.src = testImg.src;
+        img.style.display = '';
+        loading.style.display = 'none';
+    };
+    testImg.onerror = () => {
+        // Fallback: ลองจาก face_server ถ้า path เดิม
+        if (path.includes('/')) {
+            loading.innerHTML = '<i class="fas fa-image-slash text-3xl text-red-400 mb-2"></i><p class="text-sm text-red-400">ไม่พบรูปภาพ</p>';
+        } else {
+            loading.innerHTML = '<i class="fas fa-image-slash text-3xl text-red-400 mb-2"></i><p class="text-sm text-red-400">ไม่พบรูปภาพ</p>';
+        }
+    };
+    testImg.src = imgUrl;
+
+    // ปิดด้วย ESC
+    document.addEventListener('keydown', _snapEscHandler);
+}
+
+function _snapEscHandler(e) {
+    if (e.key === 'Escape') closeSnapshot();
+}
+
+function closeSnapshot() {
+    document.getElementById('snapshotModal').style.display = 'none';
+    document.getElementById('snapImage').src = '';
+    document.getElementById('snapLoading').innerHTML = '<i class="fas fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">กำลังโหลดรูป...</p>';
+    document.removeEventListener('keydown', _snapEscHandler);
+}
 
 document.addEventListener('DOMContentLoaded', () => loadLogs());
 </script>

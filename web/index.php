@@ -349,11 +349,12 @@ $recentLogs = $stmt->fetchAll();
                     <th class="text-left py-3 px-2">ทิศทาง</th>
                     <th class="text-left py-3 px-2">ความมั่นใจ</th>
                     <th class="text-left py-3 px-2">สถานะ</th>
+                    <th class="text-center py-3 px-2">รูป</th>
                 </tr>
             </thead>
             <tbody id="recentLogs">
                 <?php if (empty($recentLogs)): ?>
-                <tr><td colspan="5" class="text-center text-gray-500 py-8">ไม่มีข้อมูล</td></tr>
+                <tr><td colspan="6" class="text-center text-gray-500 py-8">ไม่มีข้อมูล</td></tr>
                 <?php else: ?>
                 <?php foreach ($recentLogs as $log): ?>
                 <tr class="border-b border-white/5 hover:bg-white/5">
@@ -381,6 +382,19 @@ $recentLogs = $stmt->fetchAll();
                         <span class="text-green-400"><i class="fas fa-check-circle"></i></span>
                         <?php else: ?>
                         <span class="text-red-400"><i class="fas fa-times-circle"></i></span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="py-3 px-2 text-center">
+                        <?php if (!empty($log['snapshot_path'])): ?>
+                        <?php
+                            $snapPath = $log['snapshot_path'];
+                            $snapUrl = strpos($snapPath, '/') !== false ? $snapPath : '';
+                        ?>
+                        <a href="<?= $snapUrl ?: '#' ?>" target="_blank" class="text-indigo-400 hover:text-indigo-300 transition" title="ดูรูปถ่าย">
+                            <i class="fas fa-image"></i>
+                        </a>
+                        <?php else: ?>
+                        <span class="text-gray-600">-</span>
                         <?php endif; ?>
                     </td>
                 </tr>

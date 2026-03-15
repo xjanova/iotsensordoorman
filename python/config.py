@@ -60,7 +60,7 @@ API_PORT = 5000
 # ============================================================
 # PHP Web Server (Laragon)
 # ============================================================
-WEB_SERVER_URL = "http://localhost/bunny-door"
+WEB_SERVER_URL = os.environ.get("WEB_SERVER_URL", "http://192.168.1.119/bunny-door")
 WEB_API_URL = f"{WEB_SERVER_URL}/api"
 
 # ============================================================

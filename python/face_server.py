@@ -399,14 +399,51 @@ def process_detected_faces(frame, faces, names, confidences, camera_id, cam_name
 
 
 def save_snapshot(frame, label, camera_id):
-    """บันทึกภาพถ่าย"""
+    """บันทึกภาพถ่าย → อัพโหลดไป Laragon แล้วลบจาก Pi"""
     # Sanitize label to prevent path traversal
     label = label.replace("/", "").replace("\\", "").replace("..", "")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"cam{camera_id}_{label}_{timestamp}.jpg"
+
+    # สร้างโฟลเดอร์ถ้ายังไม่มี
+    os.makedirs(config.SNAPSHOT_DIR, exist_ok=True)
     filepath = os.path.join(config.SNAPSHOT_DIR, filename)
     cv2.imwrite(filepath, frame)
-    return filename
+
+    # อัพโหลดไปเก็บที่ Laragon (web server) แล้วลบจาก Pi
+    uploaded_path = _upload_snapshot_to_web(filepath, filename)
+    if uploaded_path:
+        # ลบไฟล์จาก Pi เพื่อประหยัดพื้นที่
+        try:
+            os.remove(filepath)
+        except Exception:
+            pass
+        return uploaded_path  # คืน path บน Laragon (e.g. "snapshots/2026-03/cam1_somchai_20260315_120000.jpg")
+    else:
+        # อัพโหลดไม่สำเร็จ → เก็บไว้ใน Pi ก่อน (จะลองอัพโหลดทีหลัง)
+        return filename
+
+
+def _upload_snapshot_to_web(filepath, filename):
+    """ส่งรูป snapshot ไปเก็บที่ Laragon web server"""
+    try:
+        upload_url = config.WEB_API_URL + '/snapshot_upload.php'
+        with open(filepath, 'rb') as f:
+            resp = requests.post(
+                upload_url,
+                files={'file': (filename, f, 'image/jpeg')},
+                data={'filename': filename},
+                timeout=10
+            )
+        if resp.status_code == 200:
+            result = resp.json()
+            if result.get('success'):
+                print(f"[Snapshot] อัพโหลดสำเร็จ: {result['path']}")
+                return result['path']
+        print(f"[Snapshot] อัพโหลดล้มเหลว: HTTP {resp.status_code}")
+    except Exception as e:
+        print(f"[Snapshot] อัพโหลดล้มเหลว: {e}")
+    return None
 
 
 def unlock_door():
