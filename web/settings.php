@@ -29,30 +29,150 @@ $componentNames = [
 ];
 ?>
 
-<!-- System Status -->
+<!-- System Status (Live Detection) -->
 <div class="glass rounded-2xl p-6 mb-6">
-    <h3 class="font-bold mb-4 flex items-center gap-2">
-        <i class="fas fa-server text-blue-400"></i> สถานะอุปกรณ์
-    </h3>
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold flex items-center gap-2">
+            <i class="fas fa-server text-blue-400"></i> สถานะอุปกรณ์ (ตรวจสอบจริง)
+        </h3>
+        <button type="button" onclick="recheckDevices()" class="text-xs text-blue-400 hover:text-blue-300 transition flex items-center gap-1" id="btnRecheck">
+            <i class="fas fa-rotate"></i> ตรวจสอบอีกครั้ง
+        </button>
+    </div>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <?php foreach ($systemStatus as $s):
-            $info = $componentNames[$s['component']] ?? ['name' => $s['component'], 'icon' => 'fa-circle', 'color' => 'gray'];
-            $statusClass = $s['status'] === 'ONLINE' ? 'bg-green-400 pulse-dot' : ($s['status'] === 'ERROR' ? 'bg-red-400' : 'bg-gray-500');
-            $statusText = $s['status'] === 'ONLINE' ? 'ออนไลน์' : ($s['status'] === 'ERROR' ? 'ผิดพลาด' : 'ออฟไลน์');
-        ?>
+        <!-- Web Server (always online) -->
         <div class="bg-white/5 rounded-xl p-4 flex items-center gap-3">
-            <div class="w-10 h-10 bg-<?= $info['color'] ?>-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas <?= $info['icon'] ?> text-<?= $info['color'] ?>-400"></i>
+            <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-server text-blue-400"></i>
             </div>
             <div class="flex-1">
-                <p class="text-sm font-medium"><?= $info['name'] ?></p>
+                <p class="text-sm font-medium">เว็บเซิร์ฟเวอร์</p>
                 <div class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full <?= $statusClass ?>"></span>
-                    <span class="text-xs text-gray-400"><?= $statusText ?></span>
+                    <span class="w-2 h-2 rounded-full bg-green-400 pulse-dot"></span>
+                    <span class="text-xs text-green-400">ออนไลน์</span>
+                </div>
+                <p class="text-xs text-gray-600 mt-0.5" id="webIPInfo">-</p>
+            </div>
+        </div>
+
+        <!-- Database -->
+        <div class="bg-white/5 rounded-xl p-4 flex items-center gap-3">
+            <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-database text-purple-400"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-medium">ฐานข้อมูล MySQL</p>
+                <div class="flex items-center gap-1.5" id="dbStatus">
+                    <?php
+                    $dbOnline = false;
+                    try { getDB(); $dbOnline = true; } catch (Exception $e) {}
+                    ?>
+                    <span class="w-2 h-2 rounded-full <?= $dbOnline ? 'bg-green-400 pulse-dot' : 'bg-red-400' ?>"></span>
+                    <span class="text-xs <?= $dbOnline ? 'text-green-400' : 'text-red-400' ?>"><?= $dbOnline ? 'ออนไลน์' : 'ออฟไลน์' ?></span>
+                </div>
+                <p class="text-xs text-gray-600 mt-0.5"><?= DB_HOST ?>:<?= DB_PORT ?></p>
+            </div>
+        </div>
+
+        <!-- Raspberry Pi -->
+        <div class="bg-white/5 rounded-xl p-4 flex items-center gap-3">
+            <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-microchip text-green-400"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-medium">Raspberry Pi</p>
+                <div class="flex items-center gap-1.5" id="piLiveStatus">
+                    <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+                    <span class="text-xs text-gray-500">กำลังตรวจสอบ...</span>
+                </div>
+                <p class="text-xs text-gray-600 mt-0.5" id="piIPInfo"><?= FACE_SERVER_URL ?></p>
+            </div>
+        </div>
+
+        <!-- ESP32 -->
+        <div class="bg-white/5 rounded-xl p-4 flex items-center gap-3">
+            <div class="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-bolt text-yellow-400"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-medium">ESP32</p>
+                <div class="flex items-center gap-1.5" id="espLiveStatus">
+                    <?php
+                    // Check ESP32 from DB heartbeat
+                    $espOnline = false;
+                    $espIP = $settings['esp32_ip'] ?? '';
+                    try {
+                        $stmt = $db->query("SELECT last_heartbeat FROM system_status WHERE component='esp32' LIMIT 1");
+                        $row = $stmt->fetch();
+                        if ($row && $row['last_heartbeat']) {
+                            $diff = time() - strtotime($row['last_heartbeat']);
+                            $espOnline = ($diff < 60);
+                        }
+                    } catch (Exception $e) {}
+                    ?>
+                    <span class="w-2 h-2 rounded-full <?= $espOnline ? 'bg-green-400 pulse-dot' : 'bg-red-400' ?>"></span>
+                    <span class="text-xs <?= $espOnline ? 'text-green-400' : 'text-red-400' ?>"><?= $espOnline ? 'ออนไลน์' : 'ออฟไลน์' ?></span>
+                </div>
+                <p class="text-xs text-gray-600 mt-0.5"><?= $espIP ?: 'ไม่ได้ตั้งค่า IP' ?></p>
+            </div>
+        </div>
+
+        <!-- Camera Outside -->
+        <div class="bg-white/5 rounded-xl p-4 flex items-center gap-3">
+            <div class="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-video text-cyan-400"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-medium">กล้องด้านนอก</p>
+                <div class="flex items-center gap-1.5" id="camOutLiveStatus">
+                    <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+                    <span class="text-xs text-gray-500">กำลังตรวจสอบ...</span>
                 </div>
             </div>
         </div>
-        <?php endforeach; ?>
+
+        <!-- Camera Inside -->
+        <div class="bg-white/5 rounded-xl p-4 flex items-center gap-3">
+            <div class="w-10 h-10 bg-pink-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-video text-pink-400"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-medium">กล้องด้านใน</p>
+                <div class="flex items-center gap-1.5" id="camInLiveStatus">
+                    <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+                    <span class="text-xs text-gray-500">กำลังตรวจสอบ...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Face Recognition -->
+        <div class="bg-white/5 rounded-xl p-4 flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-face-smile text-indigo-400"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-medium">Face Recognition</p>
+                <div class="flex items-center gap-1.5" id="faceLiveStatus">
+                    <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+                    <span class="text-xs text-gray-500">กำลังตรวจสอบ...</span>
+                </div>
+                <p class="text-xs text-gray-600 mt-0.5" id="faceInfo">-</p>
+            </div>
+        </div>
+
+        <!-- PIR Sensors -->
+        <div class="bg-white/5 rounded-xl p-4 flex items-center gap-3">
+            <div class="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                <i class="fas fa-satellite-dish text-orange-400"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-sm font-medium">เซ็นเซอร์ PIR</p>
+                <div class="flex items-center gap-1.5" id="pirLiveStatus">
+                    <span class="w-2 h-2 rounded-full <?= $espOnline ? 'bg-green-400 pulse-dot' : 'bg-red-400' ?>"></span>
+                    <span class="text-xs <?= $espOnline ? 'text-green-400' : 'text-red-400' ?>"><?= $espOnline ? 'ออนไลน์ (ผ่าน ESP32)' : 'ออฟไลน์' ?></span>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -740,6 +860,103 @@ async function checkUpdate() {
     btn.innerHTML = '<i class="fas fa-magnifying-glass"></i> ตรวจสอบเวอร์ชันล่าสุด';
 }
 
+// ============================================================
+// Live Device Detection
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+    checkDevicesLive();
+});
+
+async function checkDevicesLive() {
+    // Detect network info
+    try {
+        const net = await fetchAPI('api/network.php?action=detect');
+        if (net.success) {
+            document.getElementById('webIPInfo').textContent = net.web_server.primary_ip;
+
+            // Pi status
+            setDeviceStatus('piLiveStatus', net.raspberry_pi.online);
+            if (net.raspberry_pi.online) {
+                document.getElementById('piIPInfo').textContent = net.raspberry_pi.url + ' (เชื่อมต่อได้)';
+            }
+
+            // If Pi online, check cameras and face recognition
+            if (net.raspberry_pi.online) {
+                checkCameras();
+                checkFaceRecognition();
+            } else {
+                setDeviceStatus('camOutLiveStatus', false);
+                setDeviceStatus('camInLiveStatus', false);
+                setDeviceStatus('faceLiveStatus', false);
+                document.getElementById('faceInfo').textContent = 'Pi ออฟไลน์';
+            }
+        }
+    } catch (e) {
+        console.error('Device check failed:', e);
+    }
+}
+
+function setDeviceStatus(elementId, online) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    if (online) {
+        el.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400 pulse-dot"></span><span class="text-xs text-green-400">ออนไลน์</span>';
+    } else {
+        el.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-400"></span><span class="text-xs text-red-400">ออฟไลน์</span>';
+    }
+}
+
+function checkCameras() {
+    // Camera outside
+    const imgOut = new Image();
+    imgOut.onload = function() { setDeviceStatus('camOutLiveStatus', true); };
+    imgOut.onerror = function() { setDeviceStatus('camOutLiveStatus', false); };
+    setTimeout(() => { if (!imgOut.complete) setDeviceStatus('camOutLiveStatus', false); }, 5000);
+    imgOut.src = FACE_SERVER + '/api/snapshot/outside?t=' + Date.now();
+
+    // Camera inside
+    const imgIn = new Image();
+    imgIn.onload = function() { setDeviceStatus('camInLiveStatus', true); };
+    imgIn.onerror = function() {
+        // Inside camera might be disabled
+        document.getElementById('camInLiveStatus').innerHTML =
+            '<span class="w-2 h-2 rounded-full bg-gray-500"></span><span class="text-xs text-gray-500">ปิดใช้งาน</span>';
+    };
+    setTimeout(() => {
+        if (!imgIn.complete) {
+            document.getElementById('camInLiveStatus').innerHTML =
+                '<span class="w-2 h-2 rounded-full bg-gray-500"></span><span class="text-xs text-gray-500">ปิดใช้งาน</span>';
+        }
+    }, 5000);
+    imgIn.src = FACE_SERVER + '/api/snapshot/inside?t=' + Date.now();
+}
+
+async function checkFaceRecognition() {
+    try {
+        const res = await fetchAPI('api/pi_health.php');
+        if (res && res.cpu_percent !== undefined) {
+            setDeviceStatus('faceLiveStatus', true);
+            document.getElementById('faceInfo').textContent = 'CPU: ' + res.cpu_percent + '% | RAM: ' + res.ram_percent + '%';
+        } else {
+            setDeviceStatus('faceLiveStatus', false);
+        }
+    } catch (e) {
+        setDeviceStatus('faceLiveStatus', false);
+    }
+}
+
+function recheckDevices() {
+    const btn = document.getElementById('btnRecheck');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังตรวจสอบ...';
+    checkDevicesLive().then(() => {
+        btn.innerHTML = '<i class="fas fa-rotate"></i> ตรวจสอบอีกครั้ง';
+        showToast('ตรวจสอบอุปกรณ์เสร็จแล้ว', 'info');
+    });
+}
+
+// ============================================================
+// System Update
+// ============================================================
 async function pullUpdate() {
     const btn = document.getElementById('btnUpdate');
     const log = document.getElementById('updateLog');

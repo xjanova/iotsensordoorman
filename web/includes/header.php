@@ -65,6 +65,7 @@
                 ['icon' => 'fa-clock-rotate-left', 'label' => 'ประวัติเข้า-ออก', 'href' => 'logs.php', 'page' => 'logs'],
                 ['icon' => 'fa-triangle-exclamation', 'label' => 'การแจ้งเตือน', 'href' => 'alerts.php', 'page' => 'alerts'],
                 ['icon' => 'fa-gear', 'label' => 'ตั้งค่าระบบ', 'href' => 'settings.php', 'page' => 'settings'],
+                ['icon' => 'fa-network-wired', 'label' => 'ตั้งค่าเครือข่าย', 'href' => 'network.php', 'page' => 'network'],
                 ['icon' => 'fa-book', 'label' => 'คู่มือระบบ', 'href' => 'guide.php', 'page' => 'guide'],
             ];
             foreach ($menuItems as $item):
