@@ -300,9 +300,8 @@ def process_detected_faces(frame, faces, names, confidences, camera_id, cam_name
             log_access(employee["id"], direction, "FACE", conf, camera_id, None, snapshot, 1)
             print(f"[Access] {name} → {direction} (conf={conf}%, cam={cam_name})")
 
-            # สั่งเปิดประตู (ถ้าเป็นกล้องด้านนอก = ขาเข้า)
-            if direction == "IN":
-                unlock_door()
+            # สั่งเปิดประตูทั้งขาเข้า (กล้องนอก) และขาออก (กล้องใน)
+            unlock_door()
 
     # Tailgating detection
     if len(names) > config.MAX_PERSONS_PER_ENTRY:
