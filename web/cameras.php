@@ -289,11 +289,38 @@ function refreshSnapshots() {
     }
 }
 
+// ============================================================
+// ESP32 PIR Sensors — เช็ค real-time
+// ============================================================
+async function checkPIR() {
+    try {
+        const data = await fetchAPI(FACE_SERVER + '/api/esp32/health');
+        const pir1 = document.getElementById('pir1Dot');
+        const pir2 = document.getElementById('pir2Dot');
+        if (data && data.online) {
+            pir1.className = data.pir_outside
+                ? 'w-3 h-3 bg-yellow-400 pulse-dot rounded-full'
+                : 'w-3 h-3 bg-gray-500 rounded-full';
+            pir2.className = data.pir_inside
+                ? 'w-3 h-3 bg-yellow-400 pulse-dot rounded-full'
+                : 'w-3 h-3 bg-gray-500 rounded-full';
+        } else {
+            pir1.className = 'w-3 h-3 bg-red-400 rounded-full';
+            pir2.className = 'w-3 h-3 bg-red-400 rounded-full';
+        }
+    } catch {
+        document.getElementById('pir1Dot').className = 'w-3 h-3 bg-red-400 rounded-full';
+        document.getElementById('pir2Dot').className = 'w-3 h-3 bg-red-400 rounded-full';
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     fetchCamConfig();
+    checkPIR();
     setTimeout(refreshSnapshots, 2000);
     setInterval(refreshSnapshots, 3000);
     setInterval(fetchCamConfig, 10000);
+    setInterval(checkPIR, 3000);
 });
 </script>
 
