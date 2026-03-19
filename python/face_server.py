@@ -77,7 +77,7 @@ _name_display_cache = {}  # {"somchai_j": "สมชาย ใจดี", ...}
 _name_cache_loaded = False
 
 def load_name_display_cache():
-    """โหลดชื่อแสดงผลจาก DB (face_image → first_name + last_name)"""
+    """โหลดชื่อแสดงผลจาก DB — map ทั้ง face_image, emp_code, และชื่อไฟล์จริงใน images/"""
     global _name_display_cache, _name_cache_loaded
     db = None
     try:
@@ -88,16 +88,41 @@ def load_name_display_cache():
         cursor.close()
         new_cache = {}
         for row in rows:
+            display = f"{row['first_name'] or ''} {row['last_name'] or ''}".strip()
+            if not display:
+                display = row['emp_code'] or 'ไม่มีชื่อ'
+
+            # Map หลาย key ไปชื่อเดียวกัน เพื่อให้ match ได้ทุกกรณี
+            # 1. face_image (ไม่มีนามสกุล) เช่น "somchai_j"
             if row['face_image']:
-                # face_image อาจเป็น "somchai_j.jpg" หรือ "somchai_j"
-                key = os.path.splitext(row['face_image'])[0]
-                display = f"{row['first_name']} {row['last_name']}".strip()
-                if not display:
-                    display = row['emp_code'] or key
-                new_cache[key] = display
+                key1 = os.path.splitext(row['face_image'])[0]
+                new_cache[key1] = display
+                # รวม face_image เต็ม (มีนามสกุล)
+                new_cache[row['face_image']] = display
+
+            # 2. emp_code เช่น "EMP001"
+            if row['emp_code']:
+                new_cache[row['emp_code']] = display
+
+        # 3. สแกนไฟล์จริงใน images/ → map ชื่อไฟล์ไป emp_code → display
+        #    กรณีไฟล์ชื่อ EMP001.jpg แต่ face_image เก็บชื่ออื่น
+        import glob
+        for img_path in glob.glob(os.path.join(config.IMAGES_PATH, "*.*")):
+            fname = os.path.splitext(os.path.basename(img_path))[0]
+            if fname not in new_cache:
+                # ลองหา emp_code ที่ตรงกับชื่อไฟล์
+                for row in rows:
+                    if row['emp_code'] and row['emp_code'] == fname:
+                        d = f"{row['first_name'] or ''} {row['last_name'] or ''}".strip()
+                        if d:
+                            new_cache[fname] = d
+                            break
+
         _name_display_cache = new_cache
         _name_cache_loaded = True
-        print(f"[NameCache] โหลด {len(new_cache)} ชื่อพนักงาน")
+        print(f"[NameCache] โหลด {len(new_cache)} mapping (จาก {len(rows)} พนักงาน)")
+        for k, v in new_cache.items():
+            print(f"  {k} → {v}")
     except Exception as e:
         print(f"[NameCache Error] {e}")
     finally:
@@ -217,14 +242,17 @@ def log_anomaly(alert_type, severity, description, camera_id, snapshot):
 
 
 def get_employee_by_name(name):
+    """ค้นหาพนักงานจากชื่อไฟล์ที่ face recognition คืนมา — ค้นทั้ง face_image, emp_code"""
     db = None
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
         cursor.execute("""
             SELECT * FROM employees
-            WHERE face_image LIKE %s AND is_authorized = 1
-        """, (f"{name}%",))
+            WHERE is_authorized = 1
+              AND (face_image LIKE %s OR emp_code = %s OR REPLACE(face_image, '.jpg', '') = %s OR REPLACE(face_image, '.png', '') = %s)
+            LIMIT 1
+        """, (f"{name}%", name, name, name))
         result = cursor.fetchone()
         cursor.close()
         return result
