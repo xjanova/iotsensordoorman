@@ -142,9 +142,18 @@ $employees = $db->query("SELECT id, emp_code, first_name, last_name FROM employe
     </div>
 </div>
 
-<!-- Summary line -->
+<!-- Summary line + Delete actions -->
 <div class="flex items-center justify-between mb-4">
     <p class="text-sm text-gray-500" id="logSummary">กำลังโหลด...</p>
+    <div class="flex items-center gap-2" id="deleteActions" style="display:none;">
+        <span class="text-xs text-gray-500" id="selectedCount">0 รายการ</span>
+        <button onclick="deleteSelected()" class="bg-red-600/20 text-red-400 hover:bg-red-600/30 px-3 py-1.5 rounded-lg text-xs transition">
+            <i class="fas fa-trash mr-1"></i> ลบที่เลือก
+        </button>
+        <button onclick="deleteAll()" class="bg-red-600/10 text-red-400/70 hover:bg-red-600/20 px-3 py-1.5 rounded-lg text-xs transition">
+            <i class="fas fa-trash-can mr-1"></i> ลบทั้งหมด
+        </button>
+    </div>
 </div>
 
 <!-- Log Table -->
@@ -153,6 +162,7 @@ $employees = $db->query("SELECT id, emp_code, first_name, last_name FROM employe
         <table class="w-full text-sm">
             <thead>
                 <tr class="text-gray-400 border-b border-white/10 bg-white/5">
+                    <th class="py-4 px-2 w-8"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="accent-red-500 cursor-pointer"></th>
                     <th class="text-left py-4 px-4">#</th>
                     <th class="text-left py-4 px-4">เวลา</th>
                     <th class="text-left py-4 px-4">พนักงาน</th>
@@ -165,7 +175,7 @@ $employees = $db->query("SELECT id, emp_code, first_name, last_name FROM employe
                 </tr>
             </thead>
             <tbody id="logsTable">
-                <tr><td colspan="9" class="text-center text-gray-500 py-8">กำลังโหลด...</td></tr>
+                <tr><td colspan="10" class="text-center text-gray-500 py-8">กำลังโหลด...</td></tr>
             </tbody>
         </table>
     </div>
@@ -231,12 +241,12 @@ function getFilterParams() {
 
 async function loadLogs() {
     const tbody = document.getElementById('logsTable');
-    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin text-xl"></i></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin text-xl"></i></td></tr>';
 
     const result = await fetchAPI('api/access_logs.php?' + getFilterParams());
 
     if (!result || !result.data) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-red-400 py-8">เกิดข้อผิดพลาด</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-red-400 py-8">เกิดข้อผิดพลาด</td></tr>';
         return;
     }
 
@@ -273,15 +283,21 @@ async function loadLogs() {
         document.getElementById('btnNext').disabled = true;
     }
 
+    // แสดง delete actions
+    document.getElementById('deleteActions').style.display = pag.total > 0 ? 'flex' : 'none';
+    document.getElementById('selectAll').checked = false;
+    updateSelectedCount();
+
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-gray-500 py-12"><i class="fas fa-inbox text-3xl mb-2"></i><br>ไม่มีข้อมูล</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-gray-500 py-12"><i class="fas fa-inbox text-3xl mb-2"></i><br>ไม่มีข้อมูล</td></tr>';
         return;
     }
 
     const startNum = (pag.page - 1) * pag.limit;
 
     tbody.innerHTML = data.map((log, i) => `
-        <tr class="border-b border-white/5 hover:bg-white/5 transition">
+        <tr class="border-b border-white/5 hover:bg-white/5 transition" data-log-id="${log.id}">
+            <td class="py-3 px-2"><input type="checkbox" class="log-check accent-red-500 cursor-pointer" value="${log.id}" onchange="updateSelectedCount()"></td>
             <td class="py-3 px-4 text-gray-500">${startNum + i + 1}</td>
             <td class="py-3 px-4">
                 <p class="text-gray-300">${formatDateTime(log.created_at)}</p>
@@ -454,6 +470,50 @@ function closeSnapshot() {
     document.getElementById('snapImage').src = '';
     document.getElementById('snapLoading').innerHTML = '<i class="fas fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">กำลังโหลดรูป...</p>';
     document.removeEventListener('keydown', _snapEscHandler);
+}
+
+// ============================================================
+// Select & Delete
+// ============================================================
+function toggleSelectAll() {
+    const checked = document.getElementById('selectAll').checked;
+    document.querySelectorAll('.log-check').forEach(cb => cb.checked = checked);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const checked = document.querySelectorAll('.log-check:checked');
+    const el = document.getElementById('selectedCount');
+    el.textContent = checked.length > 0 ? checked.length + ' รายการ' : '';
+}
+
+function getSelectedIds() {
+    return Array.from(document.querySelectorAll('.log-check:checked')).map(cb => parseInt(cb.value));
+}
+
+async function deleteSelected() {
+    const ids = getSelectedIds();
+    if (ids.length === 0) return;
+    if (!confirm(`ต้องการลบ ${ids.length} รายการที่เลือก?`)) return;
+
+    const result = await postAPI('api/access_logs.php?action=delete', { ids });
+    if (result?.success) {
+        loadLogs();
+    } else {
+        alert('ลบไม่สำเร็จ: ' + (result?.error || 'Unknown'));
+    }
+}
+
+async function deleteAll() {
+    if (!confirm('ต้องการลบประวัติทั้งหมด? การดำเนินการนี้ไม่สามารถย้อนกลับได้!')) return;
+    if (!confirm('ยืนยันอีกครั้ง: ลบประวัติเข้า-ออกทั้งหมด?')) return;
+
+    const result = await postAPI('api/access_logs.php?action=delete', { all: true });
+    if (result?.success) {
+        loadLogs();
+    } else {
+        alert('ลบไม่สำเร็จ: ' + (result?.error || 'Unknown'));
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => loadLogs());

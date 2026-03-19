@@ -96,9 +96,18 @@
     </div>
 </div>
 
-<!-- Summary -->
+<!-- Summary + Delete actions -->
 <div class="flex items-center justify-between mb-4">
     <p class="text-sm text-gray-500" id="alertSummary">กำลังโหลด...</p>
+    <div class="flex items-center gap-2" id="deleteActions" style="display:none;">
+        <span class="text-xs text-gray-500" id="selectedCount">0 รายการ</span>
+        <button onclick="deleteSelected()" class="bg-red-600/20 text-red-400 hover:bg-red-600/30 px-3 py-1.5 rounded-lg text-xs transition">
+            <i class="fas fa-trash mr-1"></i> ลบที่เลือก
+        </button>
+        <button onclick="deleteAllAlerts()" class="bg-red-600/10 text-red-400/70 hover:bg-red-600/20 px-3 py-1.5 rounded-lg text-xs transition">
+            <i class="fas fa-trash-can mr-1"></i> ลบทั้งหมด
+        </button>
+    </div>
 </div>
 
 <!-- Alert List -->
@@ -209,10 +218,15 @@ async function loadAlerts() {
         return;
     }
 
+    // Show delete actions
+    document.getElementById('deleteActions').style.display = pag.total > 0 ? 'flex' : 'none';
+    updateSelectedCount();
+
     container.innerHTML = alerts.map(alert => `
-        <div class="glass rounded-xl p-5 border ${severityColors[alert.severity] || ''} card-hover">
+        <div class="glass rounded-xl p-5 border ${severityColors[alert.severity] || ''} card-hover" data-alert-id="${alert.id}">
             <div class="flex items-start justify-between gap-4">
-                <div class="flex items-start gap-4 flex-1">
+                <div class="flex items-start gap-3 flex-1">
+                    <input type="checkbox" class="alert-check accent-red-500 cursor-pointer mt-2" value="${alert.id}" onchange="updateSelectedCount()">
                     <div class="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center mt-1 flex-shrink-0">
                         <i class="fas ${typeIcons[alert.alert_type] || 'fa-bell text-gray-400'}"></i>
                     </div>
@@ -229,7 +243,10 @@ async function loadAlerts() {
                         </div>
                     </div>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex flex-col gap-2 flex-shrink-0 items-end">
+                    ${alert.snapshot_path
+                        ? '<button onclick="showSnapshot(\'' + esc(alert.snapshot_path) + '\', \'' + esc(typeThai[alert.alert_type] || alert.alert_type) + '\', \'' + formatDateTime(alert.created_at) + '\')" class="bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 px-3 py-1.5 rounded-lg text-xs transition whitespace-nowrap"><i class="fas fa-image mr-1"></i>ดูรูป</button>'
+                        : ''}
                     ${alert.is_resolved == 0
                         ? '<button onclick="resolveAlert(' + alert.id + ')" class="bg-green-600/20 text-green-400 hover:bg-green-600/30 px-3 py-1.5 rounded-lg text-xs transition whitespace-nowrap"><i class="fas fa-check mr-1"></i>ดำเนินการแล้ว</button>'
                         : '<span class="text-green-400 text-xs whitespace-nowrap"><i class="fas fa-check-circle mr-1"></i>แก้ไขแล้ว</span>'}
@@ -309,7 +326,111 @@ document.getElementById('filterSearch').addEventListener('keypress', function(e)
     if (e.key === 'Enter') applyFilters();
 });
 
+// ============================================================
+// Snapshot Modal
+// ============================================================
+function showSnapshot(path, title, time) {
+    const modal = document.getElementById('snapshotModal');
+    const img = document.getElementById('snapImage');
+    const loading = document.getElementById('snapLoading');
+
+    document.getElementById('snapTitle').textContent = title || 'รูปถ่าย';
+    document.getElementById('snapSubtitle').textContent = time || '';
+
+    img.style.display = 'none';
+    loading.style.display = '';
+    loading.innerHTML = '<i class="fas fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">กำลังโหลดรูป...</p>';
+    modal.style.display = 'flex';
+
+    const ts = Date.now();
+    if (path.includes('/')) {
+        tryLoadImage(path + '?t=' + ts, img, loading, null);
+    } else {
+        const laragonUrl = 'snapshots/' + path + '?t=' + ts;
+        const piUrl = FACE_SERVER + '/api/snapshots/' + path + '?t=' + ts;
+        tryLoadImage(laragonUrl, img, loading, piUrl);
+    }
+    document.addEventListener('keydown', _snapEscHandler);
+}
+
+function tryLoadImage(url, imgEl, loadingEl, fallbackUrl) {
+    const testImg = new Image();
+    testImg.onload = () => { imgEl.src = testImg.src; imgEl.style.display = ''; loadingEl.style.display = 'none'; };
+    testImg.onerror = () => {
+        if (fallbackUrl) {
+            const fb = new Image();
+            fb.onload = () => { imgEl.src = fb.src; imgEl.style.display = ''; loadingEl.style.display = 'none'; };
+            fb.onerror = () => { loadingEl.innerHTML = '<i class="fas fa-image text-3xl text-red-400 mb-2"></i><p class="text-sm text-red-400">ไม่พบรูปภาพ</p>'; };
+            fb.src = fallbackUrl;
+        } else {
+            loadingEl.innerHTML = '<i class="fas fa-image text-3xl text-red-400 mb-2"></i><p class="text-sm text-red-400">ไม่พบรูปภาพ</p>';
+        }
+    };
+    testImg.src = url;
+}
+
+function _snapEscHandler(e) { if (e.key === 'Escape') closeSnapshot(); }
+
+function closeSnapshot() {
+    document.getElementById('snapshotModal').style.display = 'none';
+    document.getElementById('snapImage').src = '';
+    document.removeEventListener('keydown', _snapEscHandler);
+}
+
+// ============================================================
+// Select & Delete
+// ============================================================
+function updateSelectedCount() {
+    const checked = document.querySelectorAll('.alert-check:checked');
+    document.getElementById('selectedCount').textContent = checked.length > 0 ? checked.length + ' รายการ' : '';
+}
+
+async function deleteSelected() {
+    const ids = Array.from(document.querySelectorAll('.alert-check:checked')).map(cb => parseInt(cb.value));
+    if (ids.length === 0) return;
+    if (!confirm(`ต้องการลบ ${ids.length} รายการที่เลือก?`)) return;
+
+    const result = await postAPI('api/alerts.php?action=delete', { ids });
+    if (result?.success) {
+        showToast(`ลบ ${result.deleted} รายการ`, 'success');
+        loadAlerts();
+    }
+}
+
+async function deleteAllAlerts() {
+    if (!confirm('ต้องการลบการแจ้งเตือนทั้งหมด?')) return;
+    if (!confirm('ยืนยันอีกครั้ง: ลบทั้งหมด?')) return;
+
+    const result = await postAPI('api/alerts.php?action=delete', { all: true });
+    if (result?.success) {
+        showToast(`ลบ ${result.deleted} รายการ`, 'success');
+        loadAlerts();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => loadAlerts());
 </script>
+
+<!-- Snapshot Modal -->
+<div id="snapshotModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" style="display:none;" onclick="if(event.target===this)closeSnapshot()">
+    <div class="glass rounded-2xl overflow-hidden max-w-2xl w-full mx-4 shadow-2xl">
+        <div class="p-4 border-b border-white/10 flex items-center justify-between">
+            <div>
+                <h3 class="font-medium" id="snapTitle">รูปถ่าย</h3>
+                <p class="text-xs text-gray-400" id="snapSubtitle"></p>
+            </div>
+            <button onclick="closeSnapshot()" class="text-gray-400 hover:text-white transition">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+        </div>
+        <div class="p-2 bg-black flex items-center justify-center" style="min-height: 300px;">
+            <img id="snapImage" src="" alt="Snapshot" class="max-w-full max-h-[70vh] object-contain">
+            <div id="snapLoading" class="text-center text-gray-500">
+                <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
+                <p class="text-sm">กำลังโหลดรูป...</p>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php include 'includes/footer.php'; ?>

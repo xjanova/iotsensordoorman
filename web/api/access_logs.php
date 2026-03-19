@@ -6,6 +6,34 @@ require_once __DIR__ . '/../config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') jsonResponse(['ok' => true]);
 
+// ============================================================
+// DELETE: ลบประวัติ (เลือกรายการ หรือทั้งหมด)
+// ============================================================
+if ($_SERVER['REQUEST_METHOD'] === 'DELETE' || ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'delete')) {
+    try {
+        $db = getDB();
+        $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+        if (!empty($input['ids']) && is_array($input['ids'])) {
+            // ลบเฉพาะ ID ที่เลือก
+            $ids = array_map('intval', $input['ids']);
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $db->prepare("DELETE FROM access_logs WHERE id IN ($placeholders)");
+            $stmt->execute($ids);
+            jsonResponse(['success' => true, 'deleted' => $stmt->rowCount(), 'message' => "ลบ {$stmt->rowCount()} รายการ"]);
+        } elseif (($input['all'] ?? false) === true) {
+            // ลบทั้งหมด
+            $stmt = $db->query("DELETE FROM access_logs");
+            jsonResponse(['success' => true, 'deleted' => $stmt->rowCount(), 'message' => "ลบทั้งหมด {$stmt->rowCount()} รายการ"]);
+        } else {
+            jsonResponse(['error' => 'ระบุ ids (array) หรือ all: true'], 400);
+        }
+    } catch (PDOException $e) {
+        error_log("[API access_logs DELETE] " . $e->getMessage());
+        jsonResponse(['error' => 'เกิดข้อผิดพลาด'], 500);
+    }
+}
+
 try {
     $db = getDB();
 

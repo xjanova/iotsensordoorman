@@ -15,6 +15,33 @@ if ($method === 'POST') {
     }
 }
 
+// ============================================================
+// DELETE: ลบการแจ้งเตือน
+// ============================================================
+if (($method === 'POST' && ($_GET['action'] ?? '') === 'delete') || $method === 'DELETE') {
+    session_start();
+    try {
+        $db = getDB();
+        $input = json_decode(file_get_contents('php://input'), true) ?: [];
+
+        if (!empty($input['ids']) && is_array($input['ids'])) {
+            $ids = array_map('intval', $input['ids']);
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $db->prepare("DELETE FROM anomaly_alerts WHERE id IN ($placeholders)");
+            $stmt->execute($ids);
+            jsonResponse(['success' => true, 'deleted' => $stmt->rowCount()]);
+        } elseif (($input['all'] ?? false) === true) {
+            $stmt = $db->query("DELETE FROM anomaly_alerts");
+            jsonResponse(['success' => true, 'deleted' => $stmt->rowCount()]);
+        } else {
+            jsonResponse(['error' => 'ระบุ ids (array) หรือ all: true'], 400);
+        }
+    } catch (PDOException $e) {
+        error_log("[API alerts DELETE] " . $e->getMessage());
+        jsonResponse(['error' => 'เกิดข้อผิดพลาด'], 500);
+    }
+}
+
 try {
     $db = getDB();
 
