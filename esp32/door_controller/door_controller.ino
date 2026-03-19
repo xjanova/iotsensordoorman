@@ -282,12 +282,13 @@ void sendHeartbeat() {
     http.begin(url);
     http.addHeader("Content-Type", "application/json");
 
-    StaticJsonDocument<128> doc;
+    StaticJsonDocument<200> doc;
     doc["device"] = "esp32";
     doc["door"] = doorLocked ? "locked" : "unlocked";
     doc["pir_outside"] = pirOutsideState;
     doc["pir_inside"] = pirInsideState;
     doc["rssi"] = WiFi.RSSI();
+    doc["ip"] = WiFi.localIP().toString();
     String body;
     serializeJson(doc, body);
 

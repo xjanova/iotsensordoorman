@@ -23,8 +23,24 @@ define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: '');
 define('DB_NAME', getenv('DB_NAME') ?: 'bunny_door');
 
-// Python Face Server
-define('FACE_SERVER_URL', getenv('FACE_SERVER_URL') ?: 'http://localhost:5000');
+// Python Face Server — ดึง IP จาก DB (Pi ส่ง heartbeat มา) หรือใช้ .env fallback
+$_faceServerUrl = getenv('FACE_SERVER_URL') ?: 'http://localhost:5000';
+try {
+    $_tmpPdo = new PDO(
+        "mysql:host=" . (getenv('DB_HOST') ?: 'localhost') . ";port=" . intval(getenv('DB_PORT') ?: 3306) . ";dbname=" . (getenv('DB_NAME') ?: 'bunny_door') . ";charset=utf8mb4",
+        getenv('DB_USER') ?: 'root',
+        getenv('DB_PASS') ?: '',
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT]
+    );
+    $_piRow = $_tmpPdo->query("SELECT ip_address, last_heartbeat FROM system_status WHERE component = 'face_server' AND status = 'ONLINE' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    if ($_piRow && $_piRow['ip_address'] && (time() - strtotime($_piRow['last_heartbeat'])) < 120) {
+        $_faceServerUrl = 'http://' . $_piRow['ip_address'] . ':5000';
+    }
+    $_tmpPdo = null;
+} catch (Exception $e) {
+    // ใช้ .env fallback
+}
+define('FACE_SERVER_URL', $_faceServerUrl);
 
 // Application
 define('APP_NAME', 'Bunny Door System');

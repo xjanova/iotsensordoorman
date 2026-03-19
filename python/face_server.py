@@ -446,10 +446,15 @@ def _upload_snapshot_to_web(filepath, filename):
     return None
 
 
+def _esp32_url(path):
+    """สร้าง URL ไป ESP32 จาก IP ที่ heartbeat ส่งมา หรือ config"""
+    ip = system_state.get("esp32_ip") or config.ESP32_IP
+    return f"http://{ip}:{config.ESP32_PORT}{path}"
+
 def unlock_door():
     """สั่ง ESP32 ปลดล็อกประตู"""
     try:
-        resp = requests.post(config.ESP32_UNLOCK_URL, timeout=3)
+        resp = requests.post(_esp32_url("/api/door/unlock"), timeout=3)
         if resp.status_code == 200:
             system_state["door_status"] = "unlocked"
             print("[Door] Unlocked via ESP32")
@@ -564,7 +569,7 @@ def api_door_unlock():
 @app.route('/api/door/lock', methods=['POST'])
 def api_door_lock():
     try:
-        resp = requests.post(config.ESP32_LOCK_URL, timeout=3)
+        resp = requests.post(_esp32_url("/api/door/lock"), timeout=3)
         system_state["door_status"] = "locked"
         return jsonify({"success": True, "status": "locked"})
     except Exception as e:
@@ -597,7 +602,10 @@ def api_heartbeat():
         return jsonify({"error": "No JSON body"}), 400
     system_state["esp32_online"] = True
     system_state["door_status"] = data.get("door", "unknown")
-    update_system_status("esp32", "ONLINE", config.ESP32_IP)
+    # ดึง IP จริงของ ESP32 จาก heartbeat request หรือ JSON body
+    esp_ip = data.get("ip") or request.remote_addr
+    system_state["esp32_ip"] = esp_ip
+    update_system_status("esp32", "ONLINE", esp_ip)
     return jsonify({"received": True})
 
 
@@ -780,14 +788,17 @@ def api_system_health():
 # ============================================================
 @app.route('/api/esp32/health')
 def api_esp32_health():
-    """ดึงข้อมูล ESP32 status (door, uptime, rssi, ip)"""
+    """ดึงข้อมูล ESP32 status — ใช้ IP จาก heartbeat (auto-detect) หรือ config"""
+    esp_ip = system_state.get("esp32_ip") or config.ESP32_IP
+    status_url = f"http://{esp_ip}:{config.ESP32_PORT}/api/status"
     try:
-        resp = requests.get(config.ESP32_STATUS_URL, timeout=3)
+        resp = requests.get(status_url, timeout=3)
         data = resp.json()
         data["online"] = True
+        data["ip"] = esp_ip
         return jsonify(data)
     except Exception:
-        return jsonify({"online": False, "error": "ESP32 ไม่ตอบสนอง"})
+        return jsonify({"online": False, "error": "ESP32 ไม่ตอบสนอง", "ip": esp_ip})
 
 
 @app.route('/api/config/esp32', methods=['POST'])
@@ -1290,12 +1301,36 @@ if __name__ == "__main__":
     print("  Bunny Door System - Face Recognition Server")
     print("=" * 50)
 
-    # อัปเดตสถานะ
-    update_system_status("face_server", "ONLINE")
-    update_system_status("raspberry_pi", "ONLINE")
+    # ดึง IP จริงของ Pi
+    def get_local_ip():
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return "127.0.0.1"
+
+    _pi_ip = get_local_ip()
+    print(f"  Pi IP: {_pi_ip}")
+
+    # อัปเดตสถานะ + IP
+    update_system_status("face_server", "ONLINE", _pi_ip)
+    update_system_status("raspberry_pi", "ONLINE", _pi_ip)
 
     # โหลด name display cache จาก DB
     load_name_display_cache()
+
+    # Heartbeat loop: ส่ง IP + สถานะ ไป DB ทุก 30 วินาที
+    def _heartbeat_loop():
+        while system_state["running"]:
+            time.sleep(30)
+            ip = get_local_ip()
+            update_system_status("face_server", "ONLINE", ip)
+            update_system_status("raspberry_pi", "ONLINE", ip)
+    threading.Thread(target=_heartbeat_loop, daemon=True).start()
 
     # Refresh name cache ทุก 5 นาที (กรณีเพิ่มพนักงานใหม่)
     def _name_cache_refresh_loop():
