@@ -465,9 +465,24 @@ async function saveAllIPs() {
         if (res.success) messages.push('ESP32 settings');
     } catch (e) {}
 
+    // 3. อัพเดท Pi .env (DB_HOST, WEB_SERVER_URL, ESP32_IP) อัตโนมัติ
+    try {
+        const piUrl = `http://${piIP}:5000`;
+        const res = await postAPI(piUrl + '/api/config/env', {
+            DB_HOST: webIP || window.location.hostname,
+            WEB_SERVER_URL: `http://${webIP || window.location.hostname}/bunny-door`,
+            ESP32_IP: espIP
+        });
+        if (res?.success) {
+            messages.push('Pi .env (' + (res.updated || []).join(', ') + ')');
+        }
+    } catch (e) {
+        messages.push('Pi .env — Pi อาจออฟไลน์');
+    }
+
     if (success) {
         status.innerHTML = '<i class="fas fa-check-circle text-green-400"></i> <span class="text-green-400">บันทึกสำเร็จ!</span>';
-        showToast('บันทึก IP สำเร็จ! อย่าลืมแก้บน Pi ด้วย (ดูคำสั่งด้านล่าง)', 'success', 5000);
+        showToast('บันทึกสำเร็จ! Pi .env อัพเดทอัตโนมัติแล้ว', 'success', 5000);
     } else {
         status.innerHTML = '<i class="fas fa-times-circle text-red-400"></i> <span class="text-red-400">บันทึกไม่สำเร็จ</span>';
         showToast('เกิดข้อผิดพลาด: ' + messages.join(', '), 'error');

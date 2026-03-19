@@ -896,6 +896,77 @@ def api_esp32_health():
         return jsonify({"online": False, "error": "ESP32 ไม่ตอบสนอง", "ip": esp_ip})
 
 
+@app.route('/api/config/env', methods=['GET', 'POST'])
+def api_config_env():
+    """ดู/อัพเดท .env ของ Pi (DB_HOST, ESP32_IP, CAMERA_*, WEB_SERVER_URL ฯลฯ)"""
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+
+    if request.method == 'GET':
+        # อ่าน .env ปัจจุบัน
+        env_data = {}
+        if os.path.exists(env_path):
+            with open(env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, v = line.split('=', 1)
+                        env_data[k.strip()] = v.strip()
+        return jsonify({"success": True, "env": env_data})
+
+    # POST: อัพเดท .env
+    data = request.json
+    if not data:
+        return jsonify({"error": "No data"}), 400
+
+    # อ่าน .env ปัจจุบัน
+    env_lines = {}
+    order = []
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped and not stripped.startswith('#') and '=' in stripped:
+                    k = stripped.split('=', 1)[0].strip()
+                    env_lines[k] = line
+                    order.append(k)
+                else:
+                    order.append(line)
+
+    # Whitelist: อนุญาตให้แก้เฉพาะ key เหล่านี้
+    allowed_keys = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME',
+                    'ESP32_IP', 'CAMERA_OUTSIDE_ID', 'CAMERA_INSIDE_ID',
+                    'WEB_SERVER_URL', 'CAMERA_MODE']
+    updated = []
+    for key, value in data.items():
+        if key in allowed_keys:
+            env_lines[key] = f"{key}={value}\n"
+            if key not in order:
+                order.append(key)
+            updated.append(key)
+
+            # อัพเดท config runtime ด้วย
+            if hasattr(config, key):
+                try:
+                    old_val = getattr(config, key)
+                    if isinstance(old_val, int):
+                        setattr(config, key, int(value))
+                    else:
+                        setattr(config, key, value)
+                except:
+                    pass
+
+    # เขียนกลับ
+    with open(env_path, 'w') as f:
+        for item in order:
+            if item in env_lines:
+                f.write(env_lines[item])
+            else:
+                f.write(item)  # comment / blank line
+
+    print(f"[Config] อัพเดท .env: {updated}")
+    return jsonify({"success": True, "updated": updated})
+
+
 @app.route('/api/config/esp32', methods=['POST'])
 def api_config_esp32():
     """อัพเดท ESP32 IP (เรียกจาก network page)"""
