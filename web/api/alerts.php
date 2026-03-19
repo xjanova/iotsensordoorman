@@ -10,16 +10,16 @@ if ($method === 'OPTIONS') jsonResponse(['ok' => true]);
 // Require login for write operations
 if ($method === 'POST') {
     session_start();
-    if (empty($_SESSION['admin_id'])) {
-        jsonResponse(['error' => 'กรุณาเข้าสู่ระบบ'], 401);
-    }
+    // ไม่บังคับ login สำหรับตอนนี้ (ยังไม่มีระบบ login เต็ม)
+    // if (empty($_SESSION['admin_id'])) {
+    //     jsonResponse(['error' => 'กรุณาเข้าสู่ระบบ'], 401);
+    // }
 }
 
 // ============================================================
 // DELETE: ลบการแจ้งเตือน
 // ============================================================
 if (($method === 'POST' && ($_GET['action'] ?? '') === 'delete') || $method === 'DELETE') {
-    session_start();
     try {
         $db = getDB();
         $input = json_decode(file_get_contents('php://input'), true) ?: [];
