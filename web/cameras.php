@@ -1,18 +1,73 @@
 <?php $pageTitle = 'กล้องวงจรปิด - Bunny Door System'; ?>
 <?php include 'includes/header.php'; ?>
 
-<div class="flex justify-between items-center mb-8">
+<div class="flex justify-between items-center mb-8" id="pageHeader">
     <div>
         <h2 class="text-2xl font-bold">กล้องวงจรปิด</h2>
         <p class="text-gray-400 text-sm mt-1">Monitor แบบ Real-time — กล้อง, เซ็นเซอร์, ประตู, กิจกรรม</p>
     </div>
     <div class="flex items-center gap-3">
         <span class="text-xs text-gray-500" id="monitorClock"></span>
-        <a href="settings.php" class="text-sm text-blue-400 hover:underline flex items-center gap-1">
+        <button onclick="toggleFullscreen()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg text-sm transition flex items-center gap-2" id="btnFullscreen">
+            <i class="fas fa-expand" id="fsIcon"></i> <span id="fsLabel">Full Monitor</span>
+        </button>
+        <a href="settings.php" class="text-sm text-blue-400 hover:underline flex items-center gap-1" id="linkSettings">
             <i class="fas fa-cog"></i> ตั้งค่า
         </a>
     </div>
 </div>
+
+<style>
+/* Fullscreen Monitor Mode */
+body.fs-mode { overflow: hidden !important; }
+body.fs-mode .sidebar, body.fs-mode nav, body.fs-mode #pageHeader,
+body.fs-mode #linkSettings, body.fs-mode footer { display: none !important; }
+body.fs-mode main, body.fs-mode .main-content { margin: 0 !important; padding: 0 !important; max-width: 100% !important; }
+body.fs-mode #monitorWrap {
+    position: fixed; inset: 0; z-index: 9999;
+    background: #0a0a0f;
+    overflow-y: auto;
+    padding: 12px;
+}
+body.fs-mode #fsBar {
+    display: flex !important;
+}
+
+/* Glow effects */
+.fs-glow { box-shadow: 0 0 20px rgba(59,130,246,0.15), 0 0 60px rgba(59,130,246,0.05); }
+.fs-cam-border { border: 1px solid rgba(59,130,246,0.2); }
+
+/* Scanline overlay */
+@keyframes scanline { 0% { top: -5%; } 100% { top: 105%; } }
+.scanline::after {
+    content: ''; position: absolute; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(59,130,246,0.15), transparent);
+    animation: scanline 4s linear infinite; pointer-events: none;
+}
+
+/* Live pulse */
+@keyframes livePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.live-pulse { animation: livePulse 1.5s ease-in-out infinite; }
+</style>
+
+<!-- Fullscreen Top Bar (hidden until fs-mode) -->
+<div id="fsBar" class="hidden items-center justify-between px-4 py-2 mb-3 rounded-xl" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);">
+    <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+            <span class="w-2 h-2 bg-red-500 rounded-full live-pulse"></span>
+            <span class="text-xs font-mono text-red-400 tracking-wider">LIVE</span>
+        </div>
+        <span class="text-sm font-medium text-white/80">BUNNY DOOR — SECURITY MONITOR</span>
+    </div>
+    <div class="flex items-center gap-4">
+        <span class="text-xs font-mono text-cyan-400" id="fsClock"></span>
+        <button onclick="toggleFullscreen()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs transition">
+            <i class="fas fa-compress mr-1"></i> Exit
+        </button>
+    </div>
+</div>
+
+<div id="monitorWrap">
 
 <!-- Camera Grid -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -177,6 +232,8 @@
         <span>00</span><span>03</span><span>06</span><span>09</span><span>12</span><span>15</span><span>18</span><span>21</span><span>23</span>
     </div>
 </div>
+
+</div><!-- /monitorWrap -->
 
 <script>
 let _camOutEnabled = false;
@@ -433,6 +490,62 @@ async function loadActivityChart() {
 }
 
 // ============================================================
+// Fullscreen Monitor Mode
+// ============================================================
+let _isFullscreen = false;
+
+function toggleFullscreen() {
+    _isFullscreen = !_isFullscreen;
+    const body = document.body;
+
+    if (_isFullscreen) {
+        body.classList.add('fs-mode');
+        // Move monitorWrap + fsBar to body level for proper fixed positioning
+        document.getElementById('fsBar').style.display = '';
+
+        // Add glow + scanline to camera cards
+        document.querySelectorAll('.stream-container').forEach(el => {
+            el.classList.add('scanline');
+        });
+        document.querySelectorAll('#monitorWrap .glass').forEach(el => {
+            el.classList.add('fs-glow', 'fs-cam-border');
+        });
+
+        // Try native fullscreen
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        }
+    } else {
+        body.classList.remove('fs-mode');
+        document.getElementById('fsBar').style.display = 'none';
+
+        document.querySelectorAll('.stream-container').forEach(el => {
+            el.classList.remove('scanline');
+        });
+        document.querySelectorAll('#monitorWrap .glass').forEach(el => {
+            el.classList.remove('fs-glow', 'fs-cam-border');
+        });
+
+        if (document.exitFullscreen && document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+        }
+    }
+}
+
+// ESC key to exit fullscreen
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && _isFullscreen) {
+        toggleFullscreen();
+    }
+});
+
+// Update fullscreen clock
+function updateFsClock() {
+    const el = document.getElementById('fsClock');
+    if (el) el.textContent = new Date().toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'medium' });
+}
+
+// ============================================================
 // Init
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
@@ -449,6 +562,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(loadLastAccess, 10000);
     setInterval(loadActivityChart, 30000);
     setInterval(updateMonClock, 1000);
+    setInterval(updateFsClock, 1000);
+
+    // Auto fullscreen ถ้ามี ?fs=1 ใน URL
+    if (new URLSearchParams(window.location.search).get('fs') === '1') {
+        setTimeout(toggleFullscreen, 500);
+    }
 });
 </script>
 
