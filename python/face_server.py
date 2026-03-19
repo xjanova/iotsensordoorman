@@ -118,13 +118,18 @@ def load_name_display_cache():
                             new_cache[fname] = d
                             break
 
+        # ป้องกัน: ถ้า cache ใหม่ว่าง แต่เก่ามีข้อมูล → ไม่ทับ (DB อาจหลุดชั่วคราว)
+        if not new_cache and _name_display_cache:
+            print(f"[NameCache] ⚠ DB คืนค่าว่าง แต่ cache เดิมมี {len(_name_display_cache)} รายการ — ข้าม ไม่เคลียร์")
+            return
+
         _name_display_cache = new_cache
         _name_cache_loaded = True
         print(f"[NameCache] โหลด {len(new_cache)} mapping (จาก {len(rows)} พนักงาน)")
         for k, v in new_cache.items():
             print(f"  {k} → {v}")
     except Exception as e:
-        print(f"[NameCache Error] {e}")
+        print(f"[NameCache Error] {e} — ใช้ cache เดิมต่อ ({len(_name_display_cache)} รายการ)")
     finally:
         if db:
             try: db.close()
