@@ -97,23 +97,10 @@ $componentNames = [
             <div class="flex-1">
                 <p class="text-sm font-medium">ESP32</p>
                 <div class="flex items-center gap-1.5" id="espLiveStatus">
-                    <?php
-                    // Check ESP32 from DB heartbeat
-                    $espOnline = false;
-                    $espIP = $settings['esp32_ip'] ?? '';
-                    try {
-                        $stmt = $db->query("SELECT last_heartbeat FROM system_status WHERE component='esp32' LIMIT 1");
-                        $row = $stmt->fetch();
-                        if ($row && $row['last_heartbeat']) {
-                            $diff = time() - strtotime($row['last_heartbeat']);
-                            $espOnline = ($diff < 60);
-                        }
-                    } catch (Exception $e) {}
-                    ?>
-                    <span class="w-2 h-2 rounded-full <?= $espOnline ? 'bg-green-400 pulse-dot' : 'bg-red-400' ?>"></span>
-                    <span class="text-xs <?= $espOnline ? 'text-green-400' : 'text-red-400' ?>"><?= $espOnline ? 'ออนไลน์' : 'ออฟไลน์' ?></span>
+                    <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+                    <span class="text-xs text-gray-500">กำลังตรวจสอบ...</span>
                 </div>
-                <p class="text-xs text-gray-600 mt-0.5"><?= $espIP ?: 'ไม่ได้ตั้งค่า IP' ?></p>
+                <p class="text-xs text-gray-600 mt-0.5" id="espIPInfo">-</p>
             </div>
         </div>
 
@@ -168,9 +155,10 @@ $componentNames = [
             <div class="flex-1">
                 <p class="text-sm font-medium">เซ็นเซอร์ PIR</p>
                 <div class="flex items-center gap-1.5" id="pirLiveStatus">
-                    <span class="w-2 h-2 rounded-full <?= $espOnline ? 'bg-green-400 pulse-dot' : 'bg-red-400' ?>"></span>
-                    <span class="text-xs <?= $espOnline ? 'text-green-400' : 'text-red-400' ?>"><?= $espOnline ? 'ออนไลน์ (ผ่าน ESP32)' : 'ออฟไลน์' ?></span>
+                    <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+                    <span class="text-xs text-gray-500">กำลังตรวจสอบ...</span>
                 </div>
+                <p class="text-xs text-gray-600 mt-0.5" id="pirInfo">-</p>
             </div>
         </div>
     </div>
@@ -995,19 +983,51 @@ async function checkDevicesLive() {
                 document.getElementById('piIPInfo').textContent = net.raspberry_pi.url + ' (เชื่อมต่อได้)';
             }
 
-            // If Pi online, check cameras and face recognition
+            // If Pi online, check cameras, face recognition, and ESP32
             if (net.raspberry_pi.online) {
                 checkCameras();
                 checkFaceRecognition();
+                checkESP32();
             } else {
                 setDeviceStatus('camOutLiveStatus', false);
                 setDeviceStatus('camInLiveStatus', false);
                 setDeviceStatus('faceLiveStatus', false);
+                setDeviceStatus('espLiveStatus', false);
+                setDeviceStatus('pirLiveStatus', false);
                 document.getElementById('faceInfo').textContent = 'Pi ออฟไลน์';
+                document.getElementById('espIPInfo').textContent = '-';
+                document.getElementById('pirInfo').textContent = '-';
             }
         }
     } catch (e) {
         console.error('Device check failed:', e);
+    }
+}
+
+async function checkESP32() {
+    try {
+        const data = await fetchAPI(FACE_SERVER + '/api/esp32/health');
+        if (data && data.online) {
+            setDeviceStatus('espLiveStatus', true);
+            document.getElementById('espIPInfo').textContent = (data.ip || '-') + ' | RSSI: ' + (data.rssi || '-') + ' dBm';
+
+            // PIR sensors — ผ่าน ESP32
+            const pirOut = data.pir_outside;
+            const pirIn = data.pir_inside;
+            setDeviceStatus('pirLiveStatus', true);
+            let pirText = 'นอก: ' + (pirOut ? 'ตรวจจับ' : 'ปกติ') + ' | ใน: ' + (pirIn ? 'ตรวจจับ' : 'ปกติ');
+            document.getElementById('pirInfo').textContent = pirText;
+        } else {
+            setDeviceStatus('espLiveStatus', false);
+            document.getElementById('espIPInfo').textContent = data?.ip || 'ไม่ตอบสนอง';
+            setDeviceStatus('pirLiveStatus', false);
+            document.getElementById('pirInfo').textContent = 'ESP32 ออฟไลน์';
+        }
+    } catch {
+        setDeviceStatus('espLiveStatus', false);
+        document.getElementById('espIPInfo').textContent = 'ไม่สามารถเชื่อมต่อ';
+        setDeviceStatus('pirLiveStatus', false);
+        document.getElementById('pirInfo').textContent = 'ไม่สามารถตรวจสอบ';
     }
 }
 
