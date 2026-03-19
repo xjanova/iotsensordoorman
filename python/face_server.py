@@ -308,9 +308,21 @@ def camera_thread(camera_id, cam_name):
         return
 
     _camera_captures[cam_name] = cap
+
+    # ใช้ MJPEG format เพื่อลด USB bandwidth (แก้ปัญหาภาพเขียวเมื่อเปิด 2 กล้อง)
+    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+    cap.set(cv2.CAP_PROP_FOURCC, fourcc)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
     cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
+
+    # ยืนยันว่าได้ format อะไร
+    actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    actual_fourcc = int(cap.get(cv2.CAP_PROP_FOURCC))
+    fourcc_str = "".join([chr((actual_fourcc >> 8 * i) & 0xFF) for i in range(4)])
+    print(f"[Camera] {cam_name} opened: {actual_w}x{actual_h} format={fourcc_str}")
+
     update_system_status(cam_name, "ONLINE")
 
     frame_count = 0
