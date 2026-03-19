@@ -8,6 +8,17 @@
     </div>
     <div class="flex items-center gap-3">
         <span class="text-xs text-gray-500" id="monitorClock"></span>
+        <!-- Camera Mode Toggle -->
+        <div class="flex items-center bg-white/5 rounded-lg p-0.5 text-xs" id="modeToggle">
+            <button onclick="setCameraMode('always')" id="btnModeAlways"
+                class="px-3 py-1.5 rounded-md transition font-medium bg-green-600 text-white">
+                <i class="fas fa-eye mr-1"></i>Always
+            </button>
+            <button onclick="setCameraMode('standby')" id="btnModeStandby"
+                class="px-3 py-1.5 rounded-md transition font-medium text-gray-400 hover:text-white">
+                <i class="fas fa-moon mr-1"></i>Standby
+            </button>
+        </div>
         <button onclick="toggleFullscreen()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-2 rounded-lg text-sm transition flex items-center gap-2" id="btnFullscreen">
             <i class="fas fa-expand" id="fsIcon"></i> <span id="fsLabel">Full Monitor</span>
         </button>
@@ -60,6 +71,12 @@ body.fs-mode #fsBar {
         <span class="text-sm font-medium text-white/80">BUNNY DOOR — SECURITY MONITOR</span>
     </div>
     <div class="flex items-center gap-4">
+        <div class="flex items-center bg-white/5 rounded-lg p-0.5 text-xs" id="fsModeToggle">
+            <button onclick="setCameraMode('always')" id="fsBtnAlways"
+                class="px-2 py-1 rounded transition font-medium bg-green-600 text-white">Always</button>
+            <button onclick="setCameraMode('standby')" id="fsBtnStandby"
+                class="px-2 py-1 rounded transition font-medium text-gray-400">Standby</button>
+        </div>
         <span class="text-xs font-mono text-cyan-400" id="fsClock"></span>
         <button onclick="toggleFullscreen()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs transition">
             <i class="fas fa-compress mr-1"></i> Exit
@@ -546,11 +563,46 @@ function updateFsClock() {
 }
 
 // ============================================================
+// Camera Mode Toggle (always / standby)
+// ============================================================
+async function setCameraMode(mode) {
+    const res = await postAPI(FACE_SERVER + '/api/camera/mode', { mode });
+    if (res?.success) {
+        updateModeUI(mode);
+    }
+}
+
+function updateModeUI(mode) {
+    const alwaysBtn = document.getElementById('btnModeAlways');
+    const standbyBtn = document.getElementById('btnModeStandby');
+    const fsAlways = document.getElementById('fsBtnAlways');
+    const fsStandby = document.getElementById('fsBtnStandby');
+
+    if (mode === 'always') {
+        alwaysBtn.className = 'px-3 py-1.5 rounded-md transition font-medium bg-green-600 text-white';
+        standbyBtn.className = 'px-3 py-1.5 rounded-md transition font-medium text-gray-400 hover:text-white';
+        if (fsAlways) { fsAlways.className = 'px-2 py-1 rounded transition font-medium bg-green-600 text-white'; fsStandby.className = 'px-2 py-1 rounded transition font-medium text-gray-400'; }
+    } else {
+        alwaysBtn.className = 'px-3 py-1.5 rounded-md transition font-medium text-gray-400 hover:text-white';
+        standbyBtn.className = 'px-3 py-1.5 rounded-md transition font-medium bg-indigo-600 text-white';
+        if (fsAlways) { fsAlways.className = 'px-2 py-1 rounded transition font-medium text-gray-400'; fsStandby.className = 'px-2 py-1 rounded transition font-medium bg-indigo-600 text-white'; }
+    }
+}
+
+async function fetchCameraMode() {
+    try {
+        const data = await fetchAPI(FACE_SERVER + '/api/status');
+        if (data?.camera_mode) updateModeUI(data.camera_mode);
+    } catch {}
+}
+
+// ============================================================
 // Init
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
     updateMonClock();
     fetchCamConfig();
+    fetchCameraMode();
     checkESP32();
     loadLastAccess();
     loadActivityChart();

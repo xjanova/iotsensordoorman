@@ -157,6 +157,7 @@ system_state = {
     "esp32_online": False,
     "people_inside": 0,
     "running": True,
+    "camera_mode": config.CAMERA_MODE,  # "always" or "standby"
 }
 
 # Snapshot directory
@@ -259,9 +260,18 @@ def update_system_status(component, status, ip=None):
 # ============================================================
 _camera_captures = {}  # เก็บ VideoCapture objects สำหรับ cleanup
 
+def _is_motion_active(cam_name):
+    """เช็คว่ามี motion จาก PIR ที่ตรงกับกล้องนี้ ภายใน STANDBY_ACTIVE_SEC"""
+    now = time.time()
+    grace = config.STANDBY_ACTIVE_SEC
+    if cam_name == "camera_outside":
+        return (now - system_state.get("last_motion_outside", 0)) < grace
+    else:
+        return (now - system_state.get("last_motion_inside", 0)) < grace
+
 def camera_thread(camera_id, cam_name):
-    """Thread สำหรับประมวลผลกล้องแต่ละตัว (Lite mode สำหรับ Pi 2GB)"""
-    print(f"[Camera] Starting {cam_name} (ID: {camera_id})")
+    """Thread สำหรับประมวลผลกล้องแต่ละตัว — รองรับ always/standby mode"""
+    print(f"[Camera] Starting {cam_name} (ID: {camera_id}) — mode: {system_state.get('camera_mode', config.CAMERA_MODE)}")
 
     cap = cv2.VideoCapture(camera_id, cv2.CAP_V4L2)
     if not cap.isOpened():
@@ -279,8 +289,43 @@ def camera_thread(camera_id, cam_name):
     last_faces = []
     last_names = []
     last_confidences = []
+    _was_standby = False
 
     while system_state["running"]:
+        mode = system_state.get("camera_mode", config.CAMERA_MODE)
+
+        # === STANDBY MODE ===
+        if mode == "standby" and not _is_motion_active(cam_name):
+            # Standby: อ่าน frame ช้าๆ แค่ให้มี snapshot ดูได้ แต่ไม่ process face
+            ret, frame = cap.read()
+            if ret:
+                cam_state = system_state[cam_name]
+                # วาด "STANDBY" บน frame
+                display_frame = frame.copy()
+                display_frame = draw_thai_text(display_frame, "STANDBY — รอเซ็นเซอร์", (10, 20), (100, 100, 100), font_size=14)
+
+                _, jpeg_buf = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 50])
+                with cam_state["lock"]:
+                    cam_state["jpeg"] = jpeg_buf.tobytes()
+                    cam_state["faces"] = []
+                    cam_state["motion"] = False
+
+                # เคลียร์ face data เมื่อเข้า standby
+                if not _was_standby:
+                    last_faces = []
+                    last_names = []
+                    last_confidences = []
+                    print(f"[Camera] {cam_name} → STANDBY")
+                    _was_standby = True
+
+            time.sleep(1.0 / max(config.STANDBY_FPS_IDLE, 0.5))
+            continue
+
+        # === ACTIVE MODE (always หรือ standby+motion) ===
+        if _was_standby:
+            print(f"[Camera] {cam_name} → ACTIVE (motion detected)")
+            _was_standby = False
+
         ret, frame = cap.read()
         if not ret:
             time.sleep(0.5)
@@ -315,10 +360,9 @@ def camera_thread(camera_id, cam_name):
                 disp_name = get_display_name(name)
                 display_names.append(disp_name)
                 label = f"{disp_name} ({conf}%)" if conf > 0 else "ไม่รู้จัก"
-                # ใช้ PIL วาดข้อความไทย
                 display_frame = draw_thai_text(display_frame, label, (left, top - 22), color, font_size=16)
 
-        # Encode เป็น JPEG เก็บไว้ (ไม่ต้อง stream ตลอด)
+        # Encode เป็น JPEG เก็บไว้
         _, jpeg_buf = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 65])
         face_display = list(zip(display_names if display_names else last_names, last_confidences))
         with cam_state["lock"]:
@@ -556,8 +600,31 @@ def api_status():
         },
         "people_inside": system_state["people_inside"],
         "face_database_count": sfr.get_face_count(),
+        "camera_mode": system_state.get("camera_mode", "always"),
         "timestamp": datetime.now().isoformat()
     })
+
+
+@app.route('/api/camera/mode', methods=['GET', 'POST'])
+def api_camera_mode():
+    """ดู/เปลี่ยนโหมดกล้อง (always / standby)"""
+    if request.method == 'GET':
+        return jsonify({
+            "mode": system_state.get("camera_mode", "always"),
+            "standby_active_sec": config.STANDBY_ACTIVE_SEC,
+            "last_motion_outside": system_state.get("last_motion_outside", 0),
+            "last_motion_inside": system_state.get("last_motion_inside", 0),
+        })
+
+    data = request.json or {}
+    new_mode = data.get("mode", "").lower()
+    if new_mode not in ("always", "standby"):
+        return jsonify({"error": "mode ต้องเป็น 'always' หรือ 'standby'"}), 400
+
+    old_mode = system_state.get("camera_mode", "always")
+    system_state["camera_mode"] = new_mode
+    print(f"[Mode] Camera mode: {old_mode} → {new_mode}")
+    return jsonify({"success": True, "mode": new_mode, "previous": old_mode})
 
 
 @app.route('/api/door/unlock', methods=['POST'])
