@@ -141,31 +141,42 @@ def get_display_name(filename_name):
         return "ไม่รู้จัก"
     return _name_display_cache.get(filename_name, filename_name)
 
-# Thai font สำหรับวาดข้อความบน frame
-_thai_font = None
+# Thai font cache แบบ dict {size: font} — กันโหลดซ้ำเมื่อใช้หลายขนาดสลับกัน
+# (เดิม cache แค่ font เดียว ทำให้ reload ทุก frame เมื่อ size สลับ 14↔16)
+_thai_font_cache = {}
+_thai_font_path = None  # cache path ที่หาเจอแล้ว ไม่ต้อง scan ใหม่
 def get_thai_font(size=18):
-    """โหลด Thai font (ลอง Noto Sans Thai ก่อน, fallback ไป DejaVu/default)"""
-    global _thai_font
-    if _thai_font and _thai_font.size == size:
-        return _thai_font
-    font_paths = [
-        "/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSansThai-Bold.ttf",
-        "/usr/share/fonts/opentype/noto/NotoSansThai-Regular.ttf",
-        "/usr/share/fonts/truetype/thai/TlwgMono.ttf",
-        "/usr/share/fonts/truetype/thai/Norasi.ttf",
-        "/usr/share/fonts/truetype/tlwg/TlwgMono.ttf",
-        "/usr/share/fonts/truetype/tlwg/Norasi.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    ]
-    for fp in font_paths:
-        if os.path.exists(fp):
-            _thai_font = ImageFont.truetype(fp, size)
-            print(f"[Font] ใช้ฟอนต์: {fp}")
-            return _thai_font
-    _thai_font = ImageFont.load_default()
-    print("[Font] ใช้ฟอนต์ default (ไม่รองรับภาษาไทย)")
-    return _thai_font
+    """โหลด Thai font (cache ตาม size — ลอง Noto Sans Thai ก่อน, fallback ไป DejaVu/default)"""
+    global _thai_font_path
+    if size in _thai_font_cache:
+        return _thai_font_cache[size]
+
+    if _thai_font_path is None:
+        font_paths = [
+            "/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansThai-Bold.ttf",
+            "/usr/share/fonts/opentype/noto/NotoSansThai-Regular.ttf",
+            "/usr/share/fonts/truetype/thai/TlwgMono.ttf",
+            "/usr/share/fonts/truetype/thai/Norasi.ttf",
+            "/usr/share/fonts/truetype/tlwg/TlwgMono.ttf",
+            "/usr/share/fonts/truetype/tlwg/Norasi.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
+        for fp in font_paths:
+            if os.path.exists(fp):
+                _thai_font_path = fp
+                print(f"[Font] ใช้ฟอนต์: {fp}")
+                break
+
+    if _thai_font_path:
+        font = ImageFont.truetype(_thai_font_path, size)
+    else:
+        font = ImageFont.load_default()
+        if not _thai_font_cache:
+            print("[Font] ใช้ฟอนต์ default (ไม่รองรับภาษาไทย)")
+
+    _thai_font_cache[size] = font
+    return font
 
 def draw_thai_text(frame, text, position, color_bgr, font_size=18):
     """วาดข้อความภาษาไทยบน OpenCV frame ด้วย PIL"""
@@ -313,6 +324,9 @@ def camera_thread(camera_id, cam_name):
         return
 
     _camera_captures[cam_name] = cap
+
+    # Buffer = 1 ป้องกัน V4L2 สะสมเฟรมเก่าเมื่อ face recognition ช้า → ลดอาการกระตุก/ภาพกระโดด
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     # ใช้ MJPEG format เพื่อลด USB bandwidth (แก้ปัญหาภาพเขียวเมื่อเปิด 2 กล้อง)
     fourcc = cv2.VideoWriter_fourcc(*'MJPG')
