@@ -117,7 +117,7 @@ sudo apt install -y \
     libjpeg-dev libpng-dev libtiff-dev \
     libavcodec-dev libavformat-dev libswscale-dev \
     libv4l-dev v4l-utils \
-    libatlas-base-dev liblapack-dev libblas-dev libopenblas-dev \
+    liblapack-dev libblas-dev libopenblas-dev \
     libboost-all-dev \
     libgtk-3-dev libxvidcore-dev libx264-dev \
     libhdf5-dev libhdf5-serial-dev \
