@@ -1,0 +1,2 @@
+# Shell scripts must use LF endings (run on Linux/Pi)
+*.sh text eol=lf
