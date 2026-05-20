@@ -17,6 +17,32 @@ if ($method === 'POST') {
 }
 
 // ============================================================
+// STATS: นับ severity / resolved จาก DB ทั้งหมด (สำหรับ KPI cards)
+// ============================================================
+if ($method === 'GET' && ($_GET['action'] ?? '') === 'stats') {
+    try {
+        $db = getDB();
+        $row = $db->query("SELECT
+            SUM(CASE WHEN severity = 'CRITICAL' AND is_resolved = 0 THEN 1 ELSE 0 END) AS critical,
+            SUM(CASE WHEN severity = 'HIGH'     AND is_resolved = 0 THEN 1 ELSE 0 END) AS high,
+            SUM(CASE WHEN severity IN ('MEDIUM','LOW') AND is_resolved = 0 THEN 1 ELSE 0 END) AS med_low,
+            SUM(CASE WHEN is_resolved = 1 THEN 1 ELSE 0 END) AS resolved,
+            COUNT(*) AS total
+            FROM anomaly_alerts")->fetch();
+        jsonResponse([
+            'critical' => (int) ($row['critical'] ?? 0),
+            'high'     => (int) ($row['high'] ?? 0),
+            'med_low'  => (int) ($row['med_low'] ?? 0),
+            'resolved' => (int) ($row['resolved'] ?? 0),
+            'total'    => (int) ($row['total'] ?? 0),
+        ]);
+    } catch (PDOException $e) {
+        error_log("[API alerts STATS] " . $e->getMessage());
+        jsonResponse(['error' => 'เกิดข้อผิดพลาด'], 500);
+    }
+}
+
+// ============================================================
 // DELETE: ลบการแจ้งเตือน
 // ============================================================
 if (($method === 'POST' && ($_GET['action'] ?? '') === 'delete') || $method === 'DELETE') {

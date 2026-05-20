@@ -2,111 +2,71 @@
 <?php include 'includes/header.php'; ?>
 
 <?php
-// Get employee list for filter dropdown
 $db = getDB();
 $employees = $db->query("SELECT id, emp_code, first_name, last_name FROM employees ORDER BY first_name")->fetchAll();
 ?>
 
-<div class="flex justify-between items-center mb-6">
+<div class="page-head">
     <div>
-        <h2 class="text-2xl font-bold">ประวัติการเข้า-ออก</h2>
-        <p class="text-gray-400 text-sm mt-1">บันทึกจากการเปิดกลอนโซลินอย (Solenoid Lock)</p>
+        <h1>ประวัติการเข้า-ออก</h1>
+        <div class="sub">บันทึกจากการเปิดกลอนโซลินอย (Solenoid Lock)</div>
     </div>
 </div>
 
-<!-- Summary Cards -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    <div class="glass rounded-xl p-4 stat-card">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-door-open text-blue-400"></i>
-            </div>
-            <div>
-                <p class="text-2xl font-bold" id="statTotal">-</p>
-                <p class="text-xs text-gray-500">เปิดประตูทั้งหมด</p>
-            </div>
-        </div>
+<!-- Summary KPIs -->
+<div class="grid kpis section">
+    <div class="card kpi">
+        <div class="label"><span class="dot"></span>ทั้งหมด</div>
+        <div class="num" id="statTotal">—</div>
     </div>
-    <div class="glass rounded-xl p-4 stat-card">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-check-circle text-green-400"></i>
-            </div>
-            <div>
-                <p class="text-2xl font-bold text-green-400" id="statAuthorized">-</p>
-                <p class="text-xs text-gray-500">อนุญาต</p>
-            </div>
-        </div>
+    <div class="card kpi">
+        <div class="label"><span class="dot ok"></span>อนุญาต</div>
+        <div class="num" id="statAuthorized">—</div>
     </div>
-    <div class="glass rounded-xl p-4 stat-card">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-times-circle text-red-400"></i>
-            </div>
-            <div>
-                <p class="text-2xl font-bold text-red-400" id="statDenied">-</p>
-                <p class="text-xs text-gray-500">ปฏิเสธ</p>
-            </div>
-        </div>
+    <div class="card kpi">
+        <div class="label"><span class="dot danger"></span>ปฏิเสธ</div>
+        <div class="num" id="statDenied">—</div>
     </div>
-    <div class="glass rounded-xl p-4 stat-card">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-user-xmark text-orange-400"></i>
-            </div>
-            <div>
-                <p class="text-2xl font-bold text-orange-400" id="statUnknown">-</p>
-                <p class="text-xs text-gray-500">ไม่รู้จัก</p>
-            </div>
-        </div>
+    <div class="card kpi">
+        <div class="label"><span class="dot warn"></span>ไม่รู้จัก</div>
+        <div class="num" id="statUnknown">—</div>
     </div>
 </div>
 
 <!-- Filters -->
-<div class="glass rounded-2xl p-5 mb-6">
-    <div class="flex items-center gap-2 mb-4">
-        <i class="fas fa-filter text-blue-400"></i>
-        <span class="font-medium text-sm">ตัวกรอง</span>
+<div class="card section">
+    <div class="row" style="margin-bottom: 14px;">
+        <?= ico('filter', 14) ?>
+        <strong style="font-size: 13px;">ตัวกรอง</strong>
     </div>
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <!-- Date From -->
+    <div class="grid cols-3" style="gap: 14px;">
         <div>
-            <label class="text-xs text-gray-500 mb-1 block">ตั้งแต่วันที่</label>
-            <input type="date" id="filterDateFrom" onchange="applyFilters()"
-                   class="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+            <label class="tiny muted" style="display:block; margin-bottom:4px;">ตั้งแต่วันที่</label>
+            <input type="date" id="filterDateFrom" onchange="applyFilters()" class="input">
         </div>
-
-        <!-- Date To -->
         <div>
-            <label class="text-xs text-gray-500 mb-1 block">ถึงวันที่</label>
-            <input type="date" id="filterDateTo" onchange="applyFilters()"
-                   class="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+            <label class="tiny muted" style="display:block; margin-bottom:4px;">ถึงวันที่</label>
+            <input type="date" id="filterDateTo" onchange="applyFilters()" class="input">
         </div>
-
-        <!-- Direction -->
         <div>
-            <label class="text-xs text-gray-500 mb-1 block">ทิศทาง</label>
-            <select id="filterDirection" onchange="applyFilters()" class="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+            <label class="tiny muted" style="display:block; margin-bottom:4px;">ทิศทาง</label>
+            <select id="filterDirection" onchange="applyFilters()" class="select">
                 <option value="">ทั้งหมด</option>
                 <option value="IN">เข้า</option>
                 <option value="OUT">ออก</option>
             </select>
         </div>
-
-        <!-- Authorization -->
         <div>
-            <label class="text-xs text-gray-500 mb-1 block">สถานะ</label>
-            <select id="filterAuth" onchange="applyFilters()" class="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+            <label class="tiny muted" style="display:block; margin-bottom:4px;">สถานะ</label>
+            <select id="filterAuth" onchange="applyFilters()" class="select">
                 <option value="">ทั้งหมด</option>
                 <option value="1">อนุญาต</option>
                 <option value="0">ปฏิเสธ</option>
             </select>
         </div>
-
-        <!-- Employee -->
         <div>
-            <label class="text-xs text-gray-500 mb-1 block">พนักงาน</label>
-            <select id="filterEmployee" onchange="applyFilters()" class="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+            <label class="tiny muted" style="display:block; margin-bottom:4px;">พนักงาน</label>
+            <select id="filterEmployee" onchange="applyFilters()" class="select">
                 <option value="all">ทั้งหมด</option>
                 <option value="unknown">ไม่รู้จัก</option>
                 <?php foreach ($employees as $emp): ?>
@@ -114,103 +74,81 @@ $employees = $db->query("SELECT id, emp_code, first_name, last_name FROM employe
                 <?php endforeach; ?>
             </select>
         </div>
-
-        <!-- Search -->
         <div>
-            <label class="text-xs text-gray-500 mb-1 block">ค้นหา</label>
-            <div class="relative">
-                <input type="text" id="filterSearch" placeholder="ชื่อ, รหัส..."
-                       class="w-full bg-white/10 border border-white/10 rounded-lg px-3 py-2 pr-8 text-white text-sm focus:outline-none focus:border-blue-500">
-                <button onclick="applyFilters()" class="absolute right-2 top-2.5 text-gray-500 hover:text-white">
-                    <i class="fas fa-search text-xs"></i>
-                </button>
-            </div>
+            <label class="tiny muted" style="display:block; margin-bottom:4px;">ค้นหา</label>
+            <div class="search-wrap"><?= ico('search', 14) ?><input type="text" id="filterSearch" placeholder="ชื่อ, รหัส..." class="input input-search" onkeypress="if(event.key==='Enter')applyFilters()"></div>
         </div>
     </div>
-
-    <!-- Quick filters + Reset -->
-    <div class="flex items-center justify-between mt-3">
-        <div class="flex gap-2">
-            <button onclick="quickFilter('today')" class="text-xs bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-2.5 py-1 rounded-lg transition">วันนี้</button>
-            <button onclick="quickFilter('week')" class="text-xs bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 px-2.5 py-1 rounded-lg transition">7 วันล่าสุด</button>
-            <button onclick="quickFilter('denied')" class="text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 px-2.5 py-1 rounded-lg transition">ปฏิเสธเท่านั้น</button>
-            <button onclick="quickFilter('unknown')" class="text-xs bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 px-2.5 py-1 rounded-lg transition">ไม่รู้จัก</button>
+    <div class="row" style="margin-top: 14px; justify-content: space-between;">
+        <div class="row gap-2">
+            <button class="btn sm" onclick="quickFilter('today')">วันนี้</button>
+            <button class="btn sm" onclick="quickFilter('week')">7 วันล่าสุด</button>
+            <button class="btn sm" onclick="quickFilter('denied')">ปฏิเสธเท่านั้น</button>
+            <button class="btn sm" onclick="quickFilter('unknown')">ไม่รู้จัก</button>
         </div>
-        <button onclick="resetFilters()" class="text-xs text-gray-500 hover:text-white transition">
-            <i class="fas fa-rotate-left mr-1"></i> รีเซ็ตตัวกรอง
-        </button>
+        <button class="btn sm ghost" onclick="resetFilters()"><?= ico('refresh', 12) ?> รีเซ็ต</button>
     </div>
 </div>
 
-<!-- Summary line + Delete actions -->
-<div class="flex items-center justify-between mb-4">
-    <p class="text-sm text-gray-500" id="logSummary">กำลังโหลด...</p>
-    <div class="flex items-center gap-2" id="deleteActions" style="display:none;">
-        <span class="text-xs text-gray-500" id="selectedCount">0 รายการ</span>
-        <button onclick="deleteSelected()" class="bg-red-600/20 text-red-400 hover:bg-red-600/30 px-3 py-1.5 rounded-lg text-xs transition">
-            <i class="fas fa-trash mr-1"></i> ลบที่เลือก
-        </button>
-        <button onclick="deleteAll()" class="bg-red-600/10 text-red-400/70 hover:bg-red-600/20 px-3 py-1.5 rounded-lg text-xs transition">
-            <i class="fas fa-trash-can mr-1"></i> ลบทั้งหมด
-        </button>
+<!-- Summary + delete actions -->
+<div class="row spread" style="margin-bottom: 14px;">
+    <span class="tiny muted" id="logSummary">กำลังโหลด...</span>
+    <div class="row gap-2" id="deleteActions" style="display:none;">
+        <span class="tiny muted" id="selectedCount"></span>
+        <button class="btn sm danger" onclick="deleteSelected()"><?= ico('trash', 12) ?> ลบที่เลือก</button>
+        <button class="btn sm ghost" onclick="deleteAll()"><?= ico('trash', 12) ?> ลบทั้งหมด</button>
     </div>
 </div>
 
 <!-- Log Table -->
-<div class="glass rounded-2xl overflow-hidden">
-    <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+<div class="card flush">
+    <div style="overflow-x: auto;">
+        <table class="tbl">
             <thead>
-                <tr class="text-gray-400 border-b border-white/10 bg-white/5">
-                    <th class="py-4 px-2 w-8"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="accent-red-500 cursor-pointer"></th>
-                    <th class="text-left py-4 px-4">#</th>
-                    <th class="text-left py-4 px-4">เวลา</th>
-                    <th class="text-left py-4 px-4">พนักงาน</th>
-                    <th class="text-left py-4 px-4">ทิศทาง</th>
-                    <th class="text-left py-4 px-4">วิธี</th>
-                    <th class="text-left py-4 px-4">ความมั่นใจ</th>
-                    <th class="text-left py-4 px-4">กล้อง</th>
-                    <th class="text-center py-4 px-4">กลอน</th>
-                    <th class="text-center py-4 px-4">รูปถ่าย</th>
+                <tr>
+                    <th style="width: 36px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
+                    <th>#</th>
+                    <th>เวลา</th>
+                    <th>พนักงาน</th>
+                    <th>ทิศทาง</th>
+                    <th>วิธี</th>
+                    <th>ความมั่นใจ</th>
+                    <th>กล้อง</th>
+                    <th>กลอน</th>
+                    <th>รูป</th>
                 </tr>
             </thead>
             <tbody id="logsTable">
-                <tr><td colspan="10" class="text-center text-gray-500 py-8">กำลังโหลด...</td></tr>
+                <tr><td colspan="10" class="empty">กำลังโหลด...</td></tr>
             </tbody>
         </table>
     </div>
 </div>
 
 <!-- Pagination -->
-<div class="flex items-center justify-between mt-6" id="paginationBar" style="display:none;">
-    <p class="text-xs text-gray-500" id="pageInfo"></p>
-    <div class="flex gap-2">
-        <button onclick="goPage(-1)" id="btnPrev" class="bg-white/5 hover:bg-white/10 text-gray-400 px-4 py-2 rounded-lg text-sm transition disabled:opacity-30" disabled>
-            <i class="fas fa-chevron-left mr-1"></i> ก่อนหน้า
-        </button>
-        <button onclick="goPage(1)" id="btnNext" class="bg-white/5 hover:bg-white/10 text-gray-400 px-4 py-2 rounded-lg text-sm transition disabled:opacity-30" disabled>
-            ถัดไป <i class="fas fa-chevron-right ml-1"></i>
-        </button>
+<div class="row spread" id="paginationBar" style="margin-top: 18px; display:none;">
+    <span class="tiny muted" id="pageInfo"></span>
+    <div class="row gap-2">
+        <button class="btn sm" id="btnPrev" onclick="goPage(-1)" disabled><?= ico('chev-l', 12) ?> ก่อนหน้า</button>
+        <button class="btn sm" id="btnNext" onclick="goPage(1)" disabled>ถัดไป <?= ico('chev-r', 12) ?></button>
     </div>
 </div>
 
 <!-- Snapshot Modal -->
-<div id="snapshotModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" style="display:none;" onclick="if(event.target===this)closeSnapshot()">
-    <div class="glass rounded-2xl overflow-hidden max-w-2xl w-full mx-4 shadow-2xl">
-        <div class="p-4 border-b border-white/10 flex items-center justify-between">
+<div id="snapshotModal" class="modal-backdrop" style="display:none;">
+    <div class="modal">
+        <div class="modal-head">
             <div>
-                <h3 class="font-medium" id="snapTitle">รูปถ่ายขณะเข้า-ออก</h3>
-                <p class="text-xs text-gray-400" id="snapSubtitle"></p>
+                <h3 id="snapTitle">รูปถ่ายขณะเข้า-ออก</h3>
+                <div class="tiny muted" id="snapSubtitle"></div>
             </div>
-            <button onclick="closeSnapshot()" class="text-gray-400 hover:text-white transition">
-                <i class="fas fa-times text-lg"></i>
-            </button>
+            <button onclick="closeSnapshot()" class="icon-btn"><?= ico('x', 14) ?></button>
         </div>
-        <div class="p-2 bg-black flex items-center justify-center" style="min-height: 300px;">
-            <img id="snapImage" src="" alt="Snapshot" class="max-w-full max-h-[70vh] object-contain">
-            <div id="snapLoading" class="text-center text-gray-500">
-                <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
-                <p class="text-sm">กำลังโหลดรูป...</p>
+        <div style="background: #000; min-height: 320px; display: flex; align-items: center; justify-content: center; padding: 8px;">
+            <img id="snapImage" src="" alt="Snapshot" style="max-width:100%; max-height:70vh; object-fit:contain;">
+            <div id="snapLoading" class="empty">
+                <?= ico('refresh', 22) ?>
+                <p>กำลังโหลดรูป...</p>
             </div>
         </div>
     </div>
@@ -241,12 +179,12 @@ function getFilterParams() {
 
 async function loadLogs() {
     const tbody = document.getElementById('logsTable');
-    tbody.innerHTML = '<tr><td colspan="10" class="text-center text-gray-500 py-8"><i class="fas fa-spinner fa-spin text-xl"></i></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty"><div style="padding:24px;">กำลังโหลด...</div></td></tr>';
 
     const result = await fetchAPI('api/access_logs.php?' + getFilterParams());
 
     if (!result || !result.data) {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-red-400 py-8">เกิดข้อผิดพลาด</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="empty text-danger">เกิดข้อผิดพลาด</td></tr>';
         return;
     }
 
@@ -254,14 +192,11 @@ async function loadLogs() {
     const pag = result.pagination;
     totalPages = pag.total_pages;
 
-    // Summary
     document.getElementById('logSummary').textContent = `แสดง ${data.length} จาก ${pag.total} รายการ (หน้า ${pag.page}/${pag.total_pages})`;
 
-    // Stats
     let authorized = 0, denied = 0, unknown = 0;
     data.forEach(log => {
-        if (log.is_authorized == 1) authorized++;
-        else denied++;
+        if (log.is_authorized == 1) authorized++; else denied++;
         if (!log.employee_id) unknown++;
     });
     document.getElementById('statTotal').textContent = pag.total;
@@ -269,7 +204,6 @@ async function loadLogs() {
     document.getElementById('statDenied').textContent = denied;
     document.getElementById('statUnknown').textContent = unknown;
 
-    // Pagination
     const pagBar = document.getElementById('paginationBar');
     if (pag.total_pages > 1) {
         pagBar.style.display = 'flex';
@@ -279,108 +213,86 @@ async function loadLogs() {
     } else {
         pagBar.style.display = pag.total > 0 ? 'flex' : 'none';
         document.getElementById('pageInfo').textContent = `ทั้งหมด ${pag.total} รายการ`;
-        document.getElementById('btnPrev').disabled = true;
-        document.getElementById('btnNext').disabled = true;
     }
 
-    // แสดง delete actions
     document.getElementById('deleteActions').style.display = pag.total > 0 ? 'flex' : 'none';
     document.getElementById('selectAll').checked = false;
     updateSelectedCount();
 
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-gray-500 py-12"><i class="fas fa-inbox text-3xl mb-2"></i><br>ไม่มีข้อมูล</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="empty"><div style="padding: 32px;">ไม่มีรายการในตัวกรองนี้</div></td></tr>';
         return;
     }
 
     const startNum = (pag.page - 1) * pag.limit;
+    tbody.innerHTML = data.map((log, i) => {
+        const conf = parseFloat(log.confidence) || 0;
+        const confClass = conf > 70 ? '' : conf > 40 ? 'warn' : 'danger';
+        const name = log.first_name
+            ? `<div style="line-height:1.2;"><div>${esc(log.first_name)} ${esc(log.last_name)}</div><div class="tbl-row-id">${esc(log.emp_code || '')}</div></div>`
+            : '<span class="text-danger">ไม่รู้จัก</span>';
+        const dir = log.direction === 'IN'
+            ? '<span class="badge ok"><span class="dot"></span>เข้า</span>'
+            : '<span class="badge info"><span class="dot"></span>ออก</span>';
+        const cam = log.camera_id == 1 ? '<span class="mono tiny muted">cam-out</span>' : log.camera_id == 2 ? '<span class="mono tiny muted">cam-in</span>' : '<span class="muted">-</span>';
+        const door = log.is_authorized == 1
+            ? '<span class="badge ok">เปิด</span>'
+            : '<span class="badge danger">ล็อก</span>';
+        const snap = log.snapshot_path
+            ? `<button class="btn sm ghost" onclick="showSnapshot('${esc(log.snapshot_path)}', '${esc(log.first_name || 'ไม่รู้จัก')}', '${formatDateTime(log.created_at)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> ดู</button>`
+            : '<span class="muted">-</span>';
 
-    tbody.innerHTML = data.map((log, i) => `
-        <tr class="border-b border-white/5 hover:bg-white/5 transition" data-log-id="${log.id}">
-            <td class="py-3 px-2"><input type="checkbox" class="log-check accent-red-500 cursor-pointer" value="${log.id}" onchange="updateSelectedCount()"></td>
-            <td class="py-3 px-4 text-gray-500">${startNum + i + 1}</td>
-            <td class="py-3 px-4">
-                <p class="text-gray-300">${formatDateTime(log.created_at)}</p>
-            </td>
-            <td class="py-3 px-4">
-                ${log.first_name
-                    ? `<span class="text-white">${esc(log.first_name)} ${esc(log.last_name)}</span><br><span class="text-xs text-gray-500">${esc(log.emp_code || '')}</span>`
-                    : '<span class="text-red-400"><i class="fas fa-user-xmark mr-1"></i>ไม่รู้จัก</span>'}
-            </td>
-            <td class="py-3 px-4">
-                ${log.direction === 'IN'
-                    ? '<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs"><i class="fas fa-arrow-right mr-1"></i>เข้า</span>'
-                    : '<span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs"><i class="fas fa-arrow-left mr-1"></i>ออก</span>'}
-            </td>
-            <td class="py-3 px-4 text-gray-400 text-xs">${methodLabel(log.method)}</td>
-            <td class="py-3 px-4">
-                <div class="flex items-center gap-2">
-                    <div class="w-16 bg-gray-700 rounded-full h-1.5">
-                        <div class="h-1.5 rounded-full ${parseFloat(log.confidence) > 70 ? 'bg-green-400' : parseFloat(log.confidence) > 40 ? 'bg-yellow-400' : 'bg-red-400'}"
-                             style="width: ${Math.min(100, parseFloat(log.confidence) || 0)}%"></div>
+        return `<tr data-log-id="${log.id}">
+            <td><input type="checkbox" class="log-check" value="${log.id}" onchange="updateSelectedCount()"></td>
+            <td class="muted mono tiny">${startNum + i + 1}</td>
+            <td class="mono tiny">${formatDateTime(log.created_at)}</td>
+            <td>${name}</td>
+            <td>${dir}</td>
+            <td>${methodLabel(log.method)}</td>
+            <td>
+                <div class="row gap-2">
+                    <div class="conf-bar ${confClass}" style="width:64px; height:4px; background:var(--border); border-radius:4px; overflow:hidden;">
+                        <div style="height:100%; width:${Math.min(100, conf)}%; background:${conf > 70 ? 'var(--ok)' : conf > 40 ? 'var(--warn)' : 'var(--danger)'};"></div>
                     </div>
-                    <span class="text-xs text-gray-400">${parseFloat(log.confidence)?.toFixed(1) || '0'}%</span>
+                    <span class="mono tiny muted">${conf.toFixed(1)}%</span>
                 </div>
             </td>
-            <td class="py-3 px-4 text-gray-500 text-xs">${log.camera_id == 1 ? '<i class="fas fa-video mr-1"></i>นอก' : log.camera_id == 2 ? '<i class="fas fa-video mr-1"></i>ใน' : '-'}</td>
-            <td class="py-3 px-4 text-center">
-                ${log.is_authorized == 1
-                    ? '<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs"><i class="fas fa-lock-open mr-1"></i>เปิด</span>'
-                    : '<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded text-xs"><i class="fas fa-lock mr-1"></i>ล็อก</span>'}
-            </td>
-            <td class="py-3 px-4 text-center">
-                ${log.snapshot_path
-                    ? `<button onclick="showSnapshot('${esc(log.snapshot_path)}', '${esc(log.first_name || 'ไม่รู้จัก')}', '${formatDateTime(log.created_at)}')"
-                         class="bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 px-2 py-1 rounded text-xs transition">
-                         <i class="fas fa-image mr-1"></i>ดูรูป</button>`
-                    : '<span class="text-gray-600 text-xs">-</span>'}
-            </td>
-        </tr>
-    `).join('');
+            <td>${cam}</td>
+            <td>${door}</td>
+            <td>${snap}</td>
+        </tr>`;
+    }).join('');
 }
 
 function methodLabel(method) {
     const labels = {
-        'face_recognition': '<i class="fas fa-face-smile text-indigo-400 mr-1"></i>สแกนหน้า',
-        'emergency_button': '<i class="fas fa-exclamation-triangle text-red-400 mr-1"></i>ฉุกเฉิน',
-        'manual': '<i class="fas fa-hand text-yellow-400 mr-1"></i>กดปุ่ม',
-        'remote': '<i class="fas fa-wifi text-blue-400 mr-1"></i>รีโมท',
+        'face_recognition': '<span class="mono tiny muted">face</span>',
+        'emergency_button': '<span class="mono tiny text-danger">emergency</span>',
+        'manual':           '<span class="mono tiny text-warn">manual</span>',
+        'remote':           '<span class="mono tiny text-info">remote</span>',
     };
-    return labels[method] || esc(method || '-');
+    return labels[method] || '<span class="mono tiny muted">' + esc(method || '-') + '</span>';
 }
 
-function applyFilters() {
-    currentPage = 1;
-    loadLogs();
-}
-
-function goPage(delta) {
-    currentPage = Math.max(1, Math.min(totalPages, currentPage + delta));
-    loadLogs();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function resetFilters() {
+function applyFilters() { currentPage = 1; loadLogs(); }
+function goPage(delta) { currentPage = Math.max(1, Math.min(totalPages, currentPage + delta)); loadLogs(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function resetFilterValues() {
     document.getElementById('filterDateFrom').value = '';
     document.getElementById('filterDateTo').value = '';
     document.getElementById('filterDirection').value = '';
     document.getElementById('filterAuth').value = '';
     document.getElementById('filterEmployee').value = 'all';
     document.getElementById('filterSearch').value = '';
-    currentPage = 1;
-    loadLogs();
 }
-
+function resetFilters() { resetFilterValues(); currentPage = 1; loadLogs(); }
 function quickFilter(preset) {
     resetFilterValues();
     const today = new Date().toISOString().split('T')[0];
-
     if (preset === 'today') {
         document.getElementById('filterDateFrom').value = today;
         document.getElementById('filterDateTo').value = today;
     } else if (preset === 'week') {
-        const week = new Date();
-        week.setDate(week.getDate() - 7);
+        const week = new Date(); week.setDate(week.getDate() - 7);
         document.getElementById('filterDateFrom').value = week.toISOString().split('T')[0];
         document.getElementById('filterDateTo').value = today;
     } else if (preset === 'denied') {
@@ -391,129 +303,73 @@ function quickFilter(preset) {
     applyFilters();
 }
 
-function resetFilterValues() {
-    document.getElementById('filterDateFrom').value = '';
-    document.getElementById('filterDateTo').value = '';
-    document.getElementById('filterDirection').value = '';
-    document.getElementById('filterAuth').value = '';
-    document.getElementById('filterEmployee').value = 'all';
-    document.getElementById('filterSearch').value = '';
-}
-
-// Search on Enter
-document.getElementById('filterSearch').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') applyFilters();
-});
-
 // Snapshot modal
 function showSnapshot(path, name, time) {
     const modal = document.getElementById('snapshotModal');
     const img = document.getElementById('snapImage');
     const loading = document.getElementById('snapLoading');
-
     document.getElementById('snapTitle').textContent = name || 'รูปถ่าย';
     document.getElementById('snapSubtitle').textContent = time || '';
-
-    img.style.display = 'none';
-    loading.style.display = '';
-    loading.innerHTML = '<i class="fas fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">กำลังโหลดรูป...</p>';
+    img.style.display = 'none'; loading.style.display = '';
     modal.style.display = 'flex';
-
     const ts = Date.now();
-
     if (path.includes('/')) {
-        // path ใหม่ (snapshots/2026-03/xxx.jpg) → โหลดจาก Laragon
         tryLoadImage(path + '?t=' + ts, img, loading, null);
     } else {
-        // path เก่า (ชื่อไฟล์เดี่ยว) → ลอง Laragon ก่อน แล้ว fallback ไป Pi
-        const laragonUrl = 'snapshots/' + path + '?t=' + ts;
-        const piUrl = FACE_SERVER + '/api/snapshots/' + path + '?t=' + ts;
-        tryLoadImage(laragonUrl, img, loading, piUrl);
+        tryLoadImage('snapshots/' + path + '?t=' + ts, img, loading, FACE_SERVER + '/api/snapshots/' + path + '?t=' + ts);
     }
-
     document.addEventListener('keydown', _snapEscHandler);
 }
-
 function tryLoadImage(url, imgEl, loadingEl, fallbackUrl) {
-    const testImg = new Image();
-    testImg.onload = () => {
-        imgEl.src = testImg.src;
-        imgEl.style.display = '';
-        loadingEl.style.display = 'none';
-    };
-    testImg.onerror = () => {
+    const t = new Image();
+    t.onload = () => { imgEl.src = t.src; imgEl.style.display = ''; loadingEl.style.display = 'none'; };
+    t.onerror = () => {
         if (fallbackUrl) {
-            // ลอง fallback (Pi)
-            const fallbackImg = new Image();
-            fallbackImg.onload = () => {
-                imgEl.src = fallbackImg.src;
-                imgEl.style.display = '';
-                loadingEl.style.display = 'none';
-            };
-            fallbackImg.onerror = () => {
-                loadingEl.innerHTML = '<i class="fas fa-image text-3xl text-red-400 mb-2"></i><p class="text-sm text-red-400">ไม่พบรูปภาพ</p>';
-            };
-            fallbackImg.src = fallbackUrl;
+            const f = new Image();
+            f.onload = () => { imgEl.src = f.src; imgEl.style.display = ''; loadingEl.style.display = 'none'; };
+            f.onerror = () => { loadingEl.innerHTML = '<div class="text-danger">ไม่พบรูปภาพ</div>'; };
+            f.src = fallbackUrl;
         } else {
-            loadingEl.innerHTML = '<i class="fas fa-image text-3xl text-red-400 mb-2"></i><p class="text-sm text-red-400">ไม่พบรูปภาพ</p>';
+            loadingEl.innerHTML = '<div class="text-danger">ไม่พบรูปภาพ</div>';
         }
     };
-    testImg.src = url;
+    t.src = url;
 }
-
-function _snapEscHandler(e) {
-    if (e.key === 'Escape') closeSnapshot();
-}
-
+function _snapEscHandler(e) { if (e.key === 'Escape') closeSnapshot(); }
 function closeSnapshot() {
     document.getElementById('snapshotModal').style.display = 'none';
     document.getElementById('snapImage').src = '';
-    document.getElementById('snapLoading').innerHTML = '<i class="fas fa-spinner fa-spin text-3xl mb-2"></i><p class="text-sm">กำลังโหลดรูป...</p>';
     document.removeEventListener('keydown', _snapEscHandler);
 }
+document.getElementById('snapshotModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSnapshot(); });
 
-// ============================================================
 // Select & Delete
-// ============================================================
 function toggleSelectAll() {
     const checked = document.getElementById('selectAll').checked;
     document.querySelectorAll('.log-check').forEach(cb => cb.checked = checked);
     updateSelectedCount();
 }
-
 function updateSelectedCount() {
-    const checked = document.querySelectorAll('.log-check:checked');
-    const el = document.getElementById('selectedCount');
-    el.textContent = checked.length > 0 ? checked.length + ' รายการ' : '';
+    const c = document.querySelectorAll('.log-check:checked').length;
+    document.getElementById('selectedCount').textContent = c > 0 ? c + ' รายการ' : '';
 }
-
-function getSelectedIds() {
-    return Array.from(document.querySelectorAll('.log-check:checked')).map(cb => parseInt(cb.value));
-}
+function getSelectedIds() { return Array.from(document.querySelectorAll('.log-check:checked')).map(cb => parseInt(cb.value)); }
 
 async function deleteSelected() {
     const ids = getSelectedIds();
     if (ids.length === 0) return;
-    if (!confirm(`ต้องการลบ ${ids.length} รายการที่เลือก?`)) return;
-
-    const result = await postAPI('api/access_logs.php?action=delete', { ids });
-    if (result?.success) {
-        loadLogs();
-    } else {
-        alert('ลบไม่สำเร็จ: ' + (result?.error || 'Unknown'));
-    }
+    showConfirm('ลบรายการที่เลือก', `ต้องการลบ ${ids.length} รายการที่เลือก?`, async () => {
+        const r = await postAPI('api/access_logs.php?action=delete', { ids });
+        if (r?.success) { showToast(`ลบ ${ids.length} รายการ`, 'success'); loadLogs(); }
+        else { showToast('ลบไม่สำเร็จ: ' + (r?.error || 'Unknown'), 'error'); }
+    });
 }
-
 async function deleteAll() {
-    if (!confirm('ต้องการลบประวัติทั้งหมด? การดำเนินการนี้ไม่สามารถย้อนกลับได้!')) return;
-    if (!confirm('ยืนยันอีกครั้ง: ลบประวัติเข้า-ออกทั้งหมด?')) return;
-
-    const result = await postAPI('api/access_logs.php?action=delete', { all: true });
-    if (result?.success) {
-        loadLogs();
-    } else {
-        alert('ลบไม่สำเร็จ: ' + (result?.error || 'Unknown'));
-    }
+    showConfirm('ลบประวัติทั้งหมด', 'ต้องการลบประวัติเข้า-ออกทั้งหมด? ดำเนินการนี้ไม่สามารถย้อนกลับได้!', async () => {
+        const r = await postAPI('api/access_logs.php?action=delete', { all: true });
+        if (r?.success) { showToast('ลบประวัติทั้งหมดแล้ว', 'success'); loadLogs(); }
+        else { showToast('ลบไม่สำเร็จ: ' + (r?.error || 'Unknown'), 'error'); }
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => loadLogs());

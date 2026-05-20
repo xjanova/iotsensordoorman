@@ -3,6 +3,7 @@
  * First-time Setup - ตั้งค่าผู้ดูแลระบบครั้งแรก
  */
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/icons.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -53,116 +54,130 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 <!DOCTYPE html>
-<html lang="th">
+<html lang="th" data-theme="dark" data-accent="indigo">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ตั้งค่าระบบ - <?= APP_NAME ?></title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = {
-            theme: { extend: { colors: {
-                brand: { 900:'#0f172a', 800:'#1e3a5f' },
-                accent: { 400:'#f97316', 500:'#ea580c' }
-            }}}
-        }
+        (function() {
+            try {
+                var t = localStorage.getItem('doorman.theme') || 'dark';
+                var a = localStorage.getItem('doorman.accent') || 'indigo';
+                document.documentElement.setAttribute('data-theme', t);
+                document.documentElement.setAttribute('data-accent', a);
+            } catch(e) {}
+        })();
     </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Sarabun', sans-serif; }
-        .glass { background: rgba(255,255,255,0.05); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/doorman.css">
 </head>
-<body class="bg-brand-900 text-gray-100 min-h-screen flex items-center justify-center p-4">
+<body>
 
-<div class="w-full max-w-md">
-    <!-- Logo -->
-    <div class="text-center mb-8">
-        <div class="w-20 h-20 bg-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
-            <i class="fas fa-shield-alt text-white text-3xl"></i>
+<div class="auth-bg">
+    <div class="auth-card" style="max-width: 480px;">
+        <div class="auth-brand">
+            <div class="auth-mark">B</div>
+            <div>
+                <div style="font-size: 16px; font-weight: 600; letter-spacing: -0.01em;">Bunny Door</div>
+                <div class="tiny muted" style="margin-top: 2px; font-family: var(--font-mono);"><?= APP_NAME ?> · v<?= APP_VERSION ?></div>
+            </div>
         </div>
-        <h1 class="text-2xl font-bold"><?= APP_NAME ?></h1>
-        <p class="text-gray-400 text-sm mt-1">Access Control System v<?= APP_VERSION ?></p>
-    </div>
 
-    <?php if (!empty($dbError)): ?>
-    <div class="glass rounded-2xl p-8 text-center">
-        <i class="fas fa-database text-red-400 text-4xl mb-4"></i>
-        <h2 class="text-xl font-bold text-red-400 mb-2">ไม่สามารถเชื่อมต่อฐานข้อมูล</h2>
-        <p class="text-gray-400 text-sm">กรุณาตรวจสอบการตั้งค่าฐานข้อมูลใน .env</p>
-    </div>
-
-    <?php elseif ($success): ?>
-    <div class="glass rounded-2xl p-8 text-center">
-        <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <i class="fas fa-check text-green-400 text-3xl"></i>
+        <!-- Step indicator -->
+        <div class="setup-steps">
+            <div class="setup-step active">
+                <div class="dot">1</div>
+                <span class="lbl">บัญชีผู้ดูแล</span>
+            </div>
+            <div class="setup-line"></div>
+            <div class="setup-step">
+                <div class="dot">2</div>
+                <span class="lbl">อุปกรณ์</span>
+            </div>
+            <div class="setup-line"></div>
+            <div class="setup-step">
+                <div class="dot">3</div>
+                <span class="lbl">ทดสอบ</span>
+            </div>
         </div>
-        <h2 class="text-xl font-bold text-green-400 mb-2">สร้างบัญชีสำเร็จ!</h2>
-        <p class="text-gray-400 text-sm mb-6">คุณสามารถเข้าสู่ระบบด้วยบัญชีที่สร้างได้เลย</p>
-        <a href="login.php" class="inline-block bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl transition font-medium">
-            <i class="fas fa-sign-in-alt mr-2"></i>เข้าสู่ระบบ
-        </a>
-    </div>
 
-    <?php else: ?>
-    <div class="glass rounded-2xl p-8">
-        <div class="text-center mb-6">
-            <h2 class="text-xl font-bold">ตั้งค่าผู้ดูแลระบบ</h2>
-            <p class="text-gray-400 text-sm mt-1">สร้างบัญชีผู้ดูแลระบบสำหรับเข้าใช้งานครั้งแรก</p>
+        <?php if (!empty($dbError)): ?>
+        <div class="setup-card" style="border-color: color-mix(in oklch, var(--danger) 30%, var(--border));">
+            <div class="setup-icon danger"><?= ico('database', 22) ?></div>
+            <div>
+                <strong class="text-danger" style="font-size: 14px;">เชื่อมต่อฐานข้อมูลไม่ได้</strong>
+                <p class="tiny muted" style="margin: 4px 0 0;">ตรวจสอบการตั้งค่าฐานข้อมูลใน <code class="mono">.env</code></p>
+            </div>
         </div>
+
+        <?php elseif ($success): ?>
+        <div style="text-align: center; padding: 20px 0;">
+            <div class="setup-icon ok" style="width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 16px;">
+                <?= ico('check', 32) ?>
+            </div>
+            <h2 class="auth-title text-ok" style="margin-bottom: 4px;">สร้างบัญชีสำเร็จ!</h2>
+            <p class="auth-sub">เริ่มใช้งานระบบได้ทันที</p>
+            <a href="login.php" class="btn primary lg" style="margin-top: 14px; display: inline-flex;">
+                <?= ico('log-in', 14) ?> เข้าสู่ระบบ
+            </a>
+        </div>
+
+        <?php else: ?>
+        <h1 class="auth-title">ตั้งค่าผู้ดูแลระบบ</h1>
+        <p class="auth-sub">สร้างบัญชีผู้ดูแลระบบสำหรับเข้าใช้งานครั้งแรก</p>
 
         <?php if ($error): ?>
-        <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-4">
-            <p class="text-red-400 text-sm"><i class="fas fa-exclamation-circle mr-1"></i> <?= htmlspecialchars($error) ?></p>
+        <div class="auth-error">
+            <?= ico('alert-tri', 14) ?>
+            <span><?= htmlspecialchars($error) ?></span>
         </div>
         <?php endif; ?>
 
-        <form method="POST" class="space-y-4">
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">ชื่อผู้ใช้ (Username)</label>
-                <div class="relative">
-                    <i class="fas fa-user absolute left-3 top-3 text-gray-500"></i>
-                    <input type="text" name="username" value="<?= htmlspecialchars($username ?? '') ?>" required
-                           class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
-                           placeholder="admin" autocomplete="username">
+        <form method="POST" class="auth-form">
+            <label>
+                <span>ชื่อผู้ใช้ (Username) <span class="text-danger">*</span></span>
+                <div class="auth-field">
+                    <?= ico('users', 14) ?>
+                    <input type="text" name="username" value="<?= htmlspecialchars($username ?? '') ?>" required class="input" placeholder="admin" autocomplete="username">
                 </div>
-            </div>
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">ชื่อที่แสดง</label>
-                <div class="relative">
-                    <i class="fas fa-id-badge absolute left-3 top-3 text-gray-500"></i>
-                    <input type="text" name="display_name" value="<?= htmlspecialchars($displayName ?? '') ?>"
-                           class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
-                           placeholder="ผู้ดูแลระบบ" autocomplete="name">
+            </label>
+            <label>
+                <span>ชื่อที่แสดง</span>
+                <div class="auth-field">
+                    <?= ico('id', 14) ?>
+                    <input type="text" name="display_name" value="<?= htmlspecialchars($displayName ?? '') ?>" class="input" placeholder="ผู้ดูแลระบบ" autocomplete="name">
                 </div>
-            </div>
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">รหัสผ่าน</label>
-                <div class="relative">
-                    <i class="fas fa-lock absolute left-3 top-3 text-gray-500"></i>
-                    <input type="password" name="password" required minlength="6"
-                           class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
-                           placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="new-password">
+            </label>
+            <label>
+                <span>รหัสผ่าน <span class="text-danger">*</span></span>
+                <div class="auth-field">
+                    <?= ico('lock', 14) ?>
+                    <input type="password" name="password" required minlength="6" class="input" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="new-password">
                 </div>
-            </div>
-            <div>
-                <label class="block text-sm text-gray-400 mb-1">ยืนยันรหัสผ่าน</label>
-                <div class="relative">
-                    <i class="fas fa-lock absolute left-3 top-3 text-gray-500"></i>
-                    <input type="password" name="confirm_password" required minlength="6"
-                           class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition"
-                           placeholder="กรอกรหัสผ่านอีกครั้ง" autocomplete="new-password">
+            </label>
+            <label>
+                <span>ยืนยันรหัสผ่าน <span class="text-danger">*</span></span>
+                <div class="auth-field">
+                    <?= ico('lock', 14) ?>
+                    <input type="password" name="confirm_password" required minlength="6" class="input" placeholder="กรอกรหัสผ่านอีกครั้ง" autocomplete="new-password">
                 </div>
-            </div>
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl transition font-medium mt-2">
-                <i class="fas fa-user-plus mr-2"></i>สร้างบัญชีผู้ดูแลระบบ
+            </label>
+            <button type="submit" class="btn primary lg" style="justify-content: center; margin-top: 6px;">
+                <?= ico('user-check', 14) ?> สร้างบัญชีผู้ดูแลระบบ
             </button>
         </form>
-    </div>
-    <?php endif; ?>
 
-    <p class="text-center text-gray-600 text-xs mt-6"><?= APP_NAME ?> v<?= APP_VERSION ?> &copy; <?= date('Y') ?></p>
+        <div class="auth-help">
+            <?= ico('info', 14) ?>
+            <span>หลังสร้างบัญชีแล้ว ระบบจะให้คุณเข้าสู่ระบบครั้งแรก</span>
+        </div>
+        <?php endif; ?>
+    </div>
+
+    <p class="auth-foot"><?= APP_NAME ?> v<?= APP_VERSION ?> &copy; <?= date('Y') ?></p>
 </div>
 
 </body>

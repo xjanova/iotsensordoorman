@@ -1,256 +1,193 @@
-<?php $pageTitle = 'จัดการพนักงาน - Bunny Door System'; ?>
+<?php $pageTitle = 'พนักงาน - Bunny Door System'; ?>
 <?php include 'includes/header.php'; ?>
 
-<div class="flex justify-between items-center mb-8">
+<div class="page-head">
     <div>
-        <h2 class="text-2xl font-bold">จัดการพนักงาน</h2>
-        <p class="text-gray-400 text-sm mt-1">เพิ่ม แก้ไข ลบข้อมูลพนักงานและจัดการสิทธิ์การเข้า-ออก</p>
+        <h1>จัดการพนักงาน</h1>
+        <div class="sub">เพิ่ม แก้ไข ลบข้อมูลพนักงานและจัดการสิทธิ์การเข้า-ออก</div>
     </div>
-    <button onclick="showAddModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition">
-        <i class="fas fa-plus"></i> เพิ่มพนักงาน
-    </button>
-</div>
-
-<!-- Stats Cards -->
-<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-    <div class="glass rounded-xl p-4 stat-card">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-users text-blue-400"></i>
-            </div>
-            <div>
-                <p class="text-2xl font-bold" id="statTotal">-</p>
-                <p class="text-xs text-gray-400">พนักงานทั้งหมด</p>
-            </div>
-        </div>
-    </div>
-    <div class="glass rounded-xl p-4 stat-card">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-check-circle text-green-400"></i>
-            </div>
-            <div>
-                <p class="text-2xl font-bold" id="statAuthorized">-</p>
-                <p class="text-xs text-gray-400">อนุญาตเข้า-ออก</p>
-            </div>
-        </div>
-    </div>
-    <div class="glass rounded-xl p-4 stat-card">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-image text-purple-400"></i>
-            </div>
-            <div>
-                <p class="text-2xl font-bold" id="statWithPhoto">-</p>
-                <p class="text-xs text-gray-400">มีรูปใบหน้า</p>
-            </div>
-        </div>
-    </div>
-    <div class="glass rounded-xl p-4 stat-card">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-                <i class="fas fa-ban text-red-400"></i>
-            </div>
-            <div>
-                <p class="text-2xl font-bold" id="statSuspended">-</p>
-                <p class="text-xs text-gray-400">ระงับสิทธิ์</p>
-            </div>
-        </div>
+    <div class="page-head-actions">
+        <button class="btn primary" onclick="showAddModal()"><?= ico('plus', 14) ?> เพิ่มพนักงาน</button>
     </div>
 </div>
 
-<!-- Search -->
-<div class="glass rounded-2xl p-4 mb-6">
-    <div class="flex gap-4">
-        <div class="flex-1 relative">
-            <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-            <input type="text" id="searchInput" placeholder="ค้นหาพนักงาน..." class="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500">
+<!-- Stats -->
+<div class="grid kpis section">
+    <div class="card kpi">
+        <div class="label"><span class="dot"></span>พนักงานทั้งหมด</div>
+        <div class="num" id="statTotal">—</div>
+    </div>
+    <div class="card kpi">
+        <div class="label"><span class="dot ok"></span>อนุญาตเข้า-ออก</div>
+        <div class="num" id="statAuthorized">—</div>
+    </div>
+    <div class="card kpi">
+        <div class="label"><span class="dot accent"></span>มีรูปใบหน้า</div>
+        <div class="num" id="statWithPhoto">—</div>
+    </div>
+    <div class="card kpi">
+        <div class="label"><span class="dot danger"></span>ระงับสิทธิ์</div>
+        <div class="num" id="statSuspended">—</div>
+    </div>
+</div>
+
+<!-- Search & Filter -->
+<div class="card section">
+    <div class="row gap-3">
+        <div class="search-wrap" style="flex: 1;">
+            <?= ico('search', 14) ?>
+            <input type="text" id="searchInput" placeholder="ค้นหาพนักงาน (ชื่อ, รหัส)" class="input input-search">
         </div>
-        <select id="filterDept" class="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none">
+        <select id="filterDept" class="select" style="width: 200px;">
             <option value="">ทุกแผนก</option>
         </select>
     </div>
 </div>
 
 <!-- Employee Table -->
-<div class="glass rounded-2xl overflow-hidden">
-    <table class="w-full text-sm">
-        <thead>
-            <tr class="text-gray-400 border-b border-white/10 bg-white/5">
-                <th class="text-left py-4 px-4">รหัส</th>
-                <th class="text-left py-4 px-4">พนักงาน</th>
-                <th class="text-left py-4 px-4">แผนก</th>
-                <th class="text-left py-4 px-4">ตำแหน่ง</th>
-                <th class="text-left py-4 px-4">รูปใบหน้า</th>
-                <th class="text-center py-4 px-4">สิทธิ์</th>
-                <th class="text-center py-4 px-4">จัดการ</th>
-            </tr>
-        </thead>
-        <tbody id="employeeTable">
-            <tr><td colspan="7" class="text-center text-gray-500 py-8">กำลังโหลด...</td></tr>
-        </tbody>
-    </table>
+<div class="card flush section">
+    <div style="overflow-x: auto;">
+        <table class="tbl">
+            <thead>
+                <tr>
+                    <th>รหัส</th>
+                    <th>พนักงาน</th>
+                    <th>แผนก</th>
+                    <th>ตำแหน่ง</th>
+                    <th>รูปใบหน้า</th>
+                    <th>สิทธิ์</th>
+                    <th>จัดการ</th>
+                </tr>
+            </thead>
+            <tbody id="employeeTable">
+                <tr><td colspan="7" class="empty">กำลังโหลด...</td></tr>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <!-- Add/Edit Modal -->
-<div id="employeeModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center">
-    <div class="glass bg-brand-800 rounded-2xl p-8 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="text-lg font-bold" id="modalTitle">เพิ่มพนักงาน</h3>
-            <button onclick="closeModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+<div id="employeeModal" class="modal-backdrop" style="display:none;">
+    <div class="modal" style="max-width: 680px;">
+        <div class="modal-head">
+            <h3 id="modalTitle">เพิ่มพนักงาน</h3>
+            <button onclick="closeModal()" class="icon-btn"><?= ico('x', 14) ?></button>
         </div>
         <form id="employeeForm" onsubmit="saveEmployee(event)">
-            <input type="hidden" id="formId">
-            <input type="hidden" id="formFaceImage">
+            <div class="modal-body">
+                <input type="hidden" id="formId">
+                <input type="hidden" id="formFaceImage">
 
-            <div class="flex gap-6">
-                <!-- Photo Upload Area -->
-                <div class="flex-shrink-0">
-                    <div id="photoUploadArea"
-                         class="w-40 h-40 rounded-2xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group relative overflow-hidden"
-                         onclick="document.getElementById('photoInput').click()">
-                        <!-- Default state -->
-                        <div id="photoPlaceholder" class="flex flex-col items-center">
-                            <div class="w-14 h-14 bg-white/5 rounded-full flex items-center justify-center mb-2 group-hover:bg-blue-500/10 transition">
-                                <i class="fas fa-camera text-2xl text-gray-500 group-hover:text-blue-400 transition"></i>
+                <div class="row gap-4" style="align-items: flex-start;">
+                    <!-- Photo Upload Area -->
+                    <div style="flex-shrink: 0;">
+                        <div id="photoUploadArea"
+                             style="width: 160px; height: 160px; border-radius: var(--radius-lg); border: 2px dashed var(--border-strong); display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; position: relative; overflow: hidden; background: var(--surface-2);"
+                             onclick="document.getElementById('photoInput').click()">
+                            <div id="photoPlaceholder" style="display:flex; flex-direction:column; align-items:center; color: var(--text-3);">
+                                <?= ico('camera', 28) ?>
+                                <span class="tiny" style="margin-top: 6px;">คลิกเพื่ออัพโหลด</span>
+                                <span class="tiny muted" style="margin-top: 2px;">JPG, PNG, WEBP</span>
                             </div>
-                            <span class="text-xs text-gray-500 group-hover:text-blue-400 transition">คลิกเพื่ออัพโหลด</span>
-                            <span class="text-xs text-gray-600 mt-1">JPG, PNG, WEBP</span>
+                            <img id="photoPreview" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none;" alt="Preview">
                         </div>
-                        <!-- Preview state -->
-                        <img id="photoPreview" class="absolute inset-0 w-full h-full object-cover hidden" alt="Preview">
-                        <!-- Overlay on hover when has image -->
-                        <div id="photoOverlay" class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition hidden">
-                            <span class="text-white text-xs font-medium"><i class="fas fa-camera mr-1"></i> เปลี่ยนรูป</span>
-                        </div>
-                    </div>
-                    <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handlePhotoSelect(this)">
+                        <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" style="display:none;" onchange="handlePhotoSelect(this)">
 
-                    <!-- ปุ่มถ่ายจากกล้อง Pi -->
-                    <button type="button" onclick="openCameraCapture()" class="w-40 mt-2 bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-400 text-xs py-2 rounded-lg transition flex items-center justify-center gap-1.5 border border-cyan-500/20">
-                        <i class="fas fa-video"></i> ถ่ายจากกล้อง Pi
-                    </button>
+                        <button type="button" onclick="openCameraCapture()" class="btn sm" style="width: 160px; margin-top: 8px; justify-content: center; background: var(--info-soft); color: var(--info); border-color: transparent;">
+                            <?= ico('video', 13) ?> ถ่ายจากกล้อง Pi
+                        </button>
 
-                    <!-- Progress Bar -->
-                    <div id="uploadProgress" class="hidden mt-3">
-                        <div class="flex justify-between text-xs mb-1">
-                            <span class="text-gray-400" id="uploadStatusText">กำลังอัพโหลด...</span>
-                            <span class="text-blue-400 font-mono" id="uploadPercent">0%</span>
+                        <div id="uploadProgress" style="display:none; margin-top: 10px; width: 160px;">
+                            <div class="row spread" style="margin-bottom: 4px;">
+                                <span class="tiny muted" id="uploadStatusText">กำลังอัพโหลด...</span>
+                                <span class="tiny mono text-accent" id="uploadPercent">0%</span>
+                            </div>
+                            <div style="width:100%; height: 4px; background: var(--border); border-radius: 999px; overflow: hidden;">
+                                <div id="uploadBar" style="height: 100%; background: var(--accent); width: 0%; transition: width 0.3s;"></div>
+                            </div>
                         </div>
-                        <div class="w-40 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                            <div id="uploadBar" class="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        <div id="uploadResult" class="tiny text-ok" style="display:none; margin-top: 6px; text-align:center;"><?= ico('check', 12) ?> อัพโหลดสำเร็จ</div>
+                        <div id="faceValidation" style="display:none; margin-top: 8px; width: 160px;">
+                            <div id="faceValidIcon" style="text-align:center;"></div>
+                            <p id="faceValidMsg" class="tiny" style="text-align:center; margin: 4px 0 0; line-height: 1.3;"></p>
                         </div>
                     </div>
-                    <!-- Upload Result -->
-                    <div id="uploadResult" class="hidden mt-2 text-center">
-                        <span class="text-xs text-green-400"><i class="fas fa-check-circle mr-1"></i>อัพโหลดสำเร็จ</span>
-                    </div>
-                    <!-- Face Validation Result -->
-                    <div id="faceValidation" class="hidden mt-2 w-40">
-                        <div id="faceValidIcon" class="text-center"></div>
-                        <p id="faceValidMsg" class="text-xs text-center mt-1 leading-tight"></p>
-                    </div>
-                </div>
 
-                <!-- Form Fields -->
-                <div class="flex-1">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="text-sm text-gray-400 block mb-1">รหัสพนักงาน <span class="text-red-400">*</span></label>
-                            <input type="text" id="formEmpCode" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500" placeholder="เช่น EMP005">
+                    <!-- Form Fields -->
+                    <div style="flex: 1;">
+                        <div class="grid cols-2" style="gap: 14px;">
+                            <div>
+                                <label class="tiny muted" style="display:block; margin-bottom: 4px;">รหัสพนักงาน <span class="text-danger">*</span></label>
+                                <input type="text" id="formEmpCode" required class="input" placeholder="เช่น EMP005">
+                            </div>
+                            <div>
+                                <label class="tiny muted" style="display:block; margin-bottom: 4px;">ชื่อ <span class="text-danger">*</span></label>
+                                <input type="text" id="formFirstName" required class="input">
+                            </div>
+                            <div>
+                                <label class="tiny muted" style="display:block; margin-bottom: 4px;">นามสกุล <span class="text-danger">*</span></label>
+                                <input type="text" id="formLastName" required class="input">
+                            </div>
+                            <div>
+                                <label class="tiny muted" style="display:block; margin-bottom: 4px;">แผนก</label>
+                                <input type="text" id="formDept" class="input">
+                            </div>
+                            <div style="grid-column: 1 / -1;">
+                                <label class="tiny muted" style="display:block; margin-bottom: 4px;">ตำแหน่ง</label>
+                                <input type="text" id="formPosition" class="input">
+                            </div>
                         </div>
-                        <div>
-                            <label class="text-sm text-gray-400 block mb-1">ชื่อ <span class="text-red-400">*</span></label>
-                            <input type="text" id="formFirstName" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
-                        </div>
-                        <div>
-                            <label class="text-sm text-gray-400 block mb-1">นามสกุล <span class="text-red-400">*</span></label>
-                            <input type="text" id="formLastName" required class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
-                        </div>
-                        <div>
-                            <label class="text-sm text-gray-400 block mb-1">แผนก</label>
-                            <input type="text" id="formDept" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
-                        </div>
-                        <div class="col-span-2">
-                            <label class="text-sm text-gray-400 block mb-1">ตำแหน่ง</label>
-                            <input type="text" id="formPosition" class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500">
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2 mt-4">
-                        <label class="relative inline-flex items-center cursor-pointer">
-                            <input type="checkbox" id="formAuthorized" checked class="sr-only peer">
-                            <div class="w-9 h-5 bg-white/10 rounded-full peer peer-checked:bg-green-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                        <label class="row gap-2" style="margin-top: 14px; cursor: pointer;">
+                            <input type="checkbox" id="formAuthorized" checked>
+                            <span style="font-size: 13px;">อนุญาตเข้า-ออก</span>
                         </label>
-                        <span class="text-sm text-gray-300">อนุญาตเข้า-ออก</span>
                     </div>
                 </div>
             </div>
-
-            <div class="flex gap-3 mt-6">
-                <button type="submit" id="btnSave" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg transition font-medium flex items-center justify-center gap-2">
-                    <i class="fas fa-save"></i> บันทึก
-                </button>
-                <button type="button" onclick="closeModal()" class="flex-1 bg-white/10 hover:bg-white/20 text-white py-2.5 rounded-lg transition">ยกเลิก</button>
+            <div class="modal-foot">
+                <button type="button" onclick="closeModal()" class="btn">ยกเลิก</button>
+                <button type="submit" id="btnSave" class="btn primary"><?= ico('save', 14) ?> บันทึก</button>
             </div>
         </form>
     </div>
 </div>
 
 <!-- Camera Capture Modal -->
-<div id="cameraModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center">
-    <div class="glass bg-brand-800 rounded-2xl p-6 max-w-lg w-full mx-4" onclick="event.stopPropagation()">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="font-bold flex items-center gap-2">
-                <i class="fas fa-video text-cyan-400"></i> ถ่ายภาพจากกล้อง Pi
-            </h3>
-            <button onclick="closeCameraCapture()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+<div id="cameraModal" class="modal-backdrop" style="display:none;">
+    <div class="modal" style="max-width: 540px;">
+        <div class="modal-head">
+            <h3>ถ่ายภาพจากกล้อง Pi</h3>
+            <button onclick="closeCameraCapture()" class="icon-btn"><?= ico('x', 14) ?></button>
         </div>
-
-        <!-- เลือกกล้อง -->
-        <div class="flex gap-2 mb-4">
-            <button id="camBtnOutside" onclick="switchCaptureCamera('outside')" class="flex-1 py-2 rounded-lg text-sm transition bg-cyan-600/30 text-cyan-400 border border-cyan-500/30">
-                <i class="fas fa-door-open mr-1"></i> กล้องนอก
-            </button>
-            <button id="camBtnInside" onclick="switchCaptureCamera('inside')" class="flex-1 py-2 rounded-lg text-sm transition bg-white/5 text-gray-400 border border-white/10">
-                <i class="fas fa-door-closed mr-1"></i> กล้องใน
-            </button>
-        </div>
-
-        <!-- Live Preview -->
-        <div class="relative aspect-video bg-gray-900 rounded-xl overflow-hidden mb-4">
-            <img id="capturePreview" class="w-full h-full object-contain" alt="Camera Preview">
-            <div id="captureLoading" class="absolute inset-0 flex items-center justify-center bg-gray-900">
-                <div class="text-center text-gray-500">
-                    <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
-                    <p class="text-sm">กำลังเชื่อมต่อกล้อง...</p>
+        <div class="modal-body">
+            <div class="row gap-2" style="margin-bottom: 12px;">
+                <button id="camBtnOutside" onclick="switchCaptureCamera('outside')" class="btn primary sm" style="flex: 1; justify-content: center;">กล้องนอก</button>
+                <button id="camBtnInside" onclick="switchCaptureCamera('inside')" class="btn sm" style="flex: 1; justify-content: center;">กล้องใน</button>
+            </div>
+            <div class="cam" style="margin-bottom: 12px;">
+                <img id="capturePreview" alt="Camera Preview" style="display:block;">
+                <div id="captureLoading" class="cam-feed">CONNECTING...</div>
+                <div class="cam-overlay">
+                    <div></div>
+                    <div class="row" style="justify-content: center;">
+                        <span class="cam-chip">หันหน้าตรง · 30-50 ซม.</span>
+                    </div>
                 </div>
             </div>
-            <!-- คำแนะนำ -->
-            <div class="absolute bottom-2 left-2 right-2 text-center">
-                <span class="bg-black/60 text-white text-xs px-3 py-1 rounded-full">
-                    <i class="fas fa-info-circle mr-1"></i> หันหน้าตรง ให้ใบหน้าอยู่กลางภาพ ระยะ 30-50 ซม.
-                </span>
-            </div>
+            <div id="captureResult" style="display:none; padding: 10px; border-radius: var(--radius-md); margin-bottom: 12px; text-align: center;"></div>
         </div>
-
-        <!-- ปุ่มถ่ายภาพ -->
-        <div class="flex gap-3">
-            <button id="btnCapture" onclick="capturePhoto()" class="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white py-3 rounded-xl transition font-medium flex items-center justify-center gap-2">
-                <i class="fas fa-camera text-lg"></i> ถ่ายภาพ
-            </button>
-            <button onclick="closeCameraCapture()" class="px-6 bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl transition">ยกเลิก</button>
+        <div class="modal-foot">
+            <button onclick="closeCameraCapture()" class="btn">ยกเลิก</button>
+            <button id="btnCapture" onclick="capturePhoto()" class="btn primary"><?= ico('camera', 14) ?> ถ่ายภาพ</button>
         </div>
-
-        <!-- ผลการถ่าย -->
-        <div id="captureResult" class="hidden mt-4 p-3 rounded-xl text-center"></div>
     </div>
 </div>
 
 <!-- Photo View Modal -->
-<div id="photoViewModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center" onclick="closePhotoView()">
-    <div class="max-w-lg max-h-[80vh] p-2" onclick="event.stopPropagation()">
-        <img id="photoViewImg" class="max-w-full max-h-[75vh] rounded-2xl shadow-2xl" alt="Employee Photo">
-        <p class="text-center text-gray-400 text-sm mt-3" id="photoViewName"></p>
+<div id="photoViewModal" class="modal-backdrop" style="display:none;">
+    <div class="modal" style="max-width: 600px; background: transparent; border: 0; box-shadow: none;">
+        <img id="photoViewImg" style="max-width: 100%; max-height: 75vh; border-radius: var(--radius-lg); display: block; margin: 0 auto;" alt="Employee Photo">
+        <p id="photoViewName" class="tiny muted" style="text-align: center; margin-top: 12px;"></p>
     </div>
 </div>
 
@@ -269,61 +206,53 @@ async function loadEmployees() {
     renderTable(data);
     updateDeptFilter(data);
 }
-
 function updateStats(employees) {
     document.getElementById('statTotal').textContent = employees.length;
     document.getElementById('statAuthorized').textContent = employees.filter(e => e.is_authorized).length;
     document.getElementById('statWithPhoto').textContent = employees.filter(e => e.face_image).length;
     document.getElementById('statSuspended').textContent = employees.filter(e => !e.is_authorized).length;
 }
-
 function updateDeptFilter(employees) {
     const depts = [...new Set(employees.map(e => e.department).filter(Boolean))];
     const select = document.getElementById('filterDept');
     const current = select.value;
-    select.innerHTML = '<option value="">ทุกแผนก</option>' +
-        depts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+    select.innerHTML = '<option value="">ทุกแผนก</option>' + depts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
     select.value = current;
 }
-
 function renderTable(employees) {
     const tbody = document.getElementById('employeeTable');
     if (employees.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500 py-12"><i class="fas fa-users text-3xl mb-3 block opacity-30"></i>ไม่มีข้อมูลพนักงาน</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty"><div style="padding: 28px;">ไม่มีข้อมูลพนักงาน</div></td></tr>';
         return;
     }
-    tbody.innerHTML = employees.map(emp => `
-        <tr class="border-b border-white/5 hover:bg-white/5 transition">
-            <td class="py-3 px-4 font-mono text-blue-400 font-medium">${esc(emp.emp_code)}</td>
-            <td class="py-3 px-4">
-                <div class="flex items-center gap-3">
-                    ${emp.face_image
-                        ? `<img src="uploads/faces/${esc(emp.face_image)}" class="w-10 h-10 rounded-xl object-cover cursor-pointer hover:ring-2 ring-blue-500 shadow-lg transition" onclick="viewPhoto('uploads/faces/${esc(emp.face_image)}', '${esc(emp.first_name)} ${esc(emp.last_name)}')" onerror="this.outerHTML='<div class=\\'w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 text-sm font-bold\\'>${esc(emp.first_name).charAt(0)}</div>'">`
-                        : `<div class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-gray-400 text-sm font-bold">${esc(emp.first_name).charAt(0)}</div>`
-                    }
-                    <span>${esc(emp.first_name)} ${esc(emp.last_name)}</span>
+    tbody.innerHTML = employees.map(emp => {
+        const initials = esc(emp.first_name).charAt(0);
+        const avatarHtml = emp.face_image
+            ? `<img src="uploads/faces/${esc(emp.face_image)}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; cursor:pointer;" onclick="viewPhoto('uploads/faces/${esc(emp.face_image)}', '${esc(emp.first_name)} ${esc(emp.last_name)}')" onerror="this.outerHTML='<div class=\\'avatar\\'>${initials}</div>'">`
+            : `<div class="avatar">${initials}</div>`;
+        const auth = emp.is_authorized
+            ? '<span class="badge ok"><span class="dot"></span>อนุญาต</span>'
+            : '<span class="badge danger"><span class="dot"></span>ระงับ</span>';
+        const faceCol = emp.face_image
+            ? `<span class="badge accent" style="cursor:pointer;" onclick="viewPhoto('uploads/faces/${esc(emp.face_image)}', '${esc(emp.first_name)} ${esc(emp.last_name)}')">${esc(emp.face_image)}</span>`
+            : '<span class="muted tiny">ไม่มีรูป</span>';
+        return `<tr>
+            <td class="mono text-accent">${esc(emp.emp_code)}</td>
+            <td>
+                <div class="row gap-2" style="align-items: center;">${avatarHtml}<span>${esc(emp.first_name)} ${esc(emp.last_name)}</span></div>
+            </td>
+            <td class="muted">${esc(emp.department) || '-'}</td>
+            <td class="muted">${esc(emp.position) || '-'}</td>
+            <td>${faceCol}</td>
+            <td>${auth}</td>
+            <td>
+                <div class="row gap-2">
+                    <button class="icon-btn" onclick="editEmployee(${parseInt(emp.id)})" title="แก้ไข"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                    <button class="icon-btn danger" onclick="deleteEmployee(${parseInt(emp.id)})" title="ลบ"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
                 </div>
             </td>
-            <td class="py-3 px-4 text-gray-400">${esc(emp.department) || '-'}</td>
-            <td class="py-3 px-4 text-gray-400">${esc(emp.position) || '-'}</td>
-            <td class="py-3 px-4">
-                ${emp.face_image
-                    ? `<span class="inline-flex items-center gap-1.5 bg-green-500/10 text-green-400 px-2 py-1 rounded-lg text-xs cursor-pointer hover:bg-green-500/20 transition" onclick="viewPhoto('uploads/faces/${esc(emp.face_image)}', '${esc(emp.first_name)} ${esc(emp.last_name)}')"><i class="fas fa-image"></i>${esc(emp.face_image)}</span>`
-                    : '<span class="text-gray-600 text-xs"><i class="fas fa-image-slash mr-1"></i>ไม่มีรูป</span>'}
-            </td>
-            <td class="py-3 px-4 text-center">
-                ${emp.is_authorized
-                    ? '<span class="bg-green-500/20 text-green-400 px-2.5 py-1 rounded-lg text-xs font-medium">อนุญาต</span>'
-                    : '<span class="bg-red-500/20 text-red-400 px-2.5 py-1 rounded-lg text-xs font-medium">ระงับ</span>'}
-            </td>
-            <td class="py-3 px-4 text-center">
-                <div class="flex items-center justify-center gap-1">
-                    <button onclick="editEmployee(${parseInt(emp.id)})" class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition flex items-center justify-center" title="แก้ไข"><i class="fas fa-edit text-xs"></i></button>
-                    <button onclick="deleteEmployee(${parseInt(emp.id)})" class="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition flex items-center justify-center" title="ลบ"><i class="fas fa-trash text-xs"></i></button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
+        </tr>`;
+    }).join('');
 }
 
 // ============================================================
@@ -332,181 +261,125 @@ function renderTable(employees) {
 function handlePhotoSelect(input) {
     const file = input.files[0];
     if (!file) return;
-
-    // Validate
     const maxSize = 5 * 1024 * 1024;
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-
-    if (!allowedTypes.includes(file.type)) {
-        showToast('รองรับเฉพาะไฟล์ JPG, PNG, WEBP เท่านั้น', 'error');
-        input.value = '';
-        return;
-    }
-    if (file.size > maxSize) {
-        showToast('ไฟล์มีขนาดใหญ่เกินไป (สูงสุด 5MB)', 'error');
-        input.value = '';
-        return;
-    }
-
-    // Show preview
+    if (!allowedTypes.includes(file.type)) { showToast('รองรับเฉพาะ JPG, PNG, WEBP', 'error'); input.value = ''; return; }
+    if (file.size > maxSize) { showToast('ไฟล์ใหญ่เกิน 5MB', 'error'); input.value = ''; return; }
     const reader = new FileReader();
     reader.onload = (e) => {
         document.getElementById('photoPreview').src = e.target.result;
-        document.getElementById('photoPreview').classList.remove('hidden');
-        document.getElementById('photoOverlay').classList.remove('hidden');
-        document.getElementById('photoPlaceholder').classList.add('hidden');
+        document.getElementById('photoPreview').style.display = '';
+        document.getElementById('photoPlaceholder').style.display = 'none';
     };
     reader.readAsDataURL(file);
-
-    // Upload
     uploadPhoto(file);
 }
-
 function uploadPhoto(file) {
     const progressEl = document.getElementById('uploadProgress');
     const barEl = document.getElementById('uploadBar');
     const percentEl = document.getElementById('uploadPercent');
     const statusEl = document.getElementById('uploadStatusText');
     const resultEl = document.getElementById('uploadResult');
-
-    progressEl.classList.remove('hidden');
-    resultEl.classList.add('hidden');
+    progressEl.style.display = '';
+    resultEl.style.display = 'none';
 
     const formData = new FormData();
     formData.append('photo', file);
     formData.append('emp_code', document.getElementById('formEmpCode').value || 'temp');
 
     const xhr = new XMLHttpRequest();
-
     xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
             const pct = Math.round((e.loaded / e.total) * 100);
             barEl.style.width = pct + '%';
             percentEl.textContent = pct + '%';
-            if (pct < 100) {
-                statusEl.textContent = 'กำลังอัพโหลด...';
-            } else {
-                statusEl.textContent = 'กำลังประมวลผล...';
-            }
+            statusEl.textContent = pct < 100 ? 'กำลังอัพโหลด...' : 'กำลังประมวลผล...';
         }
     });
-
     xhr.addEventListener('load', () => {
         try {
             const res = JSON.parse(xhr.responseText);
             if (res.success) {
-                barEl.style.width = '100%';
-                percentEl.textContent = '100%';
-                barEl.classList.remove('from-blue-500', 'to-cyan-400');
-                barEl.classList.add('from-green-500', 'to-emerald-400');
+                barEl.style.width = '100%'; percentEl.textContent = '100%';
                 statusEl.textContent = 'เสร็จสิ้น';
-
-                setTimeout(() => {
-                    progressEl.classList.add('hidden');
-                    resultEl.classList.remove('hidden');
-                }, 800);
-
+                barEl.style.background = 'var(--ok)';
+                setTimeout(() => { progressEl.style.display = 'none'; resultEl.style.display = ''; }, 800);
                 document.getElementById('formFaceImage').value = res.filename;
                 currentUploadedFile = res.filename;
-
-                // Show face validation result
                 showFaceValidation(res.face_validation);
             } else {
-                barEl.classList.remove('from-blue-500', 'to-cyan-400');
-                barEl.classList.add('from-red-500', 'to-red-400');
+                barEl.style.background = 'var(--danger)';
                 statusEl.textContent = res.error || 'อัพโหลดล้มเหลว';
                 showToast(res.error || 'อัพโหลดล้มเหลว', 'error');
             }
-        } catch {
-            statusEl.textContent = 'เกิดข้อผิดพลาด';
-            showToast('เกิดข้อผิดพลาดในการอัพโหลด', 'error');
-        }
+        } catch { statusEl.textContent = 'เกิดข้อผิดพลาด'; showToast('เกิดข้อผิดพลาด', 'error'); }
     });
-
     xhr.addEventListener('error', () => {
-        barEl.classList.remove('from-blue-500', 'to-cyan-400');
-        barEl.classList.add('from-red-500', 'to-red-400');
+        barEl.style.background = 'var(--danger)';
         statusEl.textContent = 'การเชื่อมต่อล้มเหลว';
-        showToast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        showToast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error');
     });
-
     xhr.open('POST', 'api/upload.php');
     xhr.send(formData);
 }
-
 function showFaceValidation(data) {
     const container = document.getElementById('faceValidation');
     const icon = document.getElementById('faceValidIcon');
     const msg = document.getElementById('faceValidMsg');
-
-    container.classList.remove('hidden');
-
+    container.style.display = '';
     if (!data) {
-        // Face server offline — show warning
-        icon.innerHTML = '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500/20"><i class="fas fa-exclamation-triangle text-yellow-400 text-xs"></i></span>';
-        msg.className = 'text-xs text-center mt-1 leading-tight text-yellow-400';
-        msg.textContent = 'ไม่สามารถตรวจสอบใบหน้าได้ (Face Server ออฟไลน์)';
+        icon.innerHTML = '<span class="badge warn">!</span>';
+        msg.className = 'tiny text-warn';
+        msg.textContent = 'ไม่สามารถตรวจสอบใบหน้าได้';
         return;
     }
-
     if (data.valid) {
         const ratio = data.face_ratio || 0;
-        // ถ้าใบหน้าเล็กเกินไป (< 3%) = ใช้ไม่ได้
         if (ratio < 3) {
-            icon.innerHTML = '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500/20"><i class="fas fa-face-frown text-red-400 text-xs"></i></span>';
-            msg.className = 'text-xs text-center mt-1 leading-tight text-red-400';
+            icon.innerHTML = '<span class="badge danger">×</span>';
+            msg.className = 'tiny text-danger';
             msg.textContent = `ใบหน้าเล็กเกินไป (${ratio}%) ถ่ายใกล้กว่านี้`;
-            showToast('รูปใช้ไม่ได้ — ใบหน้าเล็กเกินไป ควรถ่ายใกล้ๆ หน้าตรง', 'error');
+            showToast('รูปใช้ไม่ได้ — ใบหน้าเล็ก', 'error');
         } else if (ratio < 8 || (data.quality_notes && data.quality_notes.length > 0)) {
-            // คุณภาพพอใช้ แต่ไม่ดีนัก
-            icon.innerHTML = '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500/20"><i class="fas fa-face-meh text-yellow-400 text-xs"></i></span>';
-            msg.className = 'text-xs text-center mt-1 leading-tight text-yellow-400';
-            msg.textContent = data.quality_notes?.[0] || `ใบหน้าค่อนข้างเล็ก (${ratio}%) แนะนำถ่ายใกล้ขึ้น`;
-            showToast('รูปใช้ได้แต่คุณภาพไม่ดีนัก อาจจดจำผิดพลาด', 'warning');
+            icon.innerHTML = '<span class="badge warn">!</span>';
+            msg.className = 'tiny text-warn';
+            msg.textContent = data.quality_notes?.[0] || `ใบหน้าค่อนข้างเล็ก (${ratio}%)`;
+            showToast('รูปใช้ได้ แต่คุณภาพไม่ดีนัก', 'warning');
         } else {
-            // คุณภาพดี
-            icon.innerHTML = '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500/20"><i class="fas fa-face-smile text-green-400 text-xs"></i></span>';
-            msg.className = 'text-xs text-center mt-1 leading-tight text-green-400';
-            msg.textContent = `ใบหน้าชัดเจน (${ratio}%) ใช้งานได้ดี`;
-            showToast('รูปใบหน้าคุณภาพดี ใช้งานได้!', 'success');
+            icon.innerHTML = '<span class="badge ok">✓</span>';
+            msg.className = 'tiny text-ok';
+            msg.textContent = `ใบหน้าชัดเจน (${ratio}%)`;
+            showToast('รูปใบหน้าคุณภาพดี!', 'success');
         }
     } else {
-        // No face or multiple faces
-        icon.innerHTML = '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-500/20"><i class="fas fa-face-frown text-red-400 text-xs"></i></span>';
-        msg.className = 'text-xs text-center mt-1 leading-tight text-red-400';
+        icon.innerHTML = '<span class="badge danger">×</span>';
+        msg.className = 'tiny text-danger';
         msg.textContent = data.message || 'ไม่พบใบหน้าในรูปภาพ';
-        showToast(data.message || 'ไม่พบใบหน้าในรูปภาพ', 'warning');
+        showToast(data.message || 'ไม่พบใบหน้า', 'warning');
     }
 }
-
 function viewPhoto(src, name) {
     document.getElementById('photoViewImg').src = src;
     document.getElementById('photoViewName').textContent = name;
-    document.getElementById('photoViewModal').classList.remove('hidden');
-    document.getElementById('photoViewModal').classList.add('flex');
+    document.getElementById('photoViewModal').style.display = 'flex';
 }
-
-function closePhotoView() {
-    document.getElementById('photoViewModal').classList.add('hidden');
-    document.getElementById('photoViewModal').classList.remove('flex');
-}
+document.getElementById('photoViewModal').addEventListener('click', e => { if (e.target === e.currentTarget) closePhotoView(); });
+function closePhotoView() { document.getElementById('photoViewModal').style.display = 'none'; }
 
 // ============================================================
 // Modal
 // ============================================================
 function resetPhotoArea() {
-    document.getElementById('photoPreview').classList.add('hidden');
-    document.getElementById('photoOverlay').classList.add('hidden');
-    document.getElementById('photoPlaceholder').classList.remove('hidden');
-    document.getElementById('uploadProgress').classList.add('hidden');
-    document.getElementById('uploadResult').classList.add('hidden');
+    document.getElementById('photoPreview').style.display = 'none';
+    document.getElementById('photoPlaceholder').style.display = '';
+    document.getElementById('uploadProgress').style.display = 'none';
+    document.getElementById('uploadResult').style.display = 'none';
     document.getElementById('uploadBar').style.width = '0%';
-    document.getElementById('uploadBar').className = 'h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-300';
+    document.getElementById('uploadBar').style.background = 'var(--accent)';
     document.getElementById('photoInput').value = '';
-    document.getElementById('faceValidation').classList.add('hidden');
+    document.getElementById('faceValidation').style.display = 'none';
     currentUploadedFile = null;
 }
-
 async function showAddModal() {
     document.getElementById('modalTitle').textContent = 'เพิ่มพนักงาน';
     document.getElementById('employeeForm').reset();
@@ -514,14 +387,9 @@ async function showAddModal() {
     document.getElementById('formFaceImage').value = '';
     document.getElementById('formAuthorized').checked = true;
     resetPhotoArea();
-    // Auto-generate emp_code
-    try {
-        const res = await fetchAPI('api/employees.php?next_code=1');
-        if (res?.next_code) document.getElementById('formEmpCode').value = res.next_code;
-    } catch {}
-    document.getElementById('employeeModal').classList.remove('hidden');
+    try { const res = await fetchAPI('api/employees.php?next_code=1'); if (res?.next_code) document.getElementById('formEmpCode').value = res.next_code; } catch {}
+    document.getElementById('employeeModal').style.display = 'flex';
 }
-
 function editEmployee(id) {
     const emp = allEmployees.find(e => e.id == id);
     if (!emp) return;
@@ -535,23 +403,17 @@ function editEmployee(id) {
     document.getElementById('formFaceImage').value = emp.face_image || '';
     document.getElementById('formAuthorized').checked = !!emp.is_authorized;
     resetPhotoArea();
-
-    // Show existing photo
     if (emp.face_image) {
         const preview = document.getElementById('photoPreview');
         preview.src = 'uploads/faces/' + emp.face_image;
-        preview.classList.remove('hidden');
-        document.getElementById('photoOverlay').classList.remove('hidden');
-        document.getElementById('photoPlaceholder').classList.add('hidden');
-        document.getElementById('uploadResult').classList.remove('hidden');
+        preview.style.display = '';
+        document.getElementById('photoPlaceholder').style.display = 'none';
+        document.getElementById('uploadResult').style.display = '';
     }
-
-    document.getElementById('employeeModal').classList.remove('hidden');
+    document.getElementById('employeeModal').style.display = 'flex';
 }
-
-function closeModal() {
-    document.getElementById('employeeModal').classList.add('hidden');
-}
+function closeModal() { document.getElementById('employeeModal').style.display = 'none'; }
+document.getElementById('employeeModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 
 // ============================================================
 // CRUD
@@ -569,16 +431,10 @@ async function saveEmployee(e) {
         is_authorized: document.getElementById('formAuthorized').checked ? 1 : 0,
     };
     if (id) data.id = id;
-
     const btn = document.getElementById('btnSave');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...';
-
     const result = await postAPI('api/employees.php', data);
-
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-save"></i> บันทึก';
-
     if (result?.success) {
         closeModal();
         showToast(id ? 'แก้ไขข้อมูลพนักงานสำเร็จ' : 'เพิ่มพนักงานสำเร็จ', 'success');
@@ -587,75 +443,49 @@ async function saveEmployee(e) {
         showToast(result?.error || 'เกิดข้อผิดพลาด', 'error');
     }
 }
-
 function deleteEmployee(id) {
     const emp = allEmployees.find(e => e.id == id);
     showConfirm(
         'ลบพนักงาน',
-        `ต้องการลบ "${emp ? emp.first_name + ' ' + emp.last_name : 'พนักงาน'}" หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้`,
+        `ต้องการลบ "${emp ? emp.first_name + ' ' + emp.last_name : 'พนักงาน'}" หรือไม่?`,
         async () => {
             const res = await fetch('api/employees.php?id=' + id, { method: 'DELETE' });
             const result = await res.json();
-            if (result?.success) {
-                showToast('ลบพนักงานสำเร็จ', 'success');
-                loadEmployees();
-            } else {
-                showToast(result?.error || 'เกิดข้อผิดพลาด', 'error');
-            }
+            if (result?.success) { showToast('ลบพนักงานสำเร็จ', 'success'); loadEmployees(); }
+            else { showToast(result?.error || 'เกิดข้อผิดพลาด', 'error'); }
         }
     );
 }
 
 // ============================================================
-// Camera Capture (ถ่ายจากกล้อง Pi)
+// Camera Capture
 // ============================================================
 let _captureCamera = 'outside';
 let _captureInterval = null;
-
 function openCameraCapture() {
-    document.getElementById('cameraModal').classList.remove('hidden');
-    document.getElementById('cameraModal').classList.add('flex');
-    document.getElementById('captureResult').classList.add('hidden');
-    document.getElementById('captureLoading').style.display = '';
+    document.getElementById('cameraModal').style.display = 'flex';
+    document.getElementById('captureResult').style.display = 'none';
     _captureCamera = 'outside';
     switchCaptureCamera('outside');
     startCapturePreview();
 }
-
 function closeCameraCapture() {
-    document.getElementById('cameraModal').classList.add('hidden');
-    document.getElementById('cameraModal').classList.remove('flex');
+    document.getElementById('cameraModal').style.display = 'none';
     stopCapturePreview();
 }
-
+document.getElementById('cameraModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeCameraCapture(); });
 function switchCaptureCamera(cam) {
     _captureCamera = cam;
-    // UI toggle
     const btnOut = document.getElementById('camBtnOutside');
     const btnIn = document.getElementById('camBtnInside');
-    if (cam === 'outside') {
-        btnOut.className = 'flex-1 py-2 rounded-lg text-sm transition bg-cyan-600/30 text-cyan-400 border border-cyan-500/30';
-        btnIn.className = 'flex-1 py-2 rounded-lg text-sm transition bg-white/5 text-gray-400 border border-white/10';
-    } else {
-        btnIn.className = 'flex-1 py-2 rounded-lg text-sm transition bg-cyan-600/30 text-cyan-400 border border-cyan-500/30';
-        btnOut.className = 'flex-1 py-2 rounded-lg text-sm transition bg-white/5 text-gray-400 border border-white/10';
-    }
+    btnOut.className = 'btn sm' + (cam === 'outside' ? ' primary' : '');
+    btnIn.className  = 'btn sm' + (cam === 'inside'  ? ' primary' : '');
+    btnOut.style.flex = '1'; btnIn.style.flex = '1';
+    btnOut.style.justifyContent = 'center'; btnIn.style.justifyContent = 'center';
     document.getElementById('captureLoading').style.display = '';
 }
-
-function startCapturePreview() {
-    stopCapturePreview();
-    refreshCapturePreview();
-    _captureInterval = setInterval(refreshCapturePreview, 2000);
-}
-
-function stopCapturePreview() {
-    if (_captureInterval) {
-        clearInterval(_captureInterval);
-        _captureInterval = null;
-    }
-}
-
+function startCapturePreview() { stopCapturePreview(); refreshCapturePreview(); _captureInterval = setInterval(refreshCapturePreview, 2000); }
+function stopCapturePreview() { if (_captureInterval) { clearInterval(_captureInterval); _captureInterval = null; } }
 function refreshCapturePreview() {
     const img = new Image();
     img.onload = () => {
@@ -664,72 +494,48 @@ function refreshCapturePreview() {
     };
     img.onerror = () => {
         document.getElementById('captureLoading').style.display = '';
-        document.getElementById('captureLoading').querySelector('p').textContent = 'กล้องไม่พร้อม';
+        document.getElementById('captureLoading').textContent = 'CAMERA NOT READY';
     };
     img.src = 'api/capture.php?camera=' + _captureCamera + '&t=' + Date.now();
 }
-
 async function capturePhoto() {
     const btn = document.getElementById('btnCapture');
     const result = document.getElementById('captureResult');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> กำลังถ่ายภาพ...';
-    result.classList.add('hidden');
-
+    btn.innerHTML = 'กำลังถ่ายภาพ...';
+    result.style.display = 'none';
     try {
         const empCode = document.getElementById('formEmpCode').value || 'capture';
-        const resp = await fetch('api/capture.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ camera: _captureCamera, emp_code: empCode }),
-        });
+        const resp = await fetch('api/capture.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ camera: _captureCamera, emp_code: empCode }) });
         const data = await resp.json();
-
         if (data.success && data.filename) {
-            // สำเร็จ — อัปเดต form
             document.getElementById('formFaceImage').value = data.filename;
             currentUploadedFile = data.filename;
-
-            // อัปเดต preview ในฟอร์ม
             const preview = document.getElementById('photoPreview');
             preview.src = 'uploads/faces/' + data.filename + '?t=' + Date.now();
-            preview.classList.remove('hidden');
-            document.getElementById('photoOverlay').classList.remove('hidden');
-            document.getElementById('photoPlaceholder').classList.add('hidden');
-            document.getElementById('uploadResult').classList.remove('hidden');
-
-            // แสดง face validation
-            showFaceValidation({
-                valid: true,
-                face_ratio: data.face_ratio,
-                quality_notes: data.quality_notes || [],
-            });
-
-            // แสดงผลสำเร็จ
-            result.innerHTML = `<div class="text-green-400"><i class="fas fa-check-circle text-lg mr-2"></i>ถ่ายภาพสำเร็จ! ใบหน้า ${data.face_ratio}%</div>`;
-            result.className = 'mt-4 p-3 rounded-xl text-center bg-green-500/10 border border-green-500/20';
-            result.classList.remove('hidden');
-
+            preview.style.display = '';
+            document.getElementById('photoPlaceholder').style.display = 'none';
+            document.getElementById('uploadResult').style.display = '';
+            showFaceValidation({ valid: true, face_ratio: data.face_ratio, quality_notes: data.quality_notes || [] });
+            result.innerHTML = '<span class="text-ok">ถ่ายภาพสำเร็จ! ใบหน้า ' + data.face_ratio + '%</span>';
+            result.style.background = 'var(--ok-soft)';
+            result.style.display = '';
             showToast('ถ่ายภาพจากกล้องสำเร็จ!', 'success');
-
-            // ปิด modal หลัง 1.5 วิ
             setTimeout(() => closeCameraCapture(), 1500);
         } else {
-            // ไม่สำเร็จ
-            result.innerHTML = `<div class="text-red-400"><i class="fas fa-exclamation-circle text-lg mr-2"></i>${data.error || 'เกิดข้อผิดพลาด'}</div>`;
-            result.className = 'mt-4 p-3 rounded-xl text-center bg-red-500/10 border border-red-500/20';
-            result.classList.remove('hidden');
+            result.innerHTML = '<span class="text-danger">' + (data.error || 'เกิดข้อผิดพลาด') + '</span>';
+            result.style.background = 'var(--danger-soft)';
+            result.style.display = '';
             showToast(data.error || 'ถ่ายภาพไม่สำเร็จ', 'error');
         }
     } catch (e) {
-        result.innerHTML = '<div class="text-red-400"><i class="fas fa-wifi-slash mr-2"></i>ไม่สามารถเชื่อมต่อ Face Server</div>';
-        result.className = 'mt-4 p-3 rounded-xl text-center bg-red-500/10 border border-red-500/20';
-        result.classList.remove('hidden');
-        showToast('ไม่สามารถเชื่อมต่อ Face Server', 'error');
+        result.innerHTML = '<span class="text-danger">ไม่สามารถเชื่อมต่อ Face Server</span>';
+        result.style.background = 'var(--danger-soft)';
+        result.style.display = '';
+        showToast('เชื่อมต่อ Face Server ไม่ได้', 'error');
     }
-
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-camera text-lg"></i> ถ่ายภาพ';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h4l2-2h6l2 2h4v12H3z"/><circle cx="12" cy="13" r="3.5"/></svg> ถ่ายภาพ';
 }
 
 // ============================================================
@@ -745,23 +551,10 @@ function applyFilters() {
     });
     renderTable(filtered);
 }
-
 document.getElementById('searchInput').addEventListener('input', applyFilters);
 document.getElementById('filterDept').addEventListener('change', applyFilters);
 
-// Close modal on backdrop click
-document.getElementById('employeeModal').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) closeModal();
-});
-
-// Keyboard shortcut
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        closeModal();
-        closePhotoView();
-    }
-});
-
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModal(); closePhotoView(); closeCameraCapture(); }});
 document.addEventListener('DOMContentLoaded', loadEmployees);
 </script>
 

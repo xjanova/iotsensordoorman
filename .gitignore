@@ -13,6 +13,7 @@ python/snapshots/
 # IDE
 .vscode/
 .idea/
+.claude/
 
 # OS
 Thumbs.db
@@ -21,3 +22,9 @@ Thumbs.db
 # Temp
 *.tmp
 *.log
+
+# Archives (local backups + handoffs)
+*.zip
+*.rar
+*.7z
+*.tar.gz

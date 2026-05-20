@@ -1,4 +1,4 @@
-<?php $pageTitle = 'Dashboard - Bunny Door System'; ?>
+<?php $pageTitle = 'ภาพรวมระบบ - Bunny Door System'; ?>
 <?php include 'includes/header.php'; ?>
 
 <?php
@@ -18,545 +18,339 @@ $esp32Online = ($sysStatus['esp32'] ?? '') === 'ONLINE';
 
 // สถิติวันนี้
 $stmt = $db->query("SELECT COUNT(DISTINCT employee_id) as c FROM access_logs WHERE direction='IN' AND DATE(created_at) = CURDATE() AND is_authorized = 1");
-$todayIn = $stmt->fetch()['c'] ?? 0;
+$todayIn = (int) ($stmt->fetch()['c'] ?? 0);
 
 $stmt = $db->query("SELECT COUNT(DISTINCT employee_id) as c FROM access_logs WHERE direction='OUT' AND DATE(created_at) = CURDATE() AND is_authorized = 1");
-$todayOut = $stmt->fetch()['c'] ?? 0;
+$todayOut = (int) ($stmt->fetch()['c'] ?? 0);
 
 $currentlyInside = max(0, $todayIn - $todayOut);
 
 $stmt = $db->query("SELECT COUNT(*) as c FROM anomaly_alerts WHERE is_resolved = 0");
-$unresolvedAlerts = $stmt->fetch()['c'] ?? 0;
+$unresolvedAlerts = (int) ($stmt->fetch()['c'] ?? 0);
+
+// เปรียบเทียบกับเมื่อวาน
+$stmt = $db->query("SELECT COUNT(DISTINCT employee_id) as c FROM access_logs WHERE direction='IN' AND DATE(created_at) = CURDATE() - INTERVAL 1 DAY AND is_authorized = 1");
+$yIn = (int) ($stmt->fetch()['c'] ?? 0);
+$stmt = $db->query("SELECT COUNT(DISTINCT employee_id) as c FROM access_logs WHERE direction='OUT' AND DATE(created_at) = CURDATE() - INTERVAL 1 DAY AND is_authorized = 1");
+$yOut = (int) ($stmt->fetch()['c'] ?? 0);
+$yInside = max(0, $yIn - $yOut);
+$stmt = $db->query("SELECT COUNT(*) as c FROM anomaly_alerts WHERE DATE(created_at) = CURDATE() - INTERVAL 1 DAY");
+$yAlerts = (int) ($stmt->fetch()['c'] ?? 0);
 
 // ประวัติล่าสุด
 $stmt = $db->query("SELECT al.*, e.first_name, e.last_name, e.emp_code
     FROM access_logs al LEFT JOIN employees e ON al.employee_id = e.id
-    ORDER BY al.created_at DESC LIMIT 10");
+    ORDER BY al.created_at DESC LIMIT 8");
 $recentLogs = $stmt->fetchAll();
+
+function deltaBadge(int $today, int $yesterday): string {
+    $diff = $today - $yesterday;
+    if ($diff > 0) return '<span class="up">▲ +' . $diff . '</span>';
+    if ($diff < 0) return '<span class="down">▼ ' . $diff . '</span>';
+    return '<span class="muted">— 0</span>';
+}
 ?>
 
-<!-- Page Header -->
-<div class="flex justify-between items-center mb-8">
+<div class="page-head">
     <div>
-        <h2 class="text-2xl font-bold">Dashboard</h2>
-        <p class="text-gray-400 text-sm mt-1">ภาพรวมระบบควบคุมการเข้า-ออกห้องสโตร์</p>
+        <h1>ภาพรวมระบบ</h1>
+        <div class="sub">สถานการณ์เข้า-ออกห้องสโตร์ — อัปเดตทุก 5 วินาที</div>
     </div>
-    <div class="flex items-center gap-3">
-        <span class="text-sm text-gray-400" id="currentTime"></span>
-        <button onclick="unlockDoor()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition">
-            <i class="fas fa-lock-open"></i> เปิดประตู
-        </button>
+    <div class="page-head-actions">
+        <button class="btn sm" id="btnPickDate" title="เลือกวันที่"><?= ico('calendar', 14) ?> วันนี้</button>
+        <button class="btn sm" id="btnExport" title="ส่งออก CSV"><?= ico('download', 14) ?> ส่งออก</button>
     </div>
 </div>
 
-<!-- Stats Cards -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-    <div class="stat-card glass rounded-2xl p-6 card-hover">
-        <div class="flex justify-between items-start">
-            <div>
-                <p class="text-gray-400 text-sm">เข้างานวันนี้</p>
-                <p class="text-3xl font-bold text-white mt-2" id="statIn"><?= $todayIn ?></p>
-            </div>
-            <div class="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center">
-                <i class="fas fa-arrow-right-to-bracket text-green-400 text-xl"></i>
-            </div>
-        </div>
-        <p class="text-xs text-green-400 mt-3"><i class="fas fa-arrow-up mr-1"></i> เข้าห้องสโตร์</p>
+<!-- KPI Row -->
+<div class="grid kpis section">
+    <div class="card kpi">
+        <div class="label"><span class="dot ok"></span>เข้างานวันนี้</div>
+        <div class="num" id="kpiIn"><?= $todayIn ?></div>
+        <div class="delta"><?= deltaBadge($todayIn, $yIn) ?><span>เทียบกับเมื่อวาน</span></div>
+        <svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="sparkOk" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="var(--ok)" stop-opacity="0.4"/><stop offset="100%" stop-color="var(--ok)" stop-opacity="0"/></linearGradient></defs>
+            <polyline class="spark-line" points="0,28 12,20 24,24 36,16 48,22 60,12 72,18 84,8 96,16 108,10 120,14" fill="none" stroke="var(--ok)" stroke-width="1.6"/>
+            <polygon points="0,28 12,20 24,24 36,16 48,22 60,12 72,18 84,8 96,16 108,10 120,14 120,36 0,36" fill="url(#sparkOk)"/>
+        </svg>
     </div>
-
-    <div class="stat-card glass rounded-2xl p-6 card-hover">
-        <div class="flex justify-between items-start">
-            <div>
-                <p class="text-gray-400 text-sm">ออกงานวันนี้</p>
-                <p class="text-3xl font-bold text-white mt-2" id="statOut"><?= $todayOut ?></p>
-            </div>
-            <div class="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                <i class="fas fa-arrow-right-from-bracket text-blue-400 text-xl"></i>
-            </div>
-        </div>
-        <p class="text-xs text-blue-400 mt-3"><i class="fas fa-arrow-down mr-1"></i> ออกจากห้องสโตร์</p>
+    <div class="card kpi">
+        <div class="label"><span class="dot info"></span>ออกงานวันนี้</div>
+        <div class="num" id="kpiOut"><?= $todayOut ?></div>
+        <div class="delta"><?= deltaBadge($todayOut, $yOut) ?><span>เทียบกับเมื่อวาน</span></div>
+        <svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="sparkInfo" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="var(--info)" stop-opacity="0.4"/><stop offset="100%" stop-color="var(--info)" stop-opacity="0"/></linearGradient></defs>
+            <polyline points="0,26 12,18 24,22 36,14 48,20 60,10 72,16 84,12 96,18 108,8 120,16" fill="none" stroke="var(--info)" stroke-width="1.6"/>
+            <polygon points="0,26 12,18 24,22 36,14 48,20 60,10 72,16 84,12 96,18 108,8 120,16 120,36 0,36" fill="url(#sparkInfo)"/>
+        </svg>
     </div>
-
-    <div class="stat-card glass rounded-2xl p-6 card-hover">
-        <div class="flex justify-between items-start">
-            <div>
-                <p class="text-gray-400 text-sm">อยู่ในพื้นที่</p>
-                <p class="text-3xl font-bold text-white mt-2" id="statInside"><?= $currentlyInside ?></p>
-            </div>
-            <div class="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center">
-                <i class="fas fa-person text-purple-400 text-xl"></i>
-            </div>
-        </div>
-        <p class="text-xs text-purple-400 mt-3"><i class="fas fa-location-dot mr-1"></i> คนในห้องสโตร์ตอนนี้</p>
+    <div class="card kpi">
+        <div class="label"><span class="dot accent"></span>อยู่ในพื้นที่</div>
+        <div class="num" id="kpiInside"><?= $currentlyInside ?> <span class="unit">คน</span></div>
+        <div class="delta"><?= deltaBadge($currentlyInside, $yInside) ?><span>เทียบกับเมื่อวาน</span></div>
+        <svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="sparkAccent" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="var(--accent)" stop-opacity="0.4"/><stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>
+            <polyline points="0,24 12,22 24,18 36,20 48,14 60,18 72,12 84,16 96,10 108,14 120,8" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+            <polygon points="0,24 12,22 24,18 36,20 48,14 60,18 72,12 84,16 96,10 108,14 120,8 120,36 0,36" fill="url(#sparkAccent)"/>
+        </svg>
     </div>
-
-    <div class="stat-card glass rounded-2xl p-6 card-hover">
-        <div class="flex justify-between items-start">
-            <div>
-                <p class="text-gray-400 text-sm">แจ้งเตือน</p>
-                <p class="text-3xl font-bold text-white mt-2" id="statAlerts"><?= $unresolvedAlerts ?></p>
-            </div>
-            <div class="w-12 h-12 bg-red-500/20 rounded-xl flex items-center justify-center">
-                <i class="fas fa-bell text-red-400 text-xl"></i>
-            </div>
-        </div>
-        <p class="text-xs text-red-400 mt-3"><i class="fas fa-exclamation-triangle mr-1"></i> ยังไม่ได้ดำเนินการ</p>
+    <div class="card kpi">
+        <div class="label"><span class="dot danger"></span>แจ้งเตือนค้าง</div>
+        <div class="num" id="kpiAlerts"><?= $unresolvedAlerts ?></div>
+        <div class="delta"><?= deltaBadge($unresolvedAlerts, $yAlerts) ?><span>เทียบกับเมื่อวาน</span></div>
+        <svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="sparkDanger" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="var(--danger)" stop-opacity="0.4"/><stop offset="100%" stop-color="var(--danger)" stop-opacity="0"/></linearGradient></defs>
+            <polyline points="0,28 12,26 24,30 36,22 48,28 60,16 72,24 84,20 96,28 108,22 120,18" fill="none" stroke="var(--danger)" stroke-width="1.6"/>
+            <polygon points="0,28 12,26 24,30 36,22 48,28 60,16 72,24 84,20 96,28 108,22 120,18 120,36 0,36" fill="url(#sparkDanger)"/>
+        </svg>
     </div>
 </div>
 
-<!-- Camera Feeds + Door Status -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-    <!-- Camera Outside -->
-    <div class="glass rounded-2xl overflow-hidden card-hover">
-        <div class="p-4 border-b border-white/10 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <span class="w-2 h-2 bg-gray-500 rounded-full" id="camOutDot"></span>
-                <span class="font-medium" id="camOutTitle">กล้องด้านนอก</span>
+<!-- Row 2: Activity chart + Door card -->
+<div class="grid dash section">
+    <div class="card flush">
+        <div class="card-head">
+            <div>
+                <div class="title">กิจกรรมรายชั่วโมง</div>
+                <div class="sub">วันนี้ — เข้า / ออก</div>
             </div>
-            <span class="text-xs text-gray-500" id="camOutStatus">ตรวจสอบ...</span>
-        </div>
-        <div class="stream-container aspect-video">
-            <img id="streamOutside" src="" alt="Camera Outside" class="w-full" style="display:none">
-            <div id="streamOutPlaceholder" class="absolute inset-0 flex items-center justify-center bg-gray-800">
-                <div class="text-center text-gray-500">
-                    <i class="fas fa-video-slash text-3xl mb-2"></i>
-                    <p class="text-sm">กำลังตรวจสอบ...</p>
-                </div>
+            <div class="actions">
+                <span class="badge ok"><span class="dot"></span>เข้า</span>
+                <span class="badge info"><span class="dot"></span>ออก</span>
             </div>
         </div>
-    </div>
-
-    <!-- Camera Inside -->
-    <div class="glass rounded-2xl overflow-hidden card-hover">
-        <div class="p-4 border-b border-white/10 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <span class="w-2 h-2 bg-gray-500 rounded-full" id="camInDot"></span>
-                <span class="font-medium" id="camInTitle">กล้องด้านใน</span>
+        <div class="card-body">
+            <div class="bar-chart" id="hourlyChart">
+                <!-- bars filled by JS -->
             </div>
-            <span class="text-xs text-gray-500" id="camInStatus">ตรวจสอบ...</span>
-        </div>
-        <div class="stream-container aspect-video">
-            <img id="streamInside" src="" alt="Camera Inside" class="w-full" style="display:none">
-            <div id="streamInPlaceholder" class="absolute inset-0 flex items-center justify-center bg-gray-800">
-                <div class="text-center text-gray-500">
-                    <i class="fas fa-video-slash text-3xl mb-2"></i>
-                    <p class="text-sm">กำลังตรวจสอบ...</p>
-                </div>
+            <div class="chart-axis">
+                <span>00</span><span>04</span><span>08</span><span>12</span><span>16</span><span>20</span><span>23</span>
             </div>
         </div>
     </div>
 
-    <!-- Door Status & Controls -->
-    <div class="glass rounded-2xl p-6 card-hover">
-        <h3 class="font-medium mb-4 flex items-center gap-2">
-            <i class="fas fa-door-closed text-blue-400"></i> สถานะประตู
-        </h3>
-        <div class="text-center py-6">
-            <div class="w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-red-500/20" id="doorIcon">
-                <i class="fas fa-lock text-4xl text-red-400" id="doorIconInner"></i>
+    <div class="card door-card">
+        <div class="card-head" style="padding:0 0 14px; border-bottom:1px solid var(--border); margin-bottom:14px;">
+            <div>
+                <div class="title">สถานะประตู</div>
+                <div class="sub">ESP32 controller</div>
             </div>
-            <p class="text-xl font-bold text-red-400" id="doorStatusText">ประตูล็อก</p>
-            <p class="text-sm text-gray-400 mt-1" id="doorStatusSub"></p>
+            <div class="actions"><span class="badge" id="doorTimer" style="display:none;"></span></div>
         </div>
-        <div class="space-y-3 mt-4">
-            <div class="flex justify-between items-center text-sm">
-                <span class="text-gray-400">Face Server</span>
-                <span class="flex items-center gap-1" id="statusFaceServer">
-                    <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
-                    <span class="text-gray-500">ตรวจสอบ...</span>
-                </span>
-            </div>
-            <div class="flex justify-between items-center text-sm">
-                <span class="text-gray-400">ESP32</span>
-                <span class="flex items-center gap-1" id="statusEsp32">
-                    <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
-                    <span class="text-gray-500">ตรวจสอบ...</span>
-                </span>
-            </div>
-            <div class="flex justify-between items-center text-sm">
-                <span class="text-gray-400">กล้องนอก</span>
-                <span class="flex items-center gap-1" id="statusCamOut">
-                    <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
-                    <span class="text-gray-500">ตรวจสอบ...</span>
-                </span>
-            </div>
-            <div class="flex justify-between items-center text-sm">
-                <span class="text-gray-400">กล้องใน</span>
-                <span class="flex items-center gap-1" id="statusCamIn">
-                    <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
-                    <span class="text-gray-500">ตรวจสอบ...</span>
-                </span>
+
+        <div class="door-state locked" id="doorState">
+            <div class="icon" id="doorStateIcon"><?= ico('lock', 22) ?></div>
+            <div class="text">
+                <strong id="doorStateText">ประตูล็อก</strong>
+                <div class="sub" id="doorStateSub">ตรวจสอบ...</div>
             </div>
         </div>
-        <div class="flex gap-2 mt-6">
-            <button onclick="unlockDoor()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm transition">
-                <i class="fas fa-lock-open mr-1"></i> ปลดล็อก
-            </button>
-            <button onclick="lockDoor()" class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm transition">
-                <i class="fas fa-lock mr-1"></i> ล็อก
-            </button>
+
+        <div class="btn-row">
+            <button class="btn primary sm" onclick="dashUnlock()"><?= ico('unlock', 14) ?> ปลดล็อก 8s</button>
+            <button class="btn sm" onclick="dashLock()"><?= ico('lock', 14) ?> ล็อก</button>
+        </div>
+
+        <div class="sys-list" style="margin-top:14px;">
+            <div class="item" id="sysFaceServer"><?= ico('server', 16) ?><span class="lbl">Face Server</span><span class="state">…</span></div>
+            <div class="item" id="sysEsp32"><?= ico('chip', 16) ?><span class="lbl">ESP32</span><span class="state">…</span></div>
+            <div class="item" id="sysCamOut"><?= ico('camera', 16) ?><span class="lbl">กล้องนอก</span><span class="state">…</span></div>
+            <div class="item" id="sysCamIn"><?= ico('camera', 16) ?><span class="lbl">กล้องใน</span><span class="state">…</span></div>
         </div>
     </div>
 </div>
 
-<!-- Hardware Health Monitor -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-    <!-- Raspberry Pi Monitor (2 cols) -->
-    <div class="lg:col-span-2 glass rounded-2xl p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="font-medium flex items-center gap-2">
-                <i class="fas fa-microchip text-green-400"></i> Raspberry Pi
-            </h3>
-            <div class="flex items-center gap-3">
-                <span class="text-xs text-gray-500" id="piUptime">-</span>
-                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400" id="piStatusBadge">OFFLINE</span>
+<!-- Row 3: Live cameras + recent activity -->
+<div class="grid dash section">
+    <div class="card flush">
+        <div class="card-head">
+            <div>
+                <div class="title">กล้องสด</div>
+                <div class="sub">snapshot ทุก 5 วินาที</div>
+            </div>
+            <div class="actions">
+                <a href="cameras.php" class="btn sm ghost">ดูเต็มจอ <?= ico('chev-r', 12) ?></a>
             </div>
         </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <!-- CPU Temperature -->
-            <div class="text-center">
-                <div class="relative w-24 h-24 mx-auto mb-2">
-                    <svg class="w-24 h-24 -rotate-90" viewBox="0 0 120 120">
-                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
-                        <circle id="tempRing" cx="60" cy="60" r="52" fill="none" stroke="#ef4444" stroke-width="8"
-                                stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
-                    </svg>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                        <span class="text-xl font-bold" id="piTemp">-</span>
-                        <span class="text-[10px] text-gray-400">°C</span>
-                    </div>
-                </div>
-                <p class="text-xs text-gray-400"><i class="fas fa-temperature-half text-red-400 mr-1"></i>อุณหภูมิ</p>
-            </div>
-
-            <!-- CPU Usage -->
-            <div class="text-center">
-                <div class="relative w-24 h-24 mx-auto mb-2">
-                    <svg class="w-24 h-24 -rotate-90" viewBox="0 0 120 120">
-                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
-                        <circle id="cpuRing" cx="60" cy="60" r="52" fill="none" stroke="#3b82f6" stroke-width="8"
-                                stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
-                    </svg>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                        <span class="text-xl font-bold" id="piCpu">-</span>
-                        <span class="text-[10px] text-gray-400">%</span>
-                    </div>
-                </div>
-                <p class="text-xs text-gray-400"><i class="fas fa-gauge-high text-blue-400 mr-1"></i>CPU</p>
-            </div>
-
-            <!-- RAM Usage -->
-            <div class="text-center">
-                <div class="relative w-24 h-24 mx-auto mb-2">
-                    <svg class="w-24 h-24 -rotate-90" viewBox="0 0 120 120">
-                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
-                        <circle id="ramRing" cx="60" cy="60" r="52" fill="none" stroke="#a855f7" stroke-width="8"
-                                stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
-                    </svg>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                        <span class="text-xl font-bold" id="piRam">-</span>
-                        <span class="text-[10px] text-gray-400">%</span>
-                    </div>
-                </div>
-                <p class="text-xs text-gray-400"><i class="fas fa-memory text-purple-400 mr-1"></i>RAM</p>
-                <p class="text-[10px] text-gray-500 mt-0.5" id="piRamDetail">-</p>
-            </div>
-
-            <!-- Disk Usage -->
-            <div class="text-center">
-                <div class="relative w-24 h-24 mx-auto mb-2">
-                    <svg class="w-24 h-24 -rotate-90" viewBox="0 0 120 120">
-                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
-                        <circle id="diskRing" cx="60" cy="60" r="52" fill="none" stroke="#f59e0b" stroke-width="8"
-                                stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
-                    </svg>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                        <span class="text-xl font-bold" id="piDisk">-</span>
-                        <span class="text-[10px] text-gray-400">%</span>
-                    </div>
-                </div>
-                <p class="text-xs text-gray-400"><i class="fas fa-hard-drive text-yellow-400 mr-1"></i>Disk</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- ESP32 Monitor (1 col) -->
-    <div class="glass rounded-2xl p-6">
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="font-medium flex items-center gap-2">
-                <i class="fas fa-wifi text-cyan-400"></i> ESP32
-            </h3>
-            <span class="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400" id="espStatusBadge">OFFLINE</span>
-        </div>
-        <div class="space-y-4">
-            <!-- WiFi Signal Gauge -->
-            <div class="text-center">
-                <div class="relative w-24 h-24 mx-auto mb-2">
-                    <svg class="w-24 h-24 -rotate-90" viewBox="0 0 120 120">
-                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
-                        <circle id="wifiRing" cx="60" cy="60" r="52" fill="none" stroke="#06b6d4" stroke-width="8"
-                                stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
-                    </svg>
-                    <div class="absolute inset-0 flex flex-col items-center justify-center">
-                        <span class="text-xl font-bold" id="espRssi">-</span>
-                        <span class="text-[10px] text-gray-400">dBm</span>
-                    </div>
-                </div>
-                <p class="text-xs text-gray-400"><i class="fas fa-signal text-cyan-400 mr-1"></i>WiFi Signal</p>
-            </div>
-
-            <!-- ESP32 Info -->
-            <div class="space-y-2 text-sm">
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-400"><i class="fas fa-door-closed mr-2 w-4 text-center"></i>ประตู</span>
-                    <span id="espDoor" class="text-gray-300">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-400"><i class="fas fa-clock mr-2 w-4 text-center"></i>Uptime</span>
-                    <span id="espUptime" class="text-gray-300">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-400"><i class="fas fa-network-wired mr-2 w-4 text-center"></i>IP</span>
-                    <span id="espIp" class="text-gray-300">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-400"><i class="fas fa-eye mr-2 w-4 text-center"></i>PIR นอก</span>
-                    <span id="espPirOut" class="text-gray-300">-</span>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-400"><i class="fas fa-eye mr-2 w-4 text-center"></i>PIR ใน</span>
-                    <span id="espPirIn" class="text-gray-300">-</span>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Recent Logs -->
-<div class="glass rounded-2xl p-6">
-    <div class="flex justify-between items-center mb-4">
-        <h3 class="font-medium flex items-center gap-2">
-            <i class="fas fa-clock-rotate-left text-blue-400"></i> ประวัติล่าสุด
-        </h3>
-        <a href="logs.php" class="text-blue-400 text-sm hover:underline">ดูทั้งหมด &rarr;</a>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-            <thead>
-                <tr class="text-gray-400 border-b border-white/10">
-                    <th class="text-left py-3 px-2">เวลา</th>
-                    <th class="text-left py-3 px-2">พนักงาน</th>
-                    <th class="text-left py-3 px-2">ทิศทาง</th>
-                    <th class="text-left py-3 px-2">ความมั่นใจ</th>
-                    <th class="text-left py-3 px-2">สถานะ</th>
-                    <th class="text-center py-3 px-2">รูป</th>
-                </tr>
-            </thead>
-            <tbody id="recentLogs">
-                <?php if (empty($recentLogs)): ?>
-                <tr><td colspan="6" class="text-center text-gray-500 py-8">ไม่มีข้อมูล</td></tr>
-                <?php else: ?>
-                <?php foreach ($recentLogs as $log): ?>
-                <tr class="border-b border-white/5 hover:bg-white/5">
-                    <td class="py-3 px-2 text-gray-300"><?= date('H:i:s', strtotime($log['created_at'])) ?></td>
-                    <td class="py-3 px-2"><?= $log['first_name'] ? htmlspecialchars($log['first_name']) . ' ' . htmlspecialchars($log['last_name']) : '<span class="text-red-400">ไม่รู้จัก</span>' ?></td>
-                    <td class="py-3 px-2">
-                        <?php if ($log['direction'] === 'IN'): ?>
-                        <span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs">เข้า</span>
-                        <?php else: ?>
-                        <span class="bg-blue-500/20 text-blue-400 px-2 py-1 rounded text-xs">ออก</span>
-                        <?php endif; ?>
-                    </td>
-                    <td class="py-3 px-2">
-                        <?php $conf = floatval($log['confidence'] ?? 0); ?>
-                        <div class="flex items-center gap-2">
-                            <div class="w-16 bg-gray-700 rounded-full h-1.5">
-                                <div class="h-1.5 rounded-full <?= $conf > 70 ? 'bg-green-400' : ($conf > 40 ? 'bg-yellow-400' : 'bg-red-400') ?>"
-                                     style="width: <?= $conf ?>%"></div>
+        <div class="card-body">
+            <div class="grid cams">
+                <!-- Camera Outside -->
+                <div>
+                    <div class="cam" id="camOutCard">
+                        <img id="streamOutside" alt="Camera Outside" style="display:none">
+                        <div class="cam-feed" id="streamOutPlaceholder">CAMERA — OUTSIDE</div>
+                        <div class="cam-overlay">
+                            <div class="row">
+                                <span class="cam-chip" id="camOutChip"><span class="rec"></span><span id="camOutChipText">…</span></span>
+                                <span class="cam-chip" id="camOutMeta">—</span>
                             </div>
-                            <span class="text-xs text-gray-400"><?= $conf ?>%</span>
+                            <div class="row">
+                                <span class="cam-chip" id="camOutTitle">กล้องด้านนอก</span>
+                                <span class="cam-chip" id="camOutTime">—</span>
+                            </div>
                         </div>
-                    </td>
-                    <td class="py-3 px-2">
-                        <?php if ($log['is_authorized']): ?>
-                        <span class="text-green-400"><i class="fas fa-check-circle"></i></span>
-                        <?php else: ?>
-                        <span class="text-red-400"><i class="fas fa-times-circle"></i></span>
-                        <?php endif; ?>
-                    </td>
-                    <td class="py-3 px-2 text-center">
-                        <?php if (!empty($log['snapshot_path'])): ?>
-                        <?php
-                            $snapPath = $log['snapshot_path'];
-                            $snapUrl = strpos($snapPath, '/') !== false ? $snapPath : '';
-                        ?>
-                        <a href="<?= $snapUrl ?: '#' ?>" target="_blank" class="text-indigo-400 hover:text-indigo-300 transition" title="ดูรูปถ่าย">
-                            <i class="fas fa-image"></i>
-                        </a>
-                        <?php else: ?>
-                        <span class="text-gray-600">-</span>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
+                    </div>
+                </div>
+                <!-- Camera Inside -->
+                <div>
+                    <div class="cam" id="camInCard">
+                        <img id="streamInside" alt="Camera Inside" style="display:none">
+                        <div class="cam-feed" id="streamInPlaceholder">CAMERA — INSIDE</div>
+                        <div class="cam-overlay">
+                            <div class="row">
+                                <span class="cam-chip" id="camInChip"><span class="rec"></span><span id="camInChipText">…</span></span>
+                                <span class="cam-chip" id="camInMeta">—</span>
+                            </div>
+                            <div class="row">
+                                <span class="cam-chip" id="camInTitle">กล้องด้านใน</span>
+                                <span class="cam-chip" id="camInTime">—</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card flush">
+        <div class="card-head">
+            <div>
+                <div class="title">ประวัติล่าสุด</div>
+                <div class="sub">8 รายการล่าสุด</div>
+            </div>
+            <div class="actions"><a href="logs.php" class="btn sm ghost">ดูทั้งหมด <?= ico('chev-r', 12) ?></a></div>
+        </div>
+        <div class="activity">
+            <?php if (empty($recentLogs)): ?>
+                <div class="empty">ยังไม่มีกิจกรรม</div>
+            <?php else: foreach ($recentLogs as $log):
+                $name = $log['first_name']
+                    ? htmlspecialchars($log['first_name'] . ' ' . $log['last_name'])
+                    : 'ไม่รู้จัก';
+                $isUnknown = !$log['first_name'];
+                $confidence = (float) ($log['confidence'] ?? 0);
+                $confClass = $confidence > 70 ? '' : ($confidence > 40 ? 'warn' : 'danger');
+                $dir = $log['direction'] === 'IN' ? 'เข้าห้อง' : 'ออกห้อง';
+                $time = date('H:i:s', strtotime($log['created_at']));
+                $initials = $isUnknown ? '?' : mb_strtoupper(mb_substr($log['first_name'], 0, 1));
+                ?>
+                <div class="activity-row">
+                    <div class="av"><div class="avatar" <?= $isUnknown ? 'style="background:var(--danger-soft); color:var(--danger);"' : '' ?>><?= htmlspecialchars($initials) ?></div></div>
+                    <div class="body">
+                        <div class="top">
+                            <span class="name <?= $isUnknown ? 'text-danger' : '' ?>"><?= $name ?></span>
+                            <span class="verb"><?= htmlspecialchars($dir) ?></span>
+                        </div>
+                        <div class="meta">
+                            <span><?= htmlspecialchars($log['emp_code'] ?? '-') ?></span>
+                            <span>·</span>
+                            <span><?= $log['camera_id'] == 1 ? 'cam-out' : 'cam-in' ?></span>
+                        </div>
+                    </div>
+                    <div class="conf-bar <?= $confClass ?>"><div style="width: <?= max(2, min(100, $confidence)) ?>%"></div></div>
+                    <span class="ts"><?= $time ?></span>
+                </div>
+            <?php endforeach; endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- Row 4: Hardware health -->
+<div class="grid health section">
+    <div class="card flush">
+        <div class="card-head">
+            <div>
+                <div class="title">Raspberry Pi</div>
+                <div class="sub" id="piUptime">uptime: —</div>
+            </div>
+            <div class="actions"><span class="badge" id="piStatusBadge">…</span></div>
+        </div>
+        <div class="card-body">
+            <div class="gauge-grid">
+                <div class="gauge-cell">
+                    <div class="dial">
+                        <svg width="84" height="84" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                            <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" stroke-width="8"/>
+                            <circle id="tempRing" cx="60" cy="60" r="52" fill="none" stroke="var(--danger)" stroke-width="8" stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
+                        </svg>
+                        <div class="num"><span id="piTemp">—</span><small>°C</small></div>
+                    </div>
+                    <div class="gauge-label">อุณหภูมิ</div>
+                </div>
+                <div class="gauge-cell">
+                    <div class="dial">
+                        <svg width="84" height="84" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                            <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" stroke-width="8"/>
+                            <circle id="cpuRing" cx="60" cy="60" r="52" fill="none" stroke="var(--accent)" stroke-width="8" stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
+                        </svg>
+                        <div class="num"><span id="piCpu">—</span><small>%</small></div>
+                    </div>
+                    <div class="gauge-label">CPU</div>
+                </div>
+                <div class="gauge-cell">
+                    <div class="dial">
+                        <svg width="84" height="84" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                            <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" stroke-width="8"/>
+                            <circle id="ramRing" cx="60" cy="60" r="52" fill="none" stroke="var(--info)" stroke-width="8" stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
+                        </svg>
+                        <div class="num"><span id="piRam">—</span><small>%</small></div>
+                    </div>
+                    <div class="gauge-label">RAM</div>
+                </div>
+                <div class="gauge-cell">
+                    <div class="dial">
+                        <svg width="84" height="84" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                            <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" stroke-width="8"/>
+                            <circle id="diskRing" cx="60" cy="60" r="52" fill="none" stroke="var(--warn)" stroke-width="8" stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
+                        </svg>
+                        <div class="num"><span id="piDisk">—</span><small>%</small></div>
+                    </div>
+                    <div class="gauge-label">Disk</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card flush">
+        <div class="card-head">
+            <div>
+                <div class="title">ESP32</div>
+                <div class="sub">Door controller</div>
+            </div>
+            <div class="actions"><span class="badge" id="espStatusBadge">…</span></div>
+        </div>
+        <div class="card-body">
+            <div class="gauge" style="margin-bottom: 12px;">
+                <div class="dial">
+                    <svg width="84" height="84" viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" stroke-width="8"/>
+                        <circle id="wifiRing" cx="60" cy="60" r="52" fill="none" stroke="var(--info)" stroke-width="8" stroke-dasharray="327" stroke-dashoffset="327" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease"/>
+                    </svg>
+                    <div class="num"><span id="espRssi">—</span><small>dBm</small></div>
+                </div>
+                <div class="info">
+                    <div class="lbl">WiFi signal</div>
+                    <div class="sub" id="espIp">—</div>
+                </div>
+            </div>
+            <div class="metric-row"><div class="lbl"><?= ico('door', 14) ?> ประตู</div><div class="val" id="espDoor">—</div></div>
+            <div class="metric-row"><div class="lbl"><?= ico('clock', 14) ?> Uptime</div><div class="val" id="espUptime">—</div></div>
+            <div class="metric-row"><div class="lbl"><?= ico('eye', 14) ?> PIR นอก</div><div class="val" id="espPirOut">—</div></div>
+            <div class="metric-row"><div class="lbl"><?= ico('eye', 14) ?> PIR ใน</div><div class="val" id="espPirIn">—</div></div>
+        </div>
     </div>
 </div>
 
 <script>
 // ============================================================
-// Dashboard Logic (ใช้ PHP render ข้อมูลหลัก, JS เฉพาะ snapshot + door + clock)
+// State
 // ============================================================
-
-// Camera config state
 let _camConfig = { outside: null, inside: null };
 
-// ดึง camera config จาก face_server แล้วอัพเดท UI
-async function fetchCameraConfig() {
-    try {
-        const data = await fetchAPI(FACE_SERVER + '/api/status');
-        if (!data) return;
-
-        const co = data.camera_outside;
-        const ci = data.camera_inside;
-        _camConfig.outside = co;
-        _camConfig.inside = ci;
-
-        // อัพเดทชื่อกล้อง + สถานะในหัวการ์ด
-        updateCamCard('outside', co, 'camOutTitle', 'camOutDot', 'camOutStatus', 'streamOutside', 'streamOutPlaceholder');
-        updateCamCard('inside', ci, 'camInTitle', 'camInDot', 'camInStatus', 'streamInside', 'streamInPlaceholder');
-    } catch {}
-}
-
-function updateCamCard(side, cfg, titleId, dotId, statusId, imgId, placeholderId) {
-    const titleEl = document.getElementById(titleId);
-    const dotEl = document.getElementById(dotId);
-    const statusEl = document.getElementById(statusId);
-    const imgEl = document.getElementById(imgId);
-    const phEl = document.getElementById(placeholderId);
-
-    const label = side === 'outside' ? 'ด้านนอก' : 'ด้านใน';
-
-    // กล้องไม่ได้กำหนด (ID = -1)
-    if (!cfg || cfg.id < 0) {
-        titleEl.textContent = 'กล้อง' + label;
-        dotEl.className = 'w-2 h-2 bg-yellow-400 rounded-full';
-        statusEl.textContent = 'ไม่ได้กำหนด';
-        statusEl.className = 'text-xs text-yellow-400';
-        imgEl.style.display = 'none';
-        phEl.style.display = '';
-        phEl.querySelector('p').innerHTML = 'ยังไม่ได้กำหนดกล้อง<br><a href="settings.php" class="text-blue-400 underline text-xs">ไปตั้งค่า</a>';
-        phEl.querySelector('i').className = 'fas fa-camera-rotate text-3xl mb-2';
-        setDeviceOnline('statusCam' + (side === 'outside' ? 'Out' : 'In'), false);
-        return;
-    }
-
-    // กล้องกำหนดแล้ว — แสดงชื่ออุปกรณ์
-    const devName = cfg.device_name || 'video' + cfg.id;
-    titleEl.textContent = 'กล้อง' + label + ' (' + devName + ')';
-
-    if (cfg.active && cfg.has_frame) {
-        // กล้อง active มี frame → โหลด snapshot
-        loadSnapshot(side, imgId, placeholderId, dotId, statusId);
-    } else {
-        // กล้อง assigned แต่ยังไม่มี frame
-        dotEl.className = 'w-2 h-2 bg-red-400 rounded-full';
-        statusEl.textContent = 'OFFLINE';
-        statusEl.className = 'text-xs text-red-400';
-        imgEl.style.display = 'none';
-        phEl.style.display = '';
-        phEl.querySelector('p').textContent = 'กล้องออฟไลน์';
-        setDeviceOnline('statusCam' + (side === 'outside' ? 'Out' : 'In'), false);
-    }
-}
-
-// Camera snapshots (refresh ทุก 5 วินาที) — ใช้ Image tag (ไม่ติด CORS)
-function loadSnapshot(camId, imgId, placeholderId, dotId, statusId) {
-    const img = new Image();
-    const timeout = setTimeout(() => {
-        img.src = '';
-        setCamOffline(imgId, placeholderId, dotId, statusId);
-    }, 5000);
-
-    img.onload = () => {
-        clearTimeout(timeout);
-        document.getElementById(imgId).src = img.src;
-        document.getElementById(imgId).style.display = '';
-        document.getElementById(placeholderId).style.display = 'none';
-        document.getElementById(dotId).className = 'w-2 h-2 bg-green-400 pulse-dot rounded-full';
-        const st = document.getElementById(statusId);
-        st.textContent = 'ONLINE';
-        st.className = 'text-xs text-green-400';
-        if (camId === 'outside') setDeviceOnline('statusCamOut', true);
-        if (camId === 'inside') setDeviceOnline('statusCamIn', true);
-    };
-    img.onerror = () => {
-        clearTimeout(timeout);
-        setCamOffline(imgId, placeholderId, dotId, statusId);
-        if (camId === 'outside') setDeviceOnline('statusCamOut', false);
-        if (camId === 'inside') setDeviceOnline('statusCamIn', false);
-    };
-    img.src = FACE_SERVER + '/api/snapshot/' + camId + '?t=' + Date.now();
-}
-
-function setCamOffline(imgId, placeholderId, dotId, statusId) {
-    document.getElementById(imgId).style.display = 'none';
-    document.getElementById(placeholderId).style.display = '';
-    document.getElementById(placeholderId).querySelector('p').textContent = 'กล้องออฟไลน์';
-    document.getElementById(dotId).className = 'w-2 h-2 bg-red-400 rounded-full';
-    const st = document.getElementById(statusId);
-    st.textContent = 'OFFLINE';
-    st.className = 'text-xs text-red-400';
-}
-
-function refreshDashboardSnapshots() {
-    // โหลด snapshot เฉพาะกล้องที่กำหนดไว้แล้ว (ID >= 0)
-    if (_camConfig.outside && _camConfig.outside.id >= 0) {
-        loadSnapshot('outside', 'streamOutside', 'streamOutPlaceholder', 'camOutDot', 'camOutStatus');
-    }
-    if (_camConfig.inside && _camConfig.inside.id >= 0) {
-        loadSnapshot('inside', 'streamInside', 'streamInPlaceholder', 'camInDot', 'camInStatus');
-    }
-}
-document.addEventListener('DOMContentLoaded', () => {
-    fetchCameraConfig();
-    setTimeout(refreshDashboardSnapshots, 2000); // รอ config โหลดก่อน
-    setInterval(refreshDashboardSnapshots, 5000);
-});
-
-// Door controls
-async function unlockDoor() {
-    const data = await postAPI(FACE_SERVER + '/api/door/unlock');
-    if (data?.success) {
-        document.getElementById('doorIcon').className = 'w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-green-500/20';
-        document.getElementById('doorIconInner').className = 'fas fa-lock-open text-4xl text-green-400';
-        document.getElementById('doorStatusText').textContent = 'ประตูเปิด';
-        document.getElementById('doorStatusText').className = 'text-xl font-bold text-green-400';
-    }
-}
-
-async function lockDoor() {
-    const data = await postAPI(FACE_SERVER + '/api/door/lock');
-    if (data?.success) {
-        document.getElementById('doorIcon').className = 'w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-red-500/20';
-        document.getElementById('doorIconInner').className = 'fas fa-lock text-4xl text-red-400';
-        document.getElementById('doorStatusText').textContent = 'ประตูล็อก';
-        document.getElementById('doorStatusText').className = 'text-xl font-bold text-red-400';
-    }
-}
-
-// Clock
-function updateClock() {
-    document.getElementById('currentTime').textContent =
-        new Date().toLocaleString('th-TH', { dateStyle: 'long', timeStyle: 'medium' });
-}
 // ============================================================
-// Hardware Health Monitor (Pi + ESP32)
+// Gauge helpers (port from old dashboard, same math)
 // ============================================================
-const CIRC = 327; // 2 * PI * 52
-
+const CIRC = 327; // 2π * 52
 function setRing(id, percent, color) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -564,14 +358,11 @@ function setRing(id, percent, color) {
     el.setAttribute('stroke-dashoffset', offset);
     if (color) el.setAttribute('stroke', color);
 }
-
 function colorByPercent(val, thresholds) {
-    // thresholds: [green, yellow, red] e.g. [50, 75] => <50 green, 50-75 yellow, >75 red
-    if (val < thresholds[0]) return '#22c55e';
-    if (val < thresholds[1]) return '#f59e0b';
-    return '#ef4444';
+    if (val < thresholds[0]) return 'var(--ok)';
+    if (val < thresholds[1]) return 'var(--warn)';
+    return 'var(--danger)';
 }
-
 function formatUptime(seconds) {
     const d = Math.floor(seconds / 86400);
     const h = Math.floor((seconds % 86400) / 3600);
@@ -581,149 +372,275 @@ function formatUptime(seconds) {
     return m + ' นาที';
 }
 
-// Fetch Pi health
+// ============================================================
+// Camera snapshots (เหมือนเดิม — refresh ทุก 5 วินาที)
+// ============================================================
+async function fetchCameraConfig() {
+    try {
+        const data = await fetchAPI(FACE_SERVER + '/api/status');
+        if (!data) return;
+        _camConfig.outside = data.camera_outside;
+        _camConfig.inside  = data.camera_inside;
+        updateCamCard('outside', data.camera_outside, 'camOutTitle', 'camOutChip', 'camOutChipText', 'streamOutside', 'streamOutPlaceholder', 'sysCamOut', 'camOutMeta');
+        updateCamCard('inside',  data.camera_inside,  'camInTitle',  'camInChip',  'camInChipText',  'streamInside',  'streamInPlaceholder', 'sysCamIn',  'camInMeta');
+    } catch {}
+}
+
+function setSysItem(id, status) {
+    // status: 'online' | 'offline' | 'warn' | 'unknown'
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('online', 'offline', 'warn', 'unknown');
+    el.classList.add(status);
+    const stateText = { online: 'ONLINE', offline: 'OFFLINE', warn: 'WARN', unknown: '—' }[status] || '—';
+    el.querySelector('.state').textContent = stateText;
+}
+
+function updateCamCard(side, cfg, titleId, chipId, chipTextId, imgId, phId, sysId, metaId) {
+    const label = side === 'outside' ? 'ด้านนอก' : 'ด้านใน';
+    const titleEl = document.getElementById(titleId);
+    const chipEl  = document.getElementById(chipId);
+    const chipTxt = document.getElementById(chipTextId);
+    const imgEl   = document.getElementById(imgId);
+    const phEl    = document.getElementById(phId);
+    const metaEl  = document.getElementById(metaId);
+
+    if (!cfg || cfg.id < 0) {
+        titleEl.textContent = 'กล้อง' + label;
+        chipEl.classList.add('warn'); chipEl.classList.remove('ok');
+        chipTxt.textContent = 'ไม่ได้กำหนด';
+        imgEl.style.display = 'none'; phEl.style.display = '';
+        phEl.textContent = 'NO CAMERA ASSIGNED';
+        metaEl.textContent = '—';
+        setSysItem(sysId, 'warn');
+        return;
+    }
+    const devName = cfg.device_name || ('video' + cfg.id);
+    titleEl.textContent = 'กล้อง' + label + ' · ' + devName;
+    metaEl.textContent = (cfg.width || '?') + '×' + (cfg.height || '?') + ' · ' + (cfg.fps || '15') + 'fps';
+
+    if (cfg.active && cfg.has_frame) {
+        chipEl.classList.add('ok'); chipEl.classList.remove('warn');
+        chipTxt.textContent = 'LIVE';
+        loadSnapshot(side, imgId, phId, chipId, chipTextId, sysId);
+    } else {
+        chipEl.classList.remove('ok'); chipEl.classList.remove('warn');
+        chipTxt.textContent = 'OFFLINE';
+        imgEl.style.display = 'none'; phEl.style.display = '';
+        phEl.textContent = 'CAMERA OFFLINE';
+        setSysItem(sysId, 'offline');
+    }
+}
+
+function loadSnapshot(camId, imgId, phId, chipId, chipTextId, sysId) {
+    const img = new Image();
+    const timeout = setTimeout(() => { img.src = ''; setCamOffline(imgId, phId, chipId, chipTextId, sysId); }, 5000);
+    img.onload = () => {
+        clearTimeout(timeout);
+        const el = document.getElementById(imgId);
+        el.src = img.src;
+        el.style.display = '';
+        document.getElementById(phId).style.display = 'none';
+        const chip = document.getElementById(chipId);
+        chip.classList.add('ok');
+        document.getElementById(chipTextId).textContent = 'LIVE';
+        setSysItem(sysId, 'online');
+        const timeId = camId === 'outside' ? 'camOutTime' : 'camInTime';
+        document.getElementById(timeId).textContent = new Date().toLocaleTimeString('th-TH');
+    };
+    img.onerror = () => { clearTimeout(timeout); setCamOffline(imgId, phId, chipId, chipTextId, sysId); };
+    img.src = FACE_SERVER + '/api/snapshot/' + camId + '?t=' + Date.now();
+}
+function setCamOffline(imgId, phId, chipId, chipTextId, sysId) {
+    document.getElementById(imgId).style.display = 'none';
+    document.getElementById(phId).style.display = '';
+    document.getElementById(phId).textContent = 'CAMERA OFFLINE';
+    document.getElementById(chipId).classList.remove('ok');
+    document.getElementById(chipTextId).textContent = 'OFFLINE';
+    setSysItem(sysId, 'offline');
+}
+function refreshDashboardSnapshots() {
+    if (_camConfig.outside && _camConfig.outside.id >= 0) loadSnapshot('outside', 'streamOutside', 'streamOutPlaceholder', 'camOutChip', 'camOutChipText', 'sysCamOut');
+    if (_camConfig.inside  && _camConfig.inside.id  >= 0) loadSnapshot('inside',  'streamInside',  'streamInPlaceholder',  'camInChip',  'camInChipText',  'sysCamIn');
+}
+
+// ============================================================
+// Door controls
+// ============================================================
+async function dashUnlock() {
+    const res = await postAPI(FACE_SERVER + '/api/door/unlock');
+    if (res?.success) {
+        applyDoorState('unlocked');
+        showToast('ปลดล็อกประตูแล้ว · auto-lock ใน 8s', 'success');
+    } else {
+        showToast('สั่งปลดล็อกไม่สำเร็จ', 'error');
+    }
+}
+async function dashLock() {
+    const res = await postAPI(FACE_SERVER + '/api/door/lock');
+    if (res?.success) {
+        applyDoorState('locked');
+        showToast('ล็อกประตูแล้ว', 'success');
+    } else {
+        showToast('สั่งล็อกไม่สำเร็จ', 'error');
+    }
+}
+function applyDoorState(state) {
+    const card = document.getElementById('doorState');
+    const text = document.getElementById('doorStateText');
+    const icon = document.getElementById('doorStateIcon');
+    if (state === 'unlocked') {
+        card.classList.add('unlocked'); card.classList.remove('locked');
+        text.textContent = 'ประตูปลดล็อก';
+        icon.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7-2.7"/></svg>`;
+    } else {
+        card.classList.add('locked'); card.classList.remove('unlocked');
+        text.textContent = 'ประตูล็อก';
+        icon.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`;
+    }
+}
+
+// ============================================================
+// Pi health
+// ============================================================
 async function fetchPiHealth() {
     try {
-        const resp = await fetch('api/pi_health.php', {signal: AbortSignal.timeout(5000)});
+        const resp = await fetch('api/pi_health.php', { signal: AbortSignal.timeout(5000) });
         if (!resp.ok) throw new Error();
         const d = await resp.json();
 
-        // Temperature ring (max 85°C scale)
+        // Temperature (max 85°C scale)
         const temp = d.cpu_temp ?? 0;
         const tempPct = Math.min(temp / 85 * 100, 100);
-        document.getElementById('piTemp').textContent = temp ? temp.toFixed(1) : '-';
+        document.getElementById('piTemp').textContent = temp ? temp.toFixed(1) : '—';
         setRing('tempRing', tempPct, colorByPercent(temp, [55, 70]));
 
-        // CPU ring
         document.getElementById('piCpu').textContent = d.cpu_percent.toFixed(0);
         setRing('cpuRing', d.cpu_percent, colorByPercent(d.cpu_percent, [50, 80]));
 
-        // RAM ring
         document.getElementById('piRam').textContent = d.ram_percent.toFixed(0);
         setRing('ramRing', d.ram_percent, colorByPercent(d.ram_percent, [60, 85]));
-        document.getElementById('piRamDetail').textContent = d.ram_used_mb + ' / ' + d.ram_total_mb + ' MB';
 
-        // Disk ring
         document.getElementById('piDisk').textContent = d.disk_percent.toFixed(0);
         setRing('diskRing', d.disk_percent, colorByPercent(d.disk_percent, [70, 90]));
 
-        // Uptime
-        document.getElementById('piUptime').textContent = 'Uptime: ' + formatUptime(d.uptime);
+        document.getElementById('piUptime').textContent = 'uptime: ' + formatUptime(d.uptime);
 
-        // Status badge
         const badge = document.getElementById('piStatusBadge');
         badge.textContent = 'ONLINE';
-        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400';
-
-        // Update door card: Face Server = online (Pi is responding)
-        setDeviceOnline('statusFaceServer', true);
+        badge.className = 'badge ok';
+        setSysItem('sysFaceServer', 'online');
     } catch {
         const badge = document.getElementById('piStatusBadge');
         badge.textContent = 'OFFLINE';
-        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400';
-        setDeviceOnline('statusFaceServer', false);
+        badge.className = 'badge danger';
+        setSysItem('sysFaceServer', 'offline');
     }
 }
 
-// Helper: update device status in door card
-function setDeviceOnline(id, online) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (online) {
-        el.innerHTML = '<span class="w-2 h-2 bg-green-400 pulse-dot rounded-full"></span><span class="text-green-400">Online</span>';
-    } else {
-        el.innerHTML = '<span class="w-2 h-2 bg-red-400 rounded-full"></span><span class="text-red-400">Offline</span>';
-    }
-}
-
-// Update door icon based on real status
-function updateDoorIcon(doorStatus) {
-    if (doorStatus === 'locked') {
-        document.getElementById('doorIcon').className = 'w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-red-500/20';
-        document.getElementById('doorIconInner').className = 'fas fa-lock text-4xl text-red-400';
-        document.getElementById('doorStatusText').textContent = 'ประตูล็อก';
-        document.getElementById('doorStatusText').className = 'text-xl font-bold text-red-400';
-    } else {
-        document.getElementById('doorIcon').className = 'w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 bg-green-500/20';
-        document.getElementById('doorIconInner').className = 'fas fa-lock-open text-4xl text-green-400';
-        document.getElementById('doorStatusText').textContent = 'ประตูเปิด';
-        document.getElementById('doorStatusText').className = 'text-xl font-bold text-green-400';
-    }
-}
-
-// Fetch ESP32 health
-let _espOnline = false;
+// ============================================================
+// ESP32 health
+// ============================================================
 async function fetchEspHealth() {
+    const badge = document.getElementById('espStatusBadge');
     try {
-        const resp = await fetch(FACE_SERVER + '/api/esp32/health', {signal: AbortSignal.timeout(5000)});
+        const resp = await fetch(FACE_SERVER + '/api/esp32/health', { signal: AbortSignal.timeout(5000) });
         if (!resp.ok) throw new Error();
         const d = await resp.json();
 
-        const badge = document.getElementById('espStatusBadge');
-        _espOnline = d.online;
-
         if (!d.online) {
-            badge.textContent = 'OFFLINE';
-            badge.className = 'text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400';
+            badge.textContent = 'OFFLINE'; badge.className = 'badge danger';
             setRing('wifiRing', 0);
-            setDeviceOnline('statusEsp32', false);
-            // PIR unknown when offline
-            document.getElementById('espPirOut').innerHTML = '<span class="text-gray-600">ไม่ทราบ</span>';
-            document.getElementById('espPirIn').innerHTML = '<span class="text-gray-600">ไม่ทราบ</span>';
+            setSysItem('sysEsp32', 'offline');
+            document.getElementById('espPirOut').innerHTML = '<span class="muted">—</span>';
+            document.getElementById('espPirIn').innerHTML  = '<span class="muted">—</span>';
             return;
         }
 
-        badge.textContent = 'ONLINE';
-        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400';
-        setDeviceOnline('statusEsp32', true);
+        badge.textContent = 'ONLINE'; badge.className = 'badge ok';
+        setSysItem('sysEsp32', 'online');
 
-        // WiFi signal ring (RSSI: -30 best, -90 worst)
         const rssi = d.rssi ?? -90;
         const wifiPct = Math.max(0, Math.min(100, (rssi + 90) / 60 * 100));
         document.getElementById('espRssi').textContent = rssi;
-        setRing('wifiRing', wifiPct, wifiPct > 60 ? '#22c55e' : wifiPct > 30 ? '#f59e0b' : '#ef4444');
+        setRing('wifiRing', wifiPct, wifiPct > 60 ? 'var(--ok)' : wifiPct > 30 ? 'var(--warn)' : 'var(--danger)');
 
-        // Door status — update both ESP32 card and door card
-        const doorEl = document.getElementById('espDoor');
-        if (d.door === 'locked') {
-            doorEl.innerHTML = '<span class="text-red-400"><i class="fas fa-lock mr-1"></i>ล็อก</span>';
-        } else {
-            doorEl.innerHTML = '<span class="text-green-400"><i class="fas fa-lock-open mr-1"></i>เปิด</span>';
-        }
-        updateDoorIcon(d.door);
+        // Door
+        applyDoorState(d.door === 'locked' ? 'locked' : 'unlocked');
+        document.getElementById('espDoor').textContent = d.door === 'locked' ? 'ล็อก' : 'เปิด';
+        document.getElementById('doorStateSub').textContent = 'ESP32 ' + (d.ip || '-');
 
-        // Uptime
         document.getElementById('espUptime').textContent = formatUptime(d.uptime_sec ?? 0);
+        document.getElementById('espIp').textContent = d.ip ?? '—';
 
-        // IP
-        document.getElementById('espIp').textContent = d.ip ?? '-';
-
-        // PIR sensors
         document.getElementById('espPirOut').innerHTML = d.pir_outside
-            ? '<span class="text-yellow-400"><i class="fas fa-circle text-[8px] mr-1"></i>ตรวจจับการเคลื่อนไหว</span>'
-            : '<span class="text-gray-500"><i class="fas fa-minus text-[8px] mr-1"></i>ไม่มีการเคลื่อนไหว</span>';
+            ? '<span class="text-warn">ตรวจจับ</span>'
+            : '<span class="muted">ปกติ</span>';
         document.getElementById('espPirIn').innerHTML = d.pir_inside
-            ? '<span class="text-yellow-400"><i class="fas fa-circle text-[8px] mr-1"></i>ตรวจจับการเคลื่อนไหว</span>'
-            : '<span class="text-gray-500"><i class="fas fa-minus text-[8px] mr-1"></i>ไม่มีการเคลื่อนไหว</span>';
+            ? '<span class="text-warn">ตรวจจับ</span>'
+            : '<span class="muted">ปกติ</span>';
     } catch {
-        const badge = document.getElementById('espStatusBadge');
-        badge.textContent = 'OFFLINE';
-        badge.className = 'text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400';
-        setDeviceOnline('statusEsp32', false);
+        badge.textContent = 'OFFLINE'; badge.className = 'badge danger';
+        setSysItem('sysEsp32', 'offline');
     }
 }
 
-// Poll both (รอ footer.php โหลด FACE_SERVER ก่อน)
+// ============================================================
+// Hourly activity chart (เข้า/ออก รายชั่วโมง วันนี้)
+// ============================================================
+async function loadHourlyChart() {
+    const chart = document.getElementById('hourlyChart');
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const res = await fetchAPI('api/access_logs.php?limit=500&page=1&date_from=' + today + '&date_to=' + today);
+        if (!res?.data) return;
+        const hoursIn = new Array(24).fill(0);
+        const hoursOut = new Array(24).fill(0);
+        res.data.forEach(log => {
+            const h = new Date(log.created_at).getHours();
+            if (log.is_authorized == 1 && log.direction === 'IN') hoursIn[h]++;
+            else if (log.is_authorized == 1 && log.direction === 'OUT') hoursOut[h]++;
+        });
+        const maxVal = Math.max(1, ...hoursIn, ...hoursOut);
+        const currentHour = new Date().getHours();
+        chart.innerHTML = '';
+        for (let h = 0; h < 24; h++) {
+            const inH  = (hoursIn[h] / maxVal) * 100;
+            const outH = (hoursOut[h] / maxVal) * 100;
+            const isCurrent = h === currentHour;
+            const dim = h > currentHour ? 'dim' : '';
+            chart.innerHTML += `
+                <div class="bar-col ${dim}">
+                    <div class="tip">${h.toString().padStart(2,'0')}:00 · เข้า ${hoursIn[h]} ออก ${hoursOut[h]}</div>
+                    ${outH > 0 ? `<div class="bar out" style="height:${outH}%"></div>` : ''}
+                    <div class="bar in ${isCurrent ? 'current' : ''}" style="height:${Math.max(2, inH)}%"></div>
+                </div>`;
+        }
+    } catch {
+        chart.innerHTML = '<div class="empty" style="width:100%;">โหลดกราฟไม่ได้</div>';
+    }
+}
+
+// ============================================================
+// Init + polling intervals (5s ตามเดิม)
+// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
+    fetchCameraConfig();
     fetchPiHealth();
     fetchEspHealth();
+    loadHourlyChart();
+    setTimeout(refreshDashboardSnapshots, 2000);
+    setInterval(refreshDashboardSnapshots, 5000);
+    setInterval(fetchCameraConfig, 15000);
     setInterval(fetchPiHealth, 5000);
     setInterval(fetchEspHealth, 5000);
-    updateClock();
-    setInterval(updateClock, 1000);
+    setInterval(loadHourlyChart, 60000);
 
-    // Auto-refresh page ทุก 60 วินาที
-    setTimeout(() => location.reload(), 60000);
+    // Export CSV — ใช้ logs endpoint ที่มีอยู่
+    document.getElementById('btnExport').addEventListener('click', () => {
+        const today = new Date().toISOString().split('T')[0];
+        window.location.href = 'api/access_logs.php?export=csv&date_from=' + today + '&date_to=' + today;
+    });
 });
 </script>
 
