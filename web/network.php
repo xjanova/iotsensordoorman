@@ -642,21 +642,27 @@ async function autofillWifiFromPi() {
     status.textContent = '';
     try {
         const r = await fetchAPI('api/wifi/from-pi.php');
-        if (r?.ok) {
-            if (r.ssid) {
-                document.getElementById('inputWifiSSID').value = r.ssid;
-            }
-            if (r.password) {
-                document.getElementById('inputWifiPass').value = r.password;
-                status.innerHTML = '<span style="color: var(--ok);">✓ ดึง SSID + password จาก Pi สำเร็จ — กดบันทึกแล้ว Download ได้เลย</span>';
-            } else {
-                status.innerHTML = '<span style="color: var(--warn);">⚠ ได้ SSID แล้ว แต่ Pi อ่าน password ไม่ได้ — กรุณากรอก password เอง</span>';
-            }
-        } else {
-            status.innerHTML = '<span style="color: var(--danger);">✘ Pi ตอบกลับไม่ได้ — ตรวจว่า Pi pair กับ web แล้วยัง</span>';
+
+        // เคส 1: ดึงได้ทั้ง SSID + password
+        if (r?.ssid && r?.password) {
+            document.getElementById('inputWifiSSID').value = r.ssid;
+            document.getElementById('inputWifiPass').value = r.password;
+            status.innerHTML = '<span style="color: var(--ok);">✓ ดึง SSID + password สำเร็จ — กดบันทึกแล้ว Download ได้เลย</span>';
+        }
+        // เคส 2: ได้ SSID แต่ password ไม่ได้ (sudoers/NetworkManager profile ไม่ตรง)
+        else if (r?.ssid) {
+            document.getElementById('inputWifiSSID').value = r.ssid;
+            status.innerHTML = '<span style="color: var(--warn);">⚠ ได้ SSID = <code>' + r.ssid + '</code> แล้ว แต่ Pi อ่าน password ไม่ได้ <span class="tiny muted">(Pi อาจเชื่อม Hotspot มือถือ หรือ sudoers ยังไม่ตั้ง — กรอก password เอง 1 ครั้ง ก็พอ)</span></span>';
+        }
+        // เคส 3: Pi ตอบกลับมา แต่หา SSID ไม่ได้ (Pi ใช้ ethernet หรือ iwgetid ไม่ทำงาน)
+        else if (r?.error) {
+            status.innerHTML = '<span style="color: var(--danger);">✘ ' + r.error + ' <span class="tiny muted">(face_server: ' + (r.face_server || '?') + ')</span></span>';
+        }
+        else {
+            status.innerHTML = '<span style="color: var(--warn);">⚠ Pi ไม่เห็น WiFi (Pi อาจเชื่อม Ethernet หรือ iwgetid ใช้ไม่ได้) — กรอก SSID + password เอง</span>';
         }
     } catch (e) {
-        status.innerHTML = '<span style="color: var(--danger);">✘ ' + e.message + '</span>';
+        status.innerHTML = '<span style="color: var(--danger);">✘ network error: ' + e.message + '</span>';
     }
     btn.textContent = 'ดึงจาก Pi';
 }
