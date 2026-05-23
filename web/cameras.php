@@ -91,7 +91,7 @@ body.fs-mode #fsBar { display: flex !important; }
 <div class="grid cams section">
     <!-- Camera Outside -->
     <div class="card flush">
-        <div class="card-head">
+        <div class="card-head" style="display: flex; align-items: center; justify-content: space-between;">
             <div class="row">
                 <span class="badge" id="cam1Badge">…</span>
                 <div>
@@ -99,6 +99,7 @@ body.fs-mode #fsBar { display: flex !important; }
                     <div class="sub" id="cam1Sub">ตรวจสอบ...</div>
                 </div>
             </div>
+            <button type="button" onclick="restartCamera('outside')" class="btn sm ghost" title="รีเฟรชกล้อง (release + reopen)"><?= ico('refresh', 12) ?></button>
         </div>
         <div style="padding: 0 14px 14px;">
             <div class="cam">
@@ -120,7 +121,7 @@ body.fs-mode #fsBar { display: flex !important; }
 
     <!-- Camera Inside -->
     <div class="card flush">
-        <div class="card-head">
+        <div class="card-head" style="display: flex; align-items: center; justify-content: space-between;">
             <div class="row">
                 <span class="badge" id="cam2Badge">…</span>
                 <div>
@@ -128,6 +129,7 @@ body.fs-mode #fsBar { display: flex !important; }
                     <div class="sub" id="cam2Sub">ตรวจสอบ...</div>
                 </div>
             </div>
+            <button type="button" onclick="restartCamera('inside')" class="btn sm ghost" title="รีเฟรชกล้อง (release + reopen)"><?= ico('refresh', 12) ?></button>
         </div>
         <div style="padding: 0 14px 14px;">
             <div class="cam">
@@ -479,6 +481,21 @@ function updateFsClock() {
 async function setCameraMode(mode) {
     const res = await postAPI(FACE_SERVER + '/api/camera/mode', { mode });
     if (res?.success) updateModeUI(mode);
+}
+
+async function restartCamera(which) {
+    const label = which === 'outside' ? 'นอก' : 'ใน';
+    showToast(`กำลังรีเฟรชกล้อง${label}...`, 'info');
+    try {
+        const r = await postAPI(FACE_SERVER + '/api/camera/restart', { camera: which });
+        if (r?.success) {
+            showToast(`รีเฟรชกล้อง${label}สำเร็จ — กำลังเปิดใหม่`, 'success');
+        } else {
+            showToast(r?.error || 'รีเฟรชไม่สำเร็จ', 'error');
+        }
+    } catch (e) {
+        showToast('Pi ไม่ตอบ: ' + e.message, 'error');
+    }
 }
 function updateModeUI(mode) {
     document.getElementById('btnModeAlways').classList.toggle('active', mode === 'always');

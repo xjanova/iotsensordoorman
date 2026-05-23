@@ -865,6 +865,25 @@ def api_camera_mode():
     return jsonify({"success": True, "mode": new_mode, "previous": old_mode})
 
 
+@app.route('/api/camera/restart', methods=['POST'])
+def api_camera_restart():
+    """รีเฟรชกล้อง — release cap → camera_thread outer loop จะเปิดใหม่"""
+    data = request.json or {}
+    which = data.get("camera", "").lower()
+    if which not in ("outside", "inside"):
+        return jsonify({"error": "camera ต้องเป็น 'outside' หรือ 'inside'"}), 400
+    cam_name = f"camera_{which}"
+    cap = _camera_captures.get(cam_name)
+    if cap is None:
+        return jsonify({"error": f"กล้อง {which} ไม่ได้เปิดอยู่"}), 404
+    try:
+        cap.release()
+        print(f"[Camera] {cam_name} restart requested via API")
+        return jsonify({"success": True, "camera": which, "message": "กำลังเปิดใหม่"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/door/unlock', methods=['POST'])
 def api_door_unlock():
     success = unlock_door()
