@@ -239,7 +239,10 @@ async function loadLogs() {
             ? '<span class="badge ok">เปิด</span>'
             : '<span class="badge danger">ล็อก</span>';
         const snap = log.snapshot_path
-            ? `<button class="btn sm ghost" onclick="showSnapshot('${esc(log.snapshot_path)}', '${esc(log.first_name || 'ไม่รู้จัก')}', '${formatDateTime(log.created_at)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> ดู</button>`
+            ? `<button class="btn sm ghost btn-snap"
+                       data-path="${esc(log.snapshot_path)}"
+                       data-name="${esc(log.first_name || 'ไม่รู้จัก')}"
+                       data-time="${esc(formatDateTime(log.created_at))}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> ดู</button>`
             : '<span class="muted">-</span>';
 
         return `<tr data-log-id="${log.id}">
@@ -372,7 +375,17 @@ async function deleteAll() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => loadLogs());
+document.addEventListener('DOMContentLoaded', () => {
+    loadLogs();
+    // Event delegation สำหรับปุ่ม snapshot — กัน XSS ที่อาจเกิดจาก inline onclick
+    const tbody = document.querySelector('tbody');
+    if (tbody) {
+        tbody.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-snap');
+            if (btn) showSnapshot(btn.dataset.path, btn.dataset.name, btn.dataset.time);
+        });
+    }
+});
 </script>
 
 <?php include 'includes/footer.php'; ?>

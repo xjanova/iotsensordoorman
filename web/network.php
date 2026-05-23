@@ -392,22 +392,37 @@ function togglePass() {
     inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
+// escape C-string literal — ใช้กับค่าที่ embed ใน const char*
+function escC(v) {
+    if (v == null) return '';
+    return String(v)
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t')
+        .replace(/[\x00-\x1f\x7f]/g, '');
+}
 function generateESP32Code() {
     const piIP = document.getElementById('inputPiIP').value || '192.168.1.121';
     const wifiSSID = document.getElementById('inputWifiSSID').value || 'YOUR_WIFI_SSID';
     const wifiPass = document.getElementById('inputWifiPass').value || 'YOUR_WIFI_PASSWORD';
+    // validate IP เพื่อกัน injection
+    const safePiIP = /^[0-9.]{7,15}$/.test(piIP) ? piIP : '192.168.1.121';
     const code = `/*
  * Bunny Door System - ESP32 Door Controller
  * Auto-generated: ${new Date().toLocaleString('th-TH')}
+ * หมายเหตุ: โค้ดนี้เป็นเวอร์ชัน minimal — สำหรับ auto-pair เต็มรูปแบบให้ใช้
+ *           esp32/door_controller/door_controller.ino จาก repo
  * Pin: Relay=GPIO4, LED=GPIO2, PIR_OUT=GPIO27, PIR_IN=GPIO26, Buzzer=GPIO33, BTN=GPIO13
  */
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
-const char* WIFI_SSID     = "${wifiSSID}";
-const char* WIFI_PASSWORD = "${wifiPass}";
-const char* SERVER_URL    = "http://${piIP}:5000";
+const char* WIFI_SSID     = "${escC(wifiSSID)}";
+const char* WIFI_PASSWORD = "${escC(wifiPass)}";
+const char* SERVER_URL    = "http://${safePiIP}:5000";
 
 #define PIN_PIR_OUTSIDE 27
 #define PIN_PIR_INSIDE  26

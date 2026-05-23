@@ -216,13 +216,16 @@ async function loadAlerts() {
         const sevText  = severityThai[alert.severity] || alert.severity;
         const tName    = typeThai[alert.alert_type] || alert.alert_type;
         const resolved = alert.is_resolved == 1;
-        const cam = alert.camera_id ? `<span>cam-${alert.camera_id == 1 ? 'out' : 'in'}</span>` : '';
+        const cam = (alert.camera_id == 1 || alert.camera_id == 2) ? `<span>cam-${alert.camera_id == 1 ? 'out' : 'in'}</span>` : '';
         const snapBtn = alert.snapshot_path
-            ? `<button class="btn sm" onclick="showSnapshot('${esc(alert.snapshot_path)}', '${esc(tName)}', '${formatDateTime(alert.created_at)}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> ดูรูป</button>`
+            ? `<button class="btn sm btn-snap"
+                       data-path="${esc(alert.snapshot_path)}"
+                       data-name="${esc(tName)}"
+                       data-time="${esc(formatDateTime(alert.created_at))}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> ดูรูป</button>`
             : '';
         const actBtn = resolved
             ? '<span class="badge ok"><span class="dot"></span>แก้ไขแล้ว</span>'
-            : `<button class="btn success sm" onclick="resolveAlert(${alert.id})"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg> ดำเนินการ</button>`;
+            : `<button class="btn success sm btn-resolve" data-id="${alert.id}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-11"/></svg> ดำเนินการ</button>`;
 
         return `<div class="alert-row sev-${sev} ${resolved ? 'resolved' : ''}" data-alert-id="${alert.id}">
             <div class="strip"></div>
@@ -344,7 +347,20 @@ async function deleteAllAlerts() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => { loadStats(); loadAlerts(); });
+document.addEventListener('DOMContentLoaded', () => {
+    loadStats();
+    loadAlerts();
+    // Event delegation — กัน XSS ที่อาจเกิดจาก inline onclick
+    const container = document.getElementById('alertsList') || document.querySelector('.alerts-container');
+    if (container) {
+        container.addEventListener('click', (e) => {
+            const snap = e.target.closest('.btn-snap');
+            if (snap) { showSnapshot(snap.dataset.path, snap.dataset.name, snap.dataset.time); return; }
+            const res = e.target.closest('.btn-resolve');
+            if (res) { resolveAlert(parseInt(res.dataset.id, 10)); }
+        });
+    }
+});
 </script>
 
 <?php include 'includes/footer.php'; ?>

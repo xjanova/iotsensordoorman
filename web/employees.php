@@ -227,19 +227,23 @@ function renderTable(employees) {
     }
     tbody.innerHTML = employees.map(emp => {
         const initials = esc(emp.first_name).charAt(0);
+        const fullName = esc(emp.first_name) + ' ' + esc(emp.last_name);
+        const photoData = emp.face_image
+            ? `data-photo="uploads/faces/${esc(emp.face_image)}" data-name="${fullName}"`
+            : '';
         const avatarHtml = emp.face_image
-            ? `<img src="uploads/faces/${esc(emp.face_image)}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; cursor:pointer;" onclick="viewPhoto('uploads/faces/${esc(emp.face_image)}', '${esc(emp.first_name)} ${esc(emp.last_name)}')" onerror="this.outerHTML='<div class=\\'avatar\\'>${initials}</div>'">`
+            ? `<img src="uploads/faces/${esc(emp.face_image)}" class="emp-photo" ${photoData} style="width:34px; height:34px; border-radius:50%; object-fit:cover; cursor:pointer;" onerror="this.outerHTML='<div class=\\'avatar\\'>${initials}</div>'">`
             : `<div class="avatar">${initials}</div>`;
         const auth = emp.is_authorized
             ? '<span class="badge ok"><span class="dot"></span>อนุญาต</span>'
             : '<span class="badge danger"><span class="dot"></span>ระงับ</span>';
         const faceCol = emp.face_image
-            ? `<span class="badge accent" style="cursor:pointer;" onclick="viewPhoto('uploads/faces/${esc(emp.face_image)}', '${esc(emp.first_name)} ${esc(emp.last_name)}')">${esc(emp.face_image)}</span>`
+            ? `<span class="badge accent emp-photo" ${photoData} style="cursor:pointer;">${esc(emp.face_image)}</span>`
             : '<span class="muted tiny">ไม่มีรูป</span>';
         return `<tr>
             <td class="mono text-accent">${esc(emp.emp_code)}</td>
             <td>
-                <div class="row gap-2" style="align-items: center;">${avatarHtml}<span>${esc(emp.first_name)} ${esc(emp.last_name)}</span></div>
+                <div class="row gap-2" style="align-items: center;">${avatarHtml}<span>${fullName}</span></div>
             </td>
             <td class="muted">${esc(emp.department) || '-'}</td>
             <td class="muted">${esc(emp.position) || '-'}</td>
@@ -247,8 +251,8 @@ function renderTable(employees) {
             <td>${auth}</td>
             <td>
                 <div class="row gap-2">
-                    <button class="icon-btn" onclick="editEmployee(${parseInt(emp.id)})" title="แก้ไข"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-                    <button class="icon-btn danger" onclick="deleteEmployee(${parseInt(emp.id)})" title="ลบ"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+                    <button class="icon-btn btn-edit-emp" data-id="${parseInt(emp.id)}" title="แก้ไข"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                    <button class="icon-btn danger btn-del-emp" data-id="${parseInt(emp.id)}" title="ลบ"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
                 </div>
             </td>
         </tr>`;
@@ -555,7 +559,21 @@ document.getElementById('searchInput').addEventListener('input', applyFilters);
 document.getElementById('filterDept').addEventListener('change', applyFilters);
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModal(); closePhotoView(); closeCameraCapture(); }});
-document.addEventListener('DOMContentLoaded', loadEmployees);
+document.addEventListener('DOMContentLoaded', () => {
+    loadEmployees();
+    // Event delegation — กัน XSS จาก inline onclick (face_image/name มาจาก DB)
+    const tbody = document.getElementById('employeeTable');
+    if (tbody) {
+        tbody.addEventListener('click', (e) => {
+            const photo = e.target.closest('.emp-photo');
+            if (photo) { viewPhoto(photo.dataset.photo, photo.dataset.name); return; }
+            const ed = e.target.closest('.btn-edit-emp');
+            if (ed) { editEmployee(parseInt(ed.dataset.id, 10)); return; }
+            const del = e.target.closest('.btn-del-emp');
+            if (del) { deleteEmployee(parseInt(del.dataset.id, 10)); }
+        });
+    }
+});
 </script>
 
 <?php include 'includes/footer.php'; ?>
