@@ -10,16 +10,17 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
     // Preview: ดึง snapshot จากกล้อง
-    $camera = preg_replace('/[^a-z]/', '', $_GET['camera'] ?? 'outside');
+    // restrict camera ให้เป็น whitelist เท่านั้น
+    $camera = $_GET['camera'] ?? 'outside';
+    if (!in_array($camera, ['outside', 'inside'], true)) {
+        jsonResponse(['error' => 'invalid camera'], 400);
+    }
     $url = FACE_SERVER_URL . '/api/capture/photo?camera=' . $camera;
 
     $ctx = stream_context_create(['http' => ['timeout' => 5]]);
     $img = @file_get_contents($url, false, $ctx);
     if ($img === false) {
-        http_response_code(503);
-        header('Content-Type: application/json');
-        echo json_encode(["error" => "กล้องไม่พร้อม"]);
-        exit;
+        jsonResponse(['error' => 'กล้องไม่พร้อม'], 503);
     }
 
     header('Content-Type: image/jpeg');
@@ -29,10 +30,14 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST') {
+    requireCsrf();
     // Capture: ถ่ายภาพ + face detection + บันทึก
     $input = json_decode(file_get_contents('php://input'), true);
-    $camera = preg_replace('/[^a-z]/', '', $input['camera'] ?? 'outside');
-    $empCode = preg_replace('/[^A-Za-z0-9\-]/', '', $input['emp_code'] ?? 'capture');
+    $camera = $input['camera'] ?? 'outside';
+    if (!in_array($camera, ['outside', 'inside'], true)) {
+        jsonResponse(['error' => 'invalid camera'], 400);
+    }
+    $empCode = substr(preg_replace('/[^A-Za-z0-9\-]/', '', $input['emp_code'] ?? 'capture'), 0, 20);
 
     $url = FACE_SERVER_URL . '/api/capture/save';
     $postData = json_encode(['camera' => $camera, 'emp_code' => $empCode]);
@@ -77,10 +82,7 @@ if ($method === 'POST') {
         unset($data['image_base64']);
     }
 
-    http_response_code($code);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
-    exit;
+    jsonResponse($data ?: ['error' => 'no response'], $code);
 }
 
 jsonResponse(['error' => 'Method not allowed'], 405);

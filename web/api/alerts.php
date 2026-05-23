@@ -8,6 +8,8 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'OPTIONS') jsonResponse(['ok' => true]);
 
 requireLogin();
+// write op → require CSRF
+if ($method !== 'GET') requireCsrf();
 
 // Whitelist เพื่อกัน enum invalid
 const ALERT_TYPES = ['UNKNOWN_FACE','TAILGATING','FORCED_ENTRY','SENSOR_MISMATCH','MULTI_PERSON','NO_FACE_DETECTED'];

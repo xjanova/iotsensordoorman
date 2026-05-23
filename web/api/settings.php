@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     requireLoginOrPairToken();
 } else {
     requireLogin();
+    requireCsrf();
 }
 
 // Whitelist ของ key + type/range constraints

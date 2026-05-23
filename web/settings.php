@@ -162,10 +162,11 @@ function s($key, $default = '') {
                 <div class="ctl"><input type="text" name="wifi_ssid" value="<?= s('wifi_ssid') ?>" class="input" placeholder="ชื่อ WiFi"></div>
             </div>
             <div class="field-row">
-                <div class="label-col"><strong>รหัสผ่าน WiFi</strong><p>รหัสผ่านของ WiFi</p></div>
+                <div class="label-col"><strong>รหัสผ่าน WiFi</strong><p>รหัสผ่านของ WiFi <span class="tiny muted">(เว้นว่าง = ไม่เปลี่ยน)</span></p></div>
                 <div class="ctl">
                     <div style="position: relative;">
-                        <input type="password" name="wifi_password" id="wifiPassInput" value="<?= s('wifi_password') ?>" class="input" placeholder="รหัสผ่าน WiFi" style="padding-right: 38px;">
+                        <?php $_wifiHasPwd = !empty($settings['wifi_password'] ?? ''); ?>
+                        <input type="password" name="wifi_password" id="wifiPassInput" value="" class="input" placeholder="<?= $_wifiHasPwd ? '••••••••• (มีค่าอยู่แล้ว)' : 'รหัสผ่าน WiFi' ?>" style="padding-right: 38px;" autocomplete="new-password">
                         <button type="button" onclick="toggleWifiPass()" class="icon-btn" style="position:absolute; right:2px; top:50%; transform: translateY(-50%);"><?= ico('eye', 14) ?></button>
                     </div>
                 </div>
@@ -383,6 +384,8 @@ async function saveSettings(e) {
     e.preventDefault();
     const form = new FormData(e.target);
     const data = Object.fromEntries(form);
+    // ถ้า wifi_password ว่าง → ไม่ส่งค่าเพื่อไม่ overwrite ค่าเดิมที่ถูก mask ใน UI
+    if (data.wifi_password === '') delete data.wifi_password;
     const res = await postAPI('api/settings.php', data);
     if (res?.success) showToast('บันทึกการตั้งค่าสำเร็จ (' + (res.updated || 0) + ' รายการ)', 'success');
     else showToast(res?.error || 'เกิดข้อผิดพลาด', 'error');
@@ -521,8 +524,8 @@ async function pullUpdate() {
     log.classList.remove('hidden');
     logText.textContent = 'Running git pull origin main...\n';
     try {
-        const res = await fetch('api/update.php?action=pull', { method: 'POST' });
-        const data = await res.json();
+        const data = await postAPI('api/update.php?action=pull', {});
+        if (!data) throw new Error('network');
         logText.textContent += (data.output || '') + '\n';
         if (data.success) {
             const nv = data.new_version;

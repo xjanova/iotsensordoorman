@@ -16,6 +16,7 @@ if ($method === 'GET') {
     requireLoginOrPairToken();
 } else {
     requireLogin();
+    requireCsrf();
 }
 
 try {

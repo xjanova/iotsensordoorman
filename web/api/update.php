@@ -7,8 +7,6 @@ require_once __DIR__ . '/../includes/api_auth.php';
 
 requireLogin();
 
-header('Content-Type: application/json; charset=utf-8');
-
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
 // === Check current version ===
@@ -30,25 +28,25 @@ if ($action === 'check') {
                      ($remoteVersion['version'] === $localVersion['version'] && ($remoteVersion['build'] ?? 0) > ($localVersion['build'] ?? 0));
     }
 
-    echo json_encode([
+    jsonResponse([
         'success' => true,
         'local' => $localVersion,
         'remote' => $remoteVersion,
         'has_update' => $hasUpdate,
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
+    ]);
 }
 
-// === Pull update from GitHub ===
+// === Pull update from GitHub === (write op → require CSRF)
 if ($action === 'pull') {
+    requireCsrf();
+
     // หาตำแหน่ง git repo
     $repoDir = realpath(__DIR__ . '/../../');
     if (!is_dir($repoDir . '/.git')) {
         $repoDir = realpath(__DIR__ . '/../../../');
     }
     if (!is_dir($repoDir . '/.git')) {
-        echo json_encode(['success' => false, 'error' => 'ไม่พบ Git repository'], JSON_UNESCAPED_UNICODE);
-        exit;
+        jsonResponse(['success' => false, 'error' => 'ไม่พบ Git repository'], 500);
     }
 
     // รัน git pull
@@ -60,24 +58,22 @@ if ($action === 'pull') {
     $outputStr = implode("\n", $output);
 
     if ($returnCode === 0) {
-        // อ่าน version ใหม่
         $newVersionFile = $repoDir . '/version.json';
         $newVersion = file_exists($newVersionFile) ? json_decode(file_get_contents($newVersionFile), true) : null;
 
-        echo json_encode([
+        jsonResponse([
             'success' => true,
             'message' => 'อัพเดทสำเร็จ!',
             'output' => $outputStr,
             'new_version' => $newVersion,
-        ], JSON_UNESCAPED_UNICODE);
+        ]);
     } else {
-        echo json_encode([
+        jsonResponse([
             'success' => false,
             'error' => 'Git pull ล้มเหลว',
             'output' => $outputStr,
-        ], JSON_UNESCAPED_UNICODE);
+        ], 500);
     }
-    exit;
 }
 
-echo json_encode(['error' => 'Invalid action'], JSON_UNESCAPED_UNICODE);
+jsonResponse(['error' => 'Invalid action'], 400);

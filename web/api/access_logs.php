@@ -7,6 +7,8 @@ require_once __DIR__ . '/../includes/api_auth.php';
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') jsonResponse(['ok' => true]);
 
 requireLogin();
+// write op → require CSRF
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') requireCsrf();
 
 // ============================================================
 // DELETE: ลบประวัติ (เลือกรายการ หรือทั้งหมด)
