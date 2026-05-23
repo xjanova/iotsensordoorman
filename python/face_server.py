@@ -17,6 +17,7 @@ import time
 import json
 import signal
 import threading
+import socket
 import requests
 import mysql.connector
 from datetime import datetime
@@ -188,7 +189,12 @@ system_state = {
     "people_inside": 0,
     "running": True,
     "camera_mode": config.CAMERA_MODE,  # "always" or "standby"
+    "esp32_ip": None,         # อัปเดตจาก ESP32 heartbeat หรือ discovery
+    "web_url_discovered": None,  # อัปเดตจาก DiscoveryService
 }
+
+# Discovery service (สร้างใน __main__)
+discovery_svc = None
 
 # Snapshot directory
 os.makedirs(config.SNAPSHOT_DIR, exist_ok=True)
@@ -513,15 +519,29 @@ def save_snapshot(frame, label, camera_id):
         return filename
 
 
+def _get_web_url():
+    """คืน base URL ของ web — ลำดับ: discovery.discovered → config.WEB_SERVER_URL"""
+    discovered = system_state.get("web_url_discovered") or ""
+    return discovered or config.WEB_SERVER_URL or ""
+
+
 def _upload_snapshot_to_web(filepath, filename):
-    """ส่งรูป snapshot ไปเก็บที่ Laragon web server"""
+    """ส่งรูป snapshot ไปเก็บที่ Laragon web server (ต้องส่ง X-Pair-Token)"""
+    web_url = _get_web_url()
+    if not web_url:
+        print("[Snapshot] ไม่รู้ web URL — รอ discovery")
+        return None
+    if not config.PAIRING_TOKEN:
+        print("[Snapshot] ไม่มี PAIRING_TOKEN ใน .env — ตั้งค่าก่อน")
+        return None
     try:
-        upload_url = config.WEB_API_URL + '/snapshot_upload.php'
+        upload_url = web_url + '/api/snapshot_upload.php'
         with open(filepath, 'rb') as f:
             resp = requests.post(
                 upload_url,
                 files={'file': (filename, f, 'image/jpeg')},
                 data={'filename': filename},
+                headers={'X-Pair-Token': config.PAIRING_TOKEN},
                 timeout=10
             )
         if resp.status_code == 200:
@@ -1503,6 +1523,91 @@ if __name__ == "__main__":
     update_system_status("face_server", "ONLINE", _pi_ip)
     update_system_status("raspberry_pi", "ONLINE", _pi_ip)
 
+    # ============================================================
+    # Auto-Pair Discovery
+    # ============================================================
+    if config.DISCOVERY_ENABLED and config.PAIRING_TOKEN:
+        try:
+            import discovery
+        except ImportError as e:
+            print(f"[Discovery] cannot import discovery module: {e}")
+            discovery = None
+
+        if discovery:
+            def _on_device_discovered(info, is_new):
+                """callback เมื่อ Pi ฟัง broadcast เจอ device ใหม่ หรือ IP เปลี่ยน"""
+                role = info["role"]
+                ip = info["ip"]
+                device_id = info["device_id"]
+                if role == "ESP32":
+                    # update local cache เพื่อให้ _esp32_url() ใช้
+                    system_state["esp32_ip"] = ip
+                    print(f"[Pair] ESP32 discovered: {device_id} @ {ip} (new={is_new})")
+                # ส่ง announce ไป web (ทั้ง ESP32 ที่เจอ และ Pi ตัวเอง)
+                web_url = system_state.get("web_url_discovered") or config.WEB_SERVER_URL
+                if not web_url:
+                    return
+                try:
+                    requests.post(
+                        web_url + "/api/pair/announce.php",
+                        json={
+                            "role": role,
+                            "device_id": device_id,
+                            "ip": ip,
+                            "port": info.get("port", 0),
+                            "hostname": info.get("hostname"),
+                            "extra": {"via": "pi-discovery"},
+                        },
+                        headers={"X-Pair-Token": config.PAIRING_TOKEN},
+                        timeout=5,
+                    )
+                except Exception as e:
+                    print(f"[Pair] announce failed: {e}")
+
+            discovery_svc = discovery.DiscoveryService(
+                role="PI",
+                port=config.API_PORT,
+                token=config.PAIRING_TOKEN,
+                web_url=config.WEB_SERVER_URL or None,
+            )
+            discovery_svc.registry.on_update(_on_device_discovered)
+
+            # ผูก discovery web URL กลับมาที่ system_state เมื่อเจอ
+            _orig_set_web_url = discovery_svc.set_web_url
+            def _set_web_url_and_sync(url):
+                _orig_set_web_url(url)
+                system_state["web_url_discovered"] = url
+                # announce Pi ตัวเองทันที (เพราะเพิ่งรู้จัก web)
+                try:
+                    requests.post(
+                        url + "/api/pair/announce.php",
+                        json={
+                            "role": "PI",
+                            "device_id": discovery_svc.device_id,
+                            "ip": _pi_ip,
+                            "port": config.API_PORT,
+                            "hostname": socket.gethostname(),
+                            "extra": {"version": "face_server"},
+                        },
+                        headers={"X-Pair-Token": config.PAIRING_TOKEN},
+                        timeout=5,
+                    )
+                except Exception as e:
+                    print(f"[Pair] self-announce failed: {e}")
+            discovery_svc.set_web_url = _set_web_url_and_sync
+
+            # ตั้ง initial state ถ้ามี config.WEB_SERVER_URL
+            if config.WEB_SERVER_URL:
+                system_state["web_url_discovered"] = config.WEB_SERVER_URL
+
+            discovery_svc.start()
+            print(f"[Discovery] started — pairing on UDP {discovery.DISCOVERY_PORT}")
+    else:
+        if not config.PAIRING_TOKEN:
+            print("[Discovery] disabled — set PAIRING_TOKEN ใน .env เพื่อเปิด auto-pair")
+        else:
+            print("[Discovery] disabled by DISCOVERY_ENABLED=0")
+
     # โหลด name display cache จาก DB
     load_name_display_cache()
 
@@ -1548,6 +1653,9 @@ if __name__ == "__main__":
     def cleanup(signum=None, frame=None):
         print("\n[Server] Shutting down...")
         system_state["running"] = False
+        if discovery_svc:
+            try: discovery_svc.stop()
+            except Exception: pass
         # Release กล้องทั้งหมด
         for name, cap in _camera_captures.items():
             if cap.isOpened():
