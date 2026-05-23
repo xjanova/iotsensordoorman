@@ -10,6 +10,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Check if admin already exists
+$dbError = false;
+$db = null;
 try {
     $db = getDB();
     $stmt = $db->query("SELECT COUNT(*) as c FROM admin_users");
@@ -18,11 +20,14 @@ try {
         exit;
     }
 } catch (PDOException $e) {
+    error_log("[Setup] DB connect: " . $e->getMessage());
     $dbError = true;
 }
 
 $error = '';
 $success = false;
+$username = '';
+$displayName = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
@@ -30,7 +35,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
 
-    if ($username === '' || $password === '') {
+    if ($dbError || !$db) {
+        $error = 'เชื่อมต่อฐานข้อมูลไม่ได้';
+    } elseif ($username === '' || $password === '') {
         $error = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
     } elseif (strlen($username) < 3 || strlen($username) > 50) {
         $error = 'ชื่อผู้ใช้ต้องมี 3-50 ตัวอักษร';

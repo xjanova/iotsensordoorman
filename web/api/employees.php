@@ -89,8 +89,24 @@ try {
         case 'DELETE':
             $id = intval($_GET['id'] ?? 0);
             if ($id <= 0) jsonResponse(['error' => 'ID required'], 400);
+
+            // ดึง face_image ก่อน เพื่อลบไฟล์
+            $get = $db->prepare("SELECT face_image FROM employees WHERE id = ?");
+            $get->execute([$id]);
+            $row = $get->fetch();
+            if (!$row) jsonResponse(['error' => 'ไม่พบพนักงาน'], 404);
+
             $stmt = $db->prepare("DELETE FROM employees WHERE id = ?");
             $stmt->execute([$id]);
+
+            // ลบไฟล์รูป (ถ้ามี) — sanitize ก่อนเสมอ
+            if (!empty($row['face_image'])) {
+                $safeName = basename($row['face_image']);
+                if (preg_match('/^[A-Za-z0-9_\-]+\.(jpg|jpeg|png|webp)$/i', $safeName)) {
+                    $path = __DIR__ . '/../uploads/faces/' . $safeName;
+                    if (is_file($path)) @unlink($path);
+                }
+            }
             jsonResponse(['success' => true]);
             break;
 

@@ -10,6 +10,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // If no admin exists, redirect to setup
+$dbError = false;
+$db = null;
 try {
     $db = getDB();
     $stmt = $db->query("SELECT COUNT(*) as c FROM admin_users");
@@ -18,6 +20,7 @@ try {
         exit;
     }
 } catch (PDOException $e) {
+    error_log("[Login] DB connect: " . $e->getMessage());
     $dbError = true;
 }
 
@@ -48,7 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $username = trim($_POST['username'] ?? '');
         $password = $_POST['password'] ?? '';
 
-        if ($username === '' || $password === '') {
+        if ($dbError || !$db) {
+            $error = 'เชื่อมต่อฐานข้อมูลไม่ได้ — ตรวจสอบ .env';
+        } elseif ($username === '' || $password === '') {
             $error = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
         } else {
             try {
