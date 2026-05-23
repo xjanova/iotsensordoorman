@@ -32,7 +32,7 @@ try {
 
     // System status — รวม paired_devices (Auto-Pair) เป็น source of truth
     require_once __DIR__ . '/../includes/device_status.php';
-    $ds = getDeviceStatus(30);
+    $ds = getDeviceStatus(90);
     $stmt = $db->query("SELECT component, status, last_heartbeat FROM system_status");
     $stats['system'] = $stmt->fetchAll();
     $stats['devices'] = [

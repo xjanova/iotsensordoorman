@@ -1764,6 +1764,32 @@ if __name__ == "__main__":
             discovery_svc.start()
             print(f"[Discovery] started — UDP {discovery.DISCOVERY_PORT} "
                   f"(zero-config: {'on' if not config.PAIRING_TOKEN else 'token-locked'})")
+
+            # Re-announce loop: ส่ง POST announce ไป web ทุก 30s
+            # เพื่อให้ paired_devices.last_seen สด → web เห็นว่า Pi ONLINE
+            def _reannounce_loop():
+                while system_state["running"]:
+                    time.sleep(30)
+                    web_url = system_state.get("web_url_discovered") or config.WEB_SERVER_URL
+                    if not web_url or not discovery_svc:
+                        continue
+                    try:
+                        requests.post(
+                            web_url + "/api/pair/announce.php",
+                            json={
+                                "role": "PI",
+                                "device_id": discovery_svc.device_id,
+                                "ip": get_local_ip(),
+                                "port": config.API_PORT,
+                                "hostname": socket.gethostname(),
+                                "extra": {"version": "face_server", "heartbeat": True},
+                            },
+                            headers=_announce_headers(),
+                            timeout=5,
+                        )
+                    except Exception as e:
+                        pass  # เงียบไว้ — heartbeat fail ไม่ต้องรก log
+            threading.Thread(target=_reannounce_loop, name="reannounce", daemon=True).start()
     else:
         print("[Discovery] disabled by DISCOVERY_ENABLED=0")
 

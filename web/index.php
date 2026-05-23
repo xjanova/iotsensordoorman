@@ -7,7 +7,7 @@ $db = getDB();
 
 // ── สถานะอุปกรณ์ — ใช้ paired_devices เป็นหลัก fall back system_status ──
 require_once __DIR__ . '/includes/device_status.php';
-$ds = getDeviceStatus(30);  // fresh window = 30s
+$ds = getDeviceStatus(90);  // fresh window = 90s (Pi re-announce every 30s + tolerance)
 $cam1Online      = $ds['cam_outside'];
 $cam2Online      = $ds['cam_inside'];
 $faceServerOnline = $ds['pi_online'];
