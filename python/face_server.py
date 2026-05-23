@@ -901,6 +901,60 @@ def api_stats():
 # ============================================================
 # System Health API (CPU, RAM, Temperature ของ Raspberry Pi)
 # ============================================================
+@app.route('/api/wifi/current')
+def api_wifi_current():
+    """อ่าน WiFi credentials ที่ Pi กำลังเชื่อมอยู่
+       Best-effort — password อาจไม่ได้ถ้า sudoers ไม่อนุญาต
+    """
+    import subprocess
+    import re
+
+    ssid = ""
+    psk = ""
+
+    # SSID — iwgetid ไม่ต้อง sudo
+    try:
+        ssid = subprocess.check_output(
+            ["iwgetid", "-r"], timeout=2, stderr=subprocess.DEVNULL
+        ).decode().strip()
+    except Exception:
+        pass
+
+    if ssid:
+        # ลองอ่าน password — ลำดับ: nmcli (NetworkManager) → wpa_supplicant.conf
+        # ทั้งสองวิธีต้องใช้ sudo — install-pi.sh ตั้ง NOPASSWD เฉพาะ command นี้
+        for cmd in [
+            ["sudo", "-n", "nmcli", "-s", "-g", "802-11-wireless-security.psk",
+             "connection", "show", ssid],
+            ["sudo", "-n", "cat", "/etc/wpa_supplicant/wpa_supplicant.conf"],
+        ]:
+            try:
+                out = subprocess.check_output(
+                    cmd, timeout=2, stderr=subprocess.DEVNULL
+                ).decode()
+                if "wpa_supplicant" in " ".join(cmd):
+                    # parse psk in block ที่ ssid ตรง
+                    pattern = r'ssid="' + re.escape(ssid) + r'".*?psk="([^"]*)"'
+                    m = re.search(pattern, out, re.S)
+                    if m:
+                        psk = m.group(1)
+                        break
+                else:
+                    if out.strip():
+                        psk = out.strip()
+                        break
+            except Exception:
+                continue
+
+    return jsonify({
+        "ok": bool(ssid),
+        "ssid": ssid,
+        "password": psk,
+        "has_password": bool(psk),
+        "note": "" if psk else "password อ่านไม่ได้ — install-pi.sh ตั้ง sudoers ใหม่หรือกรอกที่ web เอง",
+    })
+
+
 @app.route('/api/system/health')
 def api_system_health():
     """ส่งข้อมูล CPU/RAM/Temperature ของ Raspberry Pi"""

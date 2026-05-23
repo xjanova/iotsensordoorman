@@ -206,15 +206,23 @@ ok "สร้าง $ENV_FILE"
 step "ข้าม — Zero-Config ไม่ test DB ที่นี่ (Pi จะ resolve เองตอนรัน)"
 ok "ข้าม"
 
-# ── Step 7: Create folders + permissions ────────────────────
-step "สร้างโฟลเดอร์ที่จำเป็น + permissions"
+# ── Step 7: Create folders + permissions + sudoers (WiFi readout) ──
+step "สร้างโฟลเดอร์ที่จำเป็น + sudoers สำหรับอ่าน WiFi config"
 mkdir -p "$SCRIPT_DIR/images" "$SCRIPT_DIR/snapshots"
 # Allow user to access cameras
 if ! groups "$RUN_USER" | grep -q "\bvideo\b"; then
     sudo usermod -aG video "$RUN_USER"
     warn "เพิ่ม $RUN_USER เข้ากลุ่ม video — ต้อง reboot 1 ครั้งหลังติดตั้งเสร็จ"
 fi
-ok "โฟลเดอร์ images/, snapshots/ พร้อม"
+# sudoers สำหรับอ่าน WiFi password (สำหรับ /api/wifi/current → generate ESP32 firmware)
+sudo tee /etc/sudoers.d/bunny-door-wifi > /dev/null <<EOF
+# Bunny Door: ให้ service user อ่าน WiFi password ของ Pi ได้
+$RUN_USER ALL=(root) NOPASSWD: /usr/bin/nmcli -s -g 802-11-wireless-security.psk connection show *
+$RUN_USER ALL=(root) NOPASSWD: /bin/cat /etc/wpa_supplicant/wpa_supplicant.conf
+$RUN_USER ALL=(root) NOPASSWD: /usr/bin/cat /etc/wpa_supplicant/wpa_supplicant.conf
+EOF
+sudo chmod 0440 /etc/sudoers.d/bunny-door-wifi
+ok "โฟลเดอร์ + sudoers พร้อม"
 
 # ── Step 8: systemd service ─────────────────────────────────
 step "สร้าง systemd service"

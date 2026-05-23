@@ -33,10 +33,47 @@ try {
     exit;
 }
 
+// ── Auto-fetch จาก Pi ถ้า settings ว่าง ──
+// (Pi รู้ WiFi ของตัวเองอยู่แล้ว — ไม่ต้องให้ user กรอกซ้ำ)
+if ($cfg['wifi_ssid'] === '' || $cfg['wifi_password'] === '') {
+    try {
+        $ch = curl_init(FACE_SERVER_URL . '/api/wifi/current');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_CONNECTTIMEOUT => 3,
+        ]);
+        $resp = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($code === 200 && $resp) {
+            $piWifi = json_decode($resp, true);
+            if (is_array($piWifi)) {
+                // อัปเดต settings เพื่อ cache ครั้งต่อไป (และเอาไป generate)
+                if (empty($cfg['wifi_ssid']) && !empty($piWifi['ssid'])) {
+                    $cfg['wifi_ssid'] = $piWifi['ssid'];
+                    $u = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('wifi_ssid', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+                    $u->execute([$piWifi['ssid']]);
+                }
+                if (empty($cfg['wifi_password']) && !empty($piWifi['password'])) {
+                    $cfg['wifi_password'] = $piWifi['password'];
+                    $u = $db->prepare("INSERT INTO settings (setting_key, setting_value) VALUES ('wifi_password', ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+                    $u->execute([$piWifi['password']]);
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        // ไม่ critical — fall through ไปข้างล่าง
+    }
+}
+
 if ($cfg['wifi_ssid'] === '') {
     http_response_code(400);
     header('Content-Type: text/plain; charset=utf-8');
-    echo "ยังไม่ได้ตั้ง WiFi SSID — เปิด /settings.php ไปตั้งค่า WiFi ก่อน\n";
+    echo "ยังไม่ได้ตั้ง WiFi SSID\n";
+    echo "ทางเลือก:\n";
+    echo "  1. รอ Pi pair กับ web ก่อน (ระบบจะดึง WiFi จาก Pi อัตโนมัติ)\n";
+    echo "  2. หรือเปิด /settings.php ไปตั้งค่า WiFi เองก่อน\n";
     exit;
 }
 
