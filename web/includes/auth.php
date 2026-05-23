@@ -69,6 +69,23 @@ $currentFile = basename($_SERVER['PHP_SELF']);
 // Skip auth check for login/setup pages
 $publicPages = ['login.php', 'setup.php'];
 
+// ── DEV bypass: ถ้าตั้ง DEV_BYPASS_LOGIN=1 ใน web/.env →
+//    auto-login เป็น admin คนแรกในระบบ (สำหรับ dev เท่านั้น!)
+$_devBypass = getenv('DEV_BYPASS_LOGIN') === '1';
+if ($_devBypass && !isLoggedIn() && !in_array($currentFile, $publicPages)) {
+    try {
+        $_db = getDB();
+        $_row = $_db->query("SELECT id, username, display_name FROM admin_users ORDER BY id LIMIT 1")->fetch();
+        if ($_row) {
+            $_SESSION['admin_id'] = (int) $_row['id'];
+            $_SESSION['admin_username'] = $_row['username'];
+            $_SESSION['admin_name'] = $_row['display_name'] ?: $_row['username'];
+        }
+    } catch (Throwable $e) {
+        // เงียบ — fallback ไป flow ปกติด้านล่าง
+    }
+}
+
 if (!in_array($currentFile, $publicPages)) {
     // Check if admin exists
     if (!hasAdminUser()) {

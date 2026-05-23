@@ -18,6 +18,20 @@ if (session_status() === PHP_SESSION_NONE) {
  * ตรวจ session admin — ใช้สำหรับ endpoint ที่ admin เรียกผ่าน browser
  */
 function requireLogin(): void {
+    // DEV bypass: auto-login เป็น admin คนแรก ถ้าตั้ง DEV_BYPASS_LOGIN=1
+    if (empty($_SESSION['admin_id']) && getenv('DEV_BYPASS_LOGIN') === '1') {
+        try {
+            $db = getDB();
+            $row = $db->query("SELECT id, username, display_name FROM admin_users ORDER BY id LIMIT 1")->fetch();
+            if ($row) {
+                $_SESSION['admin_id'] = (int) $row['id'];
+                $_SESSION['admin_username'] = $row['username'];
+                $_SESSION['admin_name'] = $row['display_name'] ?: $row['username'];
+            }
+        } catch (Throwable $e) {
+            // เงียบ — flow ปกติจะ reject ด้านล่าง
+        }
+    }
     if (empty($_SESSION['admin_id'])) {
         jsonResponse(['error' => 'Unauthorized'], 401);
     }
