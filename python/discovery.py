@@ -106,19 +106,28 @@ def decode_packet(data: bytes) -> dict | None:
 # ============================================================
 # Web Discovery (subnet scan)
 # ============================================================
-def _ping_web(url: str, timeout: float = 1.5) -> dict | None:
-    """ลองยิง GET <url>/api/pair/ping.php — คืน dict ถ้าใช่ web server ของเรา"""
+def _ping_web(url: str, timeout: float = 3.0) -> dict | None:
+    """ลองยิง GET <url>/api/pair/ping.php — คืน dict ถ้าใช่ web server ของเรา
+       ใช้ requests แทน urllib (เสถียรกว่าใน thread pool, มี connection retry)
+    """
+    target = url + "/api/pair/ping.php"
     try:
-        req = urlrequest.Request(url + "/api/pair/ping.php", headers={"User-Agent": "BunnyDoor-Pi/1.0"})
-        with urlrequest.urlopen(req, timeout=timeout) as resp:
-            if resp.status != 200:
-                return None
-            data = json.loads(resp.read().decode("utf-8"))
-            if data.get("service") == "bunny-door-web":
-                return data
-    except (urlerror.URLError, json.JSONDecodeError, socket.timeout, ConnectionError, OSError):
-        pass
-    return None
+        import requests as _r
+        r = _r.get(target, timeout=timeout, headers={"User-Agent": "BunnyDoor-Pi/1.0"})
+        if r.status_code != 200:
+            return None
+        try:
+            data = r.json()
+        except ValueError:
+            return None
+        if data.get("service") == "bunny-door-web":
+            return data
+        return None
+    except Exception as e:
+        # log แค่ host ที่ดูเหมือนจะใช่ (port 80 open) เพื่อ debug
+        if ":80" in url or url.count("/") <= 3:
+            _log.debug(f"[ping] {target} → {type(e).__name__}: {e}")
+        return None
 
 
 def _probe_port(host: str, port: int = 80, timeout: float = 0.4) -> str | None:
@@ -166,24 +175,19 @@ def discover_web_url(local_ip: str, base_paths: list[str] | None = None) -> str 
         _log.warning("[discover-web] no host on port 80 in subnet")
         return None
 
-    _log.info(f"[discover-web] stage 2: HTTP ping {len(alive)} alive hosts × {len(base_paths)} paths")
+    _log.info(f"[discover-web] stage 2: HTTP ping {len(alive)} alive hosts × {len(base_paths)} paths (hosts: {alive})")
 
-    # Stage 2: HTTP ping host × path เฉพาะที่ alive
+    # Stage 2: HTTP ping host × path เฉพาะที่ alive — sequential แต่ละ host เร็ว
+    # (4-5 hosts × 6 paths = ~30 requests แค่ ~10-20s ถ้า timeout 3s)
     for path in base_paths:
-        with ThreadPoolExecutor(max_workers=min(20, len(alive))) as ex:
-            futures = {ex.submit(_ping_web, f"http://{h}{path}", 2.0): h for h in alive}
-            for fut in as_completed(futures):
-                try:
-                    data = fut.result()
-                except Exception:
-                    data = None
-                if data:
-                    found = f"http://{futures[fut]}{path}"
-                    _log.info(f"[discover-web] FOUND: {found}")
-                    ex.shutdown(wait=False, cancel_futures=True)
-                    return found
+        for h in alive:
+            target_url = f"http://{h}{path}"
+            data = _ping_web(target_url, timeout=3.0)
+            if data:
+                _log.info(f"[discover-web] FOUND: {target_url}")
+                return target_url
 
-    _log.warning(f"[discover-web] {len(alive)} hosts alive แต่ไม่มี ping.php ตอบ")
+    _log.warning(f"[discover-web] {len(alive)} hosts alive แต่ไม่มี ping.php ตอบ (ลอง paths: {base_paths})")
     return None
 
 
