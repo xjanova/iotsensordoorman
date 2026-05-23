@@ -120,17 +120,40 @@
         </div>
     </div>
 
-    <!-- ESP32 Firmware Download -->
-    <div class="net-field" style="background: linear-gradient(135deg, rgba(99,102,241,0.06), rgba(99,102,241,0.02)); border: 1px solid color-mix(in oklch, #6366f1 20%, var(--border));">
-        <div class="net-field-icon" style="background: rgba(99,102,241,0.16); color: #6366f1;"><?= ico('chip', 18) ?></div>
-        <div class="net-field-text">
-            <strong>โค้ด ESP32 (door_controller.ino) <span class="badge accent">pre-filled WiFi</span></strong>
-            <p>ดาวน์โหลด → เปิดใน Arduino IDE → Upload เข้า ESP32 — WiFi SSID/Password จากหน้า Settings จะถูกฝังให้อัตโนมัติ</p>
+    <!-- ESP32 Firmware Download + WiFi config -->
+    <div style="background: linear-gradient(135deg, rgba(99,102,241,0.06), rgba(99,102,241,0.02)); border: 1px solid color-mix(in oklch, #6366f1 20%, var(--border)); border-radius: 10px; padding: 14px; margin-top: 10px;">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <div style="background: rgba(99,102,241,0.16); color: #6366f1; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0;"><?= ico('chip', 18) ?></div>
+            <div style="flex: 1; min-width: 0;">
+                <strong style="font-size: 14px;">โค้ด ESP32 (door_controller.ino) <span class="badge accent">pre-filled WiFi</span></strong>
+                <p class="tiny muted" style="margin: 4px 0 0;">กรอก WiFi ที่ ESP32 จะเชื่อม (ดึงจาก Pi อัตโนมัติได้) → กด Download → เปิดใน Arduino IDE → Upload</p>
+            </div>
         </div>
-        <div class="row gap-2">
-            <a href="api/firmware/esp32.php" download class="btn primary sm"><?= ico('download', 12) ?> Download .ino</a>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px;">
+            <label class="tiny" style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="color: var(--text-2); font-weight: 600;">ชื่อ WiFi (SSID)</span>
+                <input type="text" id="inputWifiSSID" class="input mono" placeholder="MyWiFi">
+            </label>
+            <label class="tiny" style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="color: var(--text-2); font-weight: 600;">รหัสผ่าน WiFi</span>
+                <div style="position: relative;">
+                    <input type="password" id="inputWifiPass" class="input" placeholder="กรอกหรือดึงจาก Pi" style="padding-right: 34px; width: 100%;">
+                    <button type="button" onclick="toggleWifiPass()" class="icon-btn" style="position:absolute; right:2px; top:50%; transform: translateY(-50%);"><?= ico('eye', 12) ?></button>
+                </div>
+            </label>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center;">
+            <button type="button" onclick="autofillWifiFromPi()" class="btn sm ghost" title="ดึง WiFi จาก Pi อัตโนมัติ (ต้อง pair Pi ก่อน)">
+                <?= ico('cpu', 12) ?> <span id="autofillBtnText">ดึงจาก Pi</span>
+            </button>
+            <button type="button" onclick="saveWifiSettings()" class="btn sm" title="บันทึกลง settings"><?= ico('save', 12) ?> บันทึก</button>
+            <span style="flex: 1;"></span>
+            <a href="api/firmware/esp32.php" download class="btn primary sm" id="downloadInoBtn"><?= ico('download', 12) ?> Download .ino</a>
             <a href="api/firmware/esp32.php?preview=1" target="_blank" class="btn sm ghost" title="ดู source ก่อน download"><?= ico('eye', 12) ?> Preview</a>
         </div>
+        <div id="wifiStatus" class="tiny muted" style="margin-top: 8px;"></div>
     </div>
 
     <!-- Discovered devices list -->
@@ -156,59 +179,10 @@
 .paired-list .pair-actions { display: flex; gap: 6px; }
 </style>
 
-<!-- IP Configuration -->
-<div class="card section">
-    <div class="card-head" style="padding: 0 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 14px;">
-        <div>
-            <div class="title">แก้ไข IP เครือข่าย</div>
-            <div class="sub">เมื่อย้าย WiFi ใหม่ ให้แก้ IP ด้านล่างแล้วกดบันทึก</div>
-        </div>
-    </div>
-
-    <!-- Laragon -->
-    <div class="net-field">
-        <div class="net-field-icon" style="background:rgba(37,99,235,0.14); color:#2563eb;"><?= ico('server', 18) ?></div>
-        <div class="net-field-text">
-            <strong>IP ของ Laragon (เครื่องนี้)</strong>
-            <p>ตรวจจับอัตโนมัติ — Pi และ ESP32 จะเชื่อมมาที่ IP นี้</p>
-        </div>
-        <div class="row gap-2">
-            <input type="text" id="inputWebIP" readonly class="input mono" style="width: 180px; text-align: right; color: #2563eb;">
-            <span class="badge accent">auto</span>
-        </div>
-    </div>
-
-    <!-- Pi -->
-    <div class="net-field">
-        <div class="net-field-icon" style="background:rgba(16,185,129,0.14); color:#10b981;"><?= ico('cpu', 18) ?></div>
-        <div class="net-field-text">
-            <strong>IP ของ Raspberry Pi</strong>
-            <p>Face Recognition Server — อัพเดทในไฟล์ <code class="mono">web/.env</code></p>
-        </div>
-        <div class="row gap-2">
-            <input type="text" id="inputPiIP" placeholder="192.168.1.121" class="input mono" style="width: 180px; text-align: right;">
-            <button type="button" onclick="testPi()" class="btn sm" title="ทดสอบการเชื่อมต่อ"><?= ico('plug', 12) ?> <span id="testPiText">ทดสอบ</span></button>
-        </div>
-    </div>
-
-    <!-- ESP32 -->
-    <div class="net-field">
-        <div class="net-field-icon" style="background:rgba(217,119,6,0.14); color:#d97706;"><?= ico('chip', 18) ?></div>
-        <div class="net-field-text">
-            <strong>IP ของ ESP32</strong>
-            <p>ดูได้จาก Serial Monitor ตอน ESP32 เชื่อม WiFi</p>
-        </div>
-        <div class="row gap-2">
-            <input type="text" id="inputEspIP" placeholder="192.168.1.100" class="input mono" style="width: 180px; text-align: right;">
-            <button type="button" onclick="testEsp()" class="btn sm" title="ทดสอบการเชื่อมต่อ"><?= ico('plug', 12) ?> <span id="testEspText">ทดสอบ</span></button>
-        </div>
-    </div>
-
-    <div class="row gap-3" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
-        <button type="button" onclick="saveAllIPs()" class="btn primary"><?= ico('save', 14) ?> บันทึก IP ทั้งหมด</button>
-        <span class="tiny muted" id="saveStatus"></span>
-    </div>
-</div>
+<!-- Hidden inputs สำหรับ legacy JS (testPi/testEsp ฯลฯ) — ค่าจะถูก fill จาก detectNetwork() -->
+<input type="hidden" id="inputWebIP">
+<input type="hidden" id="inputPiIP">
+<input type="hidden" id="inputEspIP">
 
 <!-- Update Checklist -->
 <div class="card section">
@@ -641,6 +615,73 @@ function applyPairingState(enabled) {
     chk.checked = !!enabled;
     if (lbl) lbl.textContent = enabled ? 'เปิดอยู่' : 'ปิดอยู่';
 }
+
+// ── WiFi config สำหรับ ESP32 firmware ──
+function toggleWifiPass() {
+    const inp = document.getElementById('inputWifiPass');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+async function loadWifiSettings() {
+    try {
+        const r = await fetchAPI('api/settings.php');
+        if (r?.settings) {
+            document.getElementById('inputWifiSSID').value = r.settings.wifi_ssid || '';
+            // password ไม่โชว์ค่า — แค่ placeholder บอก
+            if (r.settings.wifi_password) {
+                document.getElementById('inputWifiPass').placeholder = '••••••• (มีค่าอยู่)';
+            }
+        }
+    } catch (e) {}
+}
+
+async function autofillWifiFromPi() {
+    const btn = document.getElementById('autofillBtnText');
+    const status = document.getElementById('wifiStatus');
+    btn.textContent = 'กำลังดึง...';
+    status.textContent = '';
+    try {
+        const r = await fetchAPI('api/wifi/from-pi.php');
+        if (r?.ok) {
+            if (r.ssid) {
+                document.getElementById('inputWifiSSID').value = r.ssid;
+            }
+            if (r.password) {
+                document.getElementById('inputWifiPass').value = r.password;
+                status.innerHTML = '<span style="color: var(--ok);">✓ ดึง SSID + password จาก Pi สำเร็จ — กดบันทึกแล้ว Download ได้เลย</span>';
+            } else {
+                status.innerHTML = '<span style="color: var(--warn);">⚠ ได้ SSID แล้ว แต่ Pi อ่าน password ไม่ได้ — กรุณากรอก password เอง</span>';
+            }
+        } else {
+            status.innerHTML = '<span style="color: var(--danger);">✘ Pi ตอบกลับไม่ได้ — ตรวจว่า Pi pair กับ web แล้วยัง</span>';
+        }
+    } catch (e) {
+        status.innerHTML = '<span style="color: var(--danger);">✘ ' + e.message + '</span>';
+    }
+    btn.textContent = 'ดึงจาก Pi';
+}
+
+async function saveWifiSettings() {
+    const ssid = document.getElementById('inputWifiSSID').value.trim();
+    const pass = document.getElementById('inputWifiPass').value;
+    const status = document.getElementById('wifiStatus');
+    if (!ssid) {
+        status.innerHTML = '<span style="color: var(--danger);">✘ กรอก SSID ก่อน</span>';
+        return;
+    }
+    const payload = { wifi_ssid: ssid };
+    if (pass) payload.wifi_password = pass;  // ถ้าไม่ใส่ = ไม่เปลี่ยน
+    const r = await postAPI('api/settings.php', payload);
+    if (r?.success) {
+        status.innerHTML = '<span style="color: var(--ok);">✓ บันทึกแล้ว — กด Download .ino ได้เลย</span>';
+        document.getElementById('inputWifiPass').value = '';
+        document.getElementById('inputWifiPass').placeholder = '••••••• (มีค่าอยู่)';
+    } else {
+        status.innerHTML = '<span style="color: var(--danger);">✘ บันทึกไม่สำเร็จ</span>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadWifiSettings);
 
 async function refreshPairedDevices() {
     const list = document.getElementById('pairedList');
