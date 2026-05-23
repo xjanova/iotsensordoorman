@@ -70,7 +70,11 @@ def encode_packet(role: str, device_id: str, ip: str, port: int, token: str) -> 
 
 
 def decode_packet(data: bytes) -> dict | None:
-    """คืน dict หรือ None ถ้า packet ไม่ตรงรูปแบบ"""
+    """คืน dict หรือ None ถ้า packet ไม่ตรงรูปแบบ
+       รองรับ 2 format:
+         - role=PI/ESP32: MAGIC|v1|ROLE|device_id|ip|port|token         (7 fields)
+         - role=WEB:      MAGIC|v1|WEB|device_id|ip|port|url_path|token (8 fields)
+    """
     try:
         text = data.decode("utf-8", errors="ignore").strip()
         parts = text.split("|")
@@ -78,8 +82,18 @@ def decode_packet(data: bytes) -> dict | None:
             return None
         if parts[0] != DISCOVERY_MAGIC or parts[1] != DISCOVERY_VERSION:
             return None
+        role = parts[2].upper()
+        if role == "WEB" and len(parts) >= 8:
+            return {
+                "role": role,
+                "device_id": parts[3],
+                "ip": parts[4],
+                "port": int(parts[5]) if parts[5].isdigit() else 80,
+                "url_path": parts[6],
+                "token": parts[7],
+            }
         return {
-            "role": parts[2].upper(),
+            "role": role,
             "device_id": parts[3],
             "ip": parts[4],
             "port": int(parts[5]) if parts[5].isdigit() else 0,
@@ -109,11 +123,19 @@ def _ping_web(url: str, timeout: float = 1.5) -> dict | None:
 
 def discover_web_url(local_ip: str, base_paths: list[str] | None = None) -> str | None:
     """Subnet scan หา web server บน /24
-       คืน base URL เช่น http://192.168.1.10/bunny-door หรือ http://192.168.1.10
-       base_paths: ลำดับ path ที่ลอง (default ['/bunny-door', ''])
+       คืน base URL เช่น http://192.168.1.10/bunny-door/web
+       base_paths: ลำดับ path ที่ลอง — ลอง deep path ก่อน (กัน collision ที่ root)
     """
     if base_paths is None:
-        base_paths = ["/bunny-door", ""]
+        # ลอง deep paths ก่อน — เผื่อ user clone full repo ที่มี web/ subfolder
+        base_paths = [
+            "/bunny-door/web",       # full repo clone (พบบ่อยสุด)
+            "/iotsensordoorman/web", # github default folder name
+            "/bunny-door",           # web-only clone
+            "/iotsensordoorman",
+            "/web",
+            "",                       # web ที่ document root
+        ]
 
     try:
         net = ipaddress.ip_network(local_ip + "/24", strict=False)
@@ -294,6 +316,22 @@ class DiscoveryService:
                 continue
             # ใช้ source IP จาก socket (น่าเชื่อกว่า field ใน packet ในกรณี NAT)
             real_ip = addr[0] if pkt["ip"] != addr[0] else pkt["ip"]
+
+            # WEB role — ใช้ url_path ที่ web ส่งมา set web_url ทันที (ข้าม subnet scan)
+            if pkt["role"] == "WEB" and pkt.get("url_path") is not None:
+                port = pkt["port"] or 80
+                url_path = pkt["url_path"]
+                # ใส่ http:// + IP + path
+                if port == 80:
+                    web_url = f"http://{real_ip}{url_path}"
+                else:
+                    web_url = f"http://{real_ip}:{port}{url_path}"
+                current = self.get_web_url()
+                if current != web_url:
+                    _log.info(f"[listen] WEB announced: {web_url} (replaced {current})")
+                    self.set_web_url(web_url)
+                continue
+
             self.registry.update(pkt["role"], pkt["device_id"], real_ip, pkt["port"])
 
         sock.close()
