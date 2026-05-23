@@ -7,15 +7,50 @@
         <div class="sub">Real-time monitor — กล้อง, PIR, ประตู, กิจกรรม</div>
     </div>
     <div class="page-head-actions">
-        <!-- Camera Mode Toggle -->
-        <div class="theme-switch" id="modeToggle" role="tablist" aria-label="Camera mode">
-            <button type="button" id="btnModeAlways" class="on" onclick="setCameraMode('always')" title="กล้องเปิดตลอด"><?= ico('eye', 14) ?></button>
-            <button type="button" id="btnModeStandby" onclick="setCameraMode('standby')" title="กล้องประหยัดพลังงาน"><?= ico('moon', 14) ?></button>
+        <!-- Camera Mode Toggle — segment buttons with labels -->
+        <div class="cam-mode-toggle" role="tablist" aria-label="Camera mode">
+            <button type="button" id="btnModeAlways" class="cam-mode-btn active" onclick="setCameraMode('always')" title="กล้องทำงานตลอดเวลา (ใช้ CPU มากกว่า)">
+                <?= ico('eye', 14) ?> <span>Always</span>
+            </button>
+            <button type="button" id="btnModeStandby" class="cam-mode-btn" onclick="setCameraMode('standby')" title="กล้อง standby ตอนไม่มี motion (ประหยัดพลังงาน)">
+                <?= ico('moon', 14) ?> <span>Standby</span>
+            </button>
         </div>
         <button class="btn sm" id="btnFullscreen" onclick="toggleFullscreen()"><?= ico('maximize', 14) ?> Full Monitor</button>
         <a href="settings.php" class="btn sm ghost" id="linkSettings"><?= ico('settings', 14) ?> ตั้งค่ากล้อง</a>
     </div>
 </div>
+
+<style>
+.cam-mode-toggle {
+    display: inline-flex;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+}
+.cam-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.cam-mode-btn:hover { color: var(--text-1); background: color-mix(in oklch, var(--accent) 8%, transparent); }
+.cam-mode-btn.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 1px 3px color-mix(in oklch, var(--accent) 40%, transparent);
+}
+</style>
 
 <style>
 /* Fullscreen Monitor Mode */
@@ -446,6 +481,9 @@ async function setCameraMode(mode) {
     if (res?.success) updateModeUI(mode);
 }
 function updateModeUI(mode) {
+    document.getElementById('btnModeAlways').classList.toggle('active', mode === 'always');
+    document.getElementById('btnModeStandby').classList.toggle('active', mode === 'standby');
+    // legacy 'on' class — กันโค้ดเก่าใน fullscreen bar
     document.getElementById('btnModeAlways').classList.toggle('on', mode === 'always');
     document.getElementById('btnModeStandby').classList.toggle('on', mode === 'standby');
     const fa = document.getElementById('fsBtnAlways'), fs = document.getElementById('fsBtnStandby');

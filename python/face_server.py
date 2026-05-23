@@ -815,6 +815,9 @@ def api_status():
         "people_inside": system_state["people_inside"],
         "face_database_count": sfr.get_face_count(),
         "camera_mode": system_state.get("camera_mode", "always"),
+        "unlock_mode": system_state.get("unlock_mode", "offline"),
+        "db_alive": system_state.get("db_alive", True),
+        "local_cache": (lambda: __import__('local_store').stats())() if 'local_store' in __import__('sys').modules else {},
         "timestamp": datetime.now().isoformat()
     })
 
