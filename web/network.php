@@ -60,13 +60,26 @@
     <div class="net-field">
         <div class="net-field-icon" style="background: rgba(217,119,6,0.14); color: #d97706;"><?= ico('lock', 18) ?></div>
         <div class="net-field-text">
-            <strong>Pairing Token <span class="tiny muted">(ใส่ใน .env ของ Pi / Preferences ของ ESP32)</span></strong>
-            <p>shared secret ระหว่าง web ↔ Pi ↔ ESP32 — กัน device แปลกปลอมบน WiFi เดียวกัน</p>
+            <strong>Pairing Token <span class="tiny muted">(optional — zero-config mode ไม่ต้องใส่)</span></strong>
+            <p>shared secret กัน device แปลกปลอมบน WiFi เดียวกัน — ใช้คู่กับ <code>auto_pairing</code></p>
         </div>
         <div class="row gap-2">
             <input type="text" id="pairToken" readonly class="input mono" style="width: 280px; text-align: center; letter-spacing: 1px;">
             <button type="button" onclick="copyPairToken()" class="btn sm" title="คัดลอก"><?= ico('copy', 12) ?></button>
             <button type="button" onclick="regenerateToken()" class="btn sm danger" title="สร้างใหม่"><?= ico('refresh', 12) ?> ใหม่</button>
+        </div>
+    </div>
+
+    <!-- ESP32 Firmware Download -->
+    <div class="net-field" style="background: linear-gradient(135deg, rgba(99,102,241,0.06), rgba(99,102,241,0.02)); border: 1px solid color-mix(in oklch, #6366f1 20%, var(--border));">
+        <div class="net-field-icon" style="background: rgba(99,102,241,0.16); color: #6366f1;"><?= ico('chip', 18) ?></div>
+        <div class="net-field-text">
+            <strong>โค้ด ESP32 (door_controller.ino) <span class="badge accent">pre-filled WiFi</span></strong>
+            <p>ดาวน์โหลด → เปิดใน Arduino IDE → Upload เข้า ESP32 — WiFi SSID/Password จากหน้า Settings จะถูกฝังให้อัตโนมัติ</p>
+        </div>
+        <div class="row gap-2">
+            <a href="api/firmware/esp32.php" download class="btn primary sm"><?= ico('download', 12) ?> Download .ino</a>
+            <a href="api/firmware/esp32.php?preview=1" target="_blank" class="btn sm ghost" title="ดู source ก่อน download"><?= ico('eye', 12) ?> Preview</a>
         </div>
     </div>
 
