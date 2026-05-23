@@ -23,15 +23,29 @@ define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: '');
 define('DB_NAME', getenv('DB_NAME') ?: 'bunny_door');
 
-// Python Face Server — ใช้ getDB() singleton แทนสร้าง PDO ใหม่ (ลด connection ซ้ำซ้อน)
-// ลำดับ: DB heartbeat (Pi ส่งมา) → .env FACE_SERVER_URL → fallback localhost
+// Python Face Server URL — ลำดับ:
+//   1) paired_devices (Auto-Pair, TRUSTED, ล่าสุด) — source of truth ใหม่
+//   2) system_status heartbeat (fresh ภายใน 120s)
+//   3) .env FACE_SERVER_URL
+//   4) localhost (fallback)
 $_faceServerUrl = getenv('FACE_SERVER_URL') ?: 'http://localhost:5000';
 try {
-    $_piRow = getDB()
-        ->query("SELECT ip_address, last_heartbeat FROM system_status WHERE component = 'face_server' AND status = 'ONLINE' LIMIT 1")
-        ->fetch(PDO::FETCH_ASSOC);
-    if ($_piRow && $_piRow['ip_address'] && (time() - strtotime($_piRow['last_heartbeat'])) < 120) {
-        $_faceServerUrl = 'http://' . $_piRow['ip_address'] . ':5000';
+    $_db = getDB();
+    // 1) Auto-Pair ก่อน
+    $_paired = $_db->query("SELECT ip_address, port FROM paired_devices
+                            WHERE role = 'PI' AND status = 'TRUSTED'
+                            ORDER BY last_seen DESC LIMIT 1")
+                   ->fetch(PDO::FETCH_ASSOC);
+    if ($_paired && $_paired['ip_address']) {
+        $_port = $_paired['port'] ?: 5000;
+        $_faceServerUrl = "http://{$_paired['ip_address']}:{$_port}";
+    } else {
+        // 2) ของเก่า: heartbeat ใน system_status
+        $_piRow = $_db->query("SELECT ip_address, last_heartbeat FROM system_status WHERE component = 'face_server' AND status = 'ONLINE' LIMIT 1")
+                      ->fetch(PDO::FETCH_ASSOC);
+        if ($_piRow && $_piRow['ip_address'] && (time() - strtotime($_piRow['last_heartbeat'])) < 120) {
+            $_faceServerUrl = 'http://' . $_piRow['ip_address'] . ':5000';
+        }
     }
 } catch (Throwable $e) {
     // เงียบไว้ — ใช้ fallback (DB ล่ม)

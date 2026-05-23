@@ -9,7 +9,19 @@ requireLogin();
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache');
 
+// ลำดับ: ใช้ Pi จาก paired_devices (Auto-Pair, TRUSTED) ก่อน → fall back FACE_SERVER_URL
 $url = FACE_SERVER_URL . '/api/system/health';
+try {
+    $db = getDB();
+    $stmt = $db->query("SELECT ip_address, port FROM paired_devices
+                        WHERE role = 'PI' AND status = 'TRUSTED'
+                        ORDER BY last_seen DESC LIMIT 1");
+    $row = $stmt->fetch();
+    if ($row) {
+        $port = $row['port'] ?: 5000;
+        $url = "http://{$row['ip_address']}:{$port}/api/system/health";
+    }
+} catch (Throwable $e) {}
 
 $ctx = stream_context_create([
     'http' => [

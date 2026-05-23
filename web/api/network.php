@@ -38,22 +38,51 @@ switch ($action) {
             $serverIPs[] = $_SERVER['SERVER_ADDR'];
         }
 
-        // Current Pi IP from .env
-        $piUrl = FACE_SERVER_URL;
-        $piIP = '';
-        if (preg_match('/http:\/\/([^:\/]+)/', $piUrl, $m)) {
-            $piIP = $m[1];
-        }
-
-        // Current ESP32 IP from DB settings
+        // ============================================================
+        // Source of truth: paired_devices (Auto-Pair) → fall back .env/settings
+        // ============================================================
         $db = getDB();
+        $piIP = '';
+        $piUrl = '';
         $esp32IP = '';
         $wifiSSID = '';
         $serverUrl = '';
+
+        // Pi IP: ดึงจาก paired_devices ที่ TRUSTED + last_seen ล่าสุด
+        try {
+            $stmt = $db->query("SELECT ip_address, port FROM paired_devices
+                                WHERE role = 'PI' AND status = 'TRUSTED'
+                                ORDER BY last_seen DESC LIMIT 1");
+            $row = $stmt->fetch();
+            if ($row) {
+                $piIP = $row['ip_address'];
+                $port = $row['port'] ?: 5000;
+                $piUrl = "http://{$piIP}:{$port}";
+            }
+        } catch (Exception $e) {}
+
+        // ESP32 IP: ดึงจาก paired_devices ก่อน
+        try {
+            $stmt = $db->query("SELECT ip_address FROM paired_devices
+                                WHERE role = 'ESP32' AND status = 'TRUSTED'
+                                ORDER BY last_seen DESC LIMIT 1");
+            $row = $stmt->fetch();
+            if ($row) $esp32IP = $row['ip_address'];
+        } catch (Exception $e) {}
+
+        // Fallback: ถ้ายังไม่ paired ก็ใช้ค่าเก่าจาก .env/settings
+        if (!$piIP) {
+            $piUrl = FACE_SERVER_URL;
+            if (preg_match('/http:\/\/([^:\/]+)/', $piUrl, $m)) {
+                $piIP = $m[1];
+            }
+        }
+
+        // wifi_ssid + server_url ยังอ่านจาก settings เหมือนเดิม
         try {
             $stmt = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('esp32_ip','wifi_ssid','server_url')");
             foreach ($stmt->fetchAll() as $row) {
-                if ($row['setting_key'] === 'esp32_ip') $esp32IP = $row['setting_value'];
+                if ($row['setting_key'] === 'esp32_ip' && !$esp32IP) $esp32IP = $row['setting_value'];
                 if ($row['setting_key'] === 'wifi_ssid') $wifiSSID = $row['setting_value'];
                 if ($row['setting_key'] === 'server_url') $serverUrl = $row['setting_value'];
             }
