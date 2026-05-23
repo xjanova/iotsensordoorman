@@ -78,7 +78,9 @@ _name_display_cache = {}  # {"somchai_j": "สมชาย ใจดี", ...}
 _name_cache_loaded = False
 
 def load_name_display_cache():
-    """โหลดชื่อแสดงผลจาก DB — map ทั้ง face_image, emp_code, และชื่อไฟล์จริงใน images/"""
+    """โหลดชื่อแสดงผลจาก DB — map ทั้ง face_image, emp_code, และชื่อไฟล์จริงใน images/
+       + sync unlock_mode (offline / online_only)
+    """
     global _name_display_cache, _name_cache_loaded
     db = None
     try:
@@ -88,10 +90,24 @@ def load_name_display_cache():
         rows = cursor.fetchall()
         cursor.close()
 
+        # อ่าน unlock_mode จาก settings — sync ทุกครั้งที่โหลด cache
+        try:
+            cur2 = db.cursor()
+            cur2.execute("SELECT setting_value FROM settings WHERE setting_key='pi_unlock_mode' LIMIT 1")
+            row = cur2.fetchone()
+            cur2.close()
+            mode = (row[0] if row else "offline") or "offline"
+            if mode not in ("offline", "online_only"):
+                mode = "offline"
+            system_state["unlock_mode"] = mode
+        except Exception:
+            pass
+
         # Mirror ลง local cache สำหรับใช้ตอน DB ตาย
         try:
             import local_store
             local_store.cache_employees(list(rows))
+            local_store.cache_setting("unlock_mode", system_state.get("unlock_mode", "offline"))
         except Exception as ee:
             print(f"[LocalStore] mirror error: {ee}")
         new_cache = {}
@@ -198,7 +214,19 @@ system_state = {
     "camera_mode": config.CAMERA_MODE,  # "always" or "standby"
     "esp32_ip": None,         # อัปเดตจาก ESP32 heartbeat หรือ discovery
     "web_url_discovered": None,  # อัปเดตจาก DiscoveryService
+    "unlock_mode": "offline", # offline = ใช้ cache ปลดได้ / online_only = ต้อง DB online
+    "db_alive": True,         # ปรับโดย get_employee_by_name แต่ละครั้ง
 }
+
+# โหลด cached unlock_mode ตั้งแต่ boot (กรณี DB ตายตั้งแต่เริ่ม)
+try:
+    import local_store as _ls
+    _cached_mode = _ls.get_cached_setting("unlock_mode")
+    if _cached_mode in ("offline", "online_only"):
+        system_state["unlock_mode"] = _cached_mode
+        print(f"[Boot] unlock_mode = {_cached_mode} (จาก cache)")
+except Exception:
+    pass
 
 # Discovery service (สร้างใน __main__)
 discovery_svc = None
@@ -292,9 +320,13 @@ def log_anomaly(alert_type, severity, description, camera_id, snapshot):
             db.close()
 
 
-def get_employee_by_name(name):
-    """ค้นหาพนักงานจากชื่อ — ลอง DB ก่อน → fallback local cache (offline mode)"""
+def get_employee_by_name(name, return_source: bool = False):
+    """ค้นหาพนักงานจากชื่อ — ลอง DB ก่อน → fallback local cache (offline mode)
+       ถ้า return_source=True คืน (emp, source) โดย source = 'db' หรือ 'cache'
+    """
     db = None
+    result = None
+    source = "none"
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
@@ -306,19 +338,24 @@ def get_employee_by_name(name):
         """, (f"{name}%", name, name, name))
         result = cursor.fetchone()
         cursor.close()
-        return result
+        if result:
+            source = "db"
+        system_state["db_alive"] = True
     except Exception as e:
-        # DB ตาย → fallback local cache
+        system_state["db_alive"] = False
         print(f"[DB Error] {e} — fallback local cache")
         try:
             import local_store
-            return local_store.find_employee_by_name(name)
+            result = local_store.find_employee_by_name(name)
+            if result:
+                source = "cache"
         except Exception as ee:
             print(f"[LocalStore] find error: {ee}")
-            return None
     finally:
         if db:
-            db.close()
+            try: db.close()
+            except: pass
+    return (result, source) if return_source else result
 
 
 def update_system_status(component, status, ip=None):
@@ -516,12 +553,20 @@ def process_detected_faces(frame, faces, names, confidences, camera_id, cam_name
         _last_action_time[debounce_key] = now
         _last_direction[name] = {"dir": direction, "time": now}
 
-        # ค้นหาพนักงานในฐานข้อมูล
-        employee = get_employee_by_name(name)
+        # ค้นหาพนักงานในฐานข้อมูล + ดู source (db/cache)
+        employee, src = get_employee_by_name(name, return_source=True)
         if employee and employee["is_authorized"]:
             snapshot = save_snapshot(frame, name, camera_id)
+            # Online-Only mode: ห้ามปลดล็อกถ้าได้ข้อมูลจาก cache (DB ตาย)
+            unlock_mode = system_state.get("unlock_mode", "offline")
+            if unlock_mode == "online_only" and src != "db":
+                emp_id = employee.get("id", 0)
+                log_access(emp_id if emp_id and emp_id > 0 else None,
+                           direction, "FACE", conf, camera_id, None, snapshot, 0)
+                print(f"[Access] BLOCKED {name} — DB offline + unlock_mode=online_only")
+                continue
             log_access(employee["id"], direction, "FACE", conf, camera_id, None, snapshot, 1)
-            print(f"[Access] {name} → {direction} (conf={conf}%, cam={cam_name})")
+            print(f"[Access] {name} → {direction} (conf={conf}%, cam={cam_name}, src={src})")
 
             # สั่งเปิดประตูทั้งขาเข้า (กล้องนอก) และขาออก (กล้องใน)
             unlock_door()

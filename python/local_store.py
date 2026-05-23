@@ -21,6 +21,7 @@ _CACHE_DIR.mkdir(parents=True, exist_ok=True)
 EMP_FILE = _CACHE_DIR / "employees.json"
 PENDING_LOG_FILE = _CACHE_DIR / "pending_logs.jsonl"
 PENDING_EMP_FILE = _CACHE_DIR / "pending_emp.jsonl"
+SETTINGS_FILE = _CACHE_DIR / "settings.json"
 
 _lock_emp = threading.Lock()
 _lock_log = threading.Lock()
@@ -235,6 +236,31 @@ def flush_new_employees(db_writer) -> int:
             print(f"[LocalStore] flush_emp rewrite error: {e}")
 
     return flushed
+
+
+def cache_setting(key: str, value) -> None:
+    """บันทึก setting แต่ละ key ลง settings.json (merged)"""
+    try:
+        current = load_cached_settings()
+        current[key] = value
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(current, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[LocalStore] cache_setting error: {e}")
+
+
+def load_cached_settings() -> dict:
+    try:
+        if not SETTINGS_FILE.exists():
+            return {}
+        with open(SETTINGS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def get_cached_setting(key: str, default=None):
+    return load_cached_settings().get(key, default)
 
 
 def stats() -> dict:

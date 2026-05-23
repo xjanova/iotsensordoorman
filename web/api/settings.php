@@ -33,6 +33,7 @@ const SETTING_SPECS = [
     'heartbeat_interval_ms'      => ['type' => 'int',  'min' => 1000, 'max' => 60000],
     'door_lock_type'             => ['type' => 'enum', 'options' => ['NO', 'NC']],
     'pairing_enabled'            => ['type' => 'bool'],
+    'pi_unlock_mode'             => ['type' => 'enum', 'options' => ['offline', 'online_only']],
 ];
 
 function validateSetting(string $key, $value): array {

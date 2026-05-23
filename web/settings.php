@@ -186,6 +186,18 @@ function s($key, $default = '') {
                 <div class="title">ESP32 Hardware</div>
             </div>
             <div class="field-row">
+                <div class="label-col">
+                    <strong>นโยบายปลดล็อก (Unlock Policy)</strong>
+                    <p>Online Only = ปลอดภัยกว่า แต่ถ้า DB ตายประตูจะไม่เปิด<br>Offline-Aware = ใช้ข้อมูลที่ cache ไว้ปลดได้แม้ DB ตาย</p>
+                </div>
+                <div class="ctl">
+                    <select name="pi_unlock_mode" class="select" style="width: 280px;">
+                        <option value="offline" <?= ($settings['pi_unlock_mode'] ?? 'offline') === 'offline' ? 'selected' : '' ?>>Offline-Aware (ใช้ cache ปลดได้)</option>
+                        <option value="online_only" <?= ($settings['pi_unlock_mode'] ?? 'offline') === 'online_only' ? 'selected' : '' ?>>Online Only (ต้อง DB ออนไลน์)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field-row">
                 <div class="label-col"><strong>ประเภท Relay</strong><p>NO = ปกติเปิด (ล็อกเมื่อ HIGH), NC = ปกติปิด</p></div>
                 <div class="ctl">
                     <select name="door_lock_type" class="select" style="width: 280px;">

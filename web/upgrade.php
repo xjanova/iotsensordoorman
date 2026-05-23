@@ -39,6 +39,7 @@ $requiredSettings = [
     'db_share_enabled'     => ['1', 'อนุญาตให้ Pi ที่ TRUSTED ดึง DB credentials ผ่าน /api/pair/credentials.php'],
     'pairing_token'        => ['', 'Shared secret สำหรับ pair (auto-generated)'],
     'pairing_enabled'      => ['1', 'เปิดรับการ pair อุปกรณ์ใหม่'],
+    'pi_unlock_mode'       => ['offline', 'Pi unlock policy: offline / online_only'],
 ];
 
 $existing = [];
