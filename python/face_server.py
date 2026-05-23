@@ -232,6 +232,9 @@ def get_db():
         database=config.DB_NAME,
         charset="utf8mb4",
         connection_timeout=3,   # short timeout — ไม่ให้ block startup
+        ssl_disabled=True,      # ปิด SSL — Laragon MariaDB ใหม่เปิด TLS default
+                                # แต่ใช้ self-signed cert ที่ Pi verify ไม่ผ่าน
+                                # ปลอดภัยพอใน LAN เดียวกัน
     )
 
 
