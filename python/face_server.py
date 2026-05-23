@@ -84,9 +84,16 @@ def load_name_display_cache():
     try:
         db = get_db()
         cursor = db.cursor(dictionary=True)
-        cursor.execute("SELECT face_image, first_name, last_name, emp_code FROM employees WHERE is_authorized = 1")
+        cursor.execute("SELECT id, face_image, first_name, last_name, emp_code, department, position, is_authorized FROM employees WHERE is_authorized = 1")
         rows = cursor.fetchall()
         cursor.close()
+
+        # Mirror ลง local cache สำหรับใช้ตอน DB ตาย
+        try:
+            import local_store
+            local_store.cache_employees(list(rows))
+        except Exception as ee:
+            print(f"[LocalStore] mirror error: {ee}")
         new_cache = {}
         for row in rows:
             display = f"{row['first_name'] or ''} {row['last_name'] or ''}".strip()
@@ -239,6 +246,7 @@ def get_db():
 
 
 def log_access(employee_id, direction, method, confidence, camera_id, sensor_id, snapshot, authorized):
+    """เขียน access_log ลง DB → ถ้า fail queue local + flush รอบหน้า"""
     db = None
     try:
         db = get_db()
@@ -251,7 +259,16 @@ def log_access(employee_id, direction, method, confidence, camera_id, sensor_id,
         db.commit()
         cursor.close()
     except Exception as e:
-        print(f"[DB Error] {e}")
+        # DB ตาย → queue ลง local pending file → จะ flush ตอน DB กลับ
+        print(f"[DB Error] {e} — queue access log offline")
+        try:
+            import local_store
+            local_store.queue_access_log(
+                employee_id, direction, method, confidence,
+                camera_id, sensor_id, snapshot, authorized,
+            )
+        except Exception as ee:
+            print(f"[LocalStore] queue error: {ee}")
     finally:
         if db:
             db.close()
@@ -276,7 +293,7 @@ def log_anomaly(alert_type, severity, description, camera_id, snapshot):
 
 
 def get_employee_by_name(name):
-    """ค้นหาพนักงานจากชื่อไฟล์ที่ face recognition คืนมา — ค้นทั้ง face_image, emp_code"""
+    """ค้นหาพนักงานจากชื่อ — ลอง DB ก่อน → fallback local cache (offline mode)"""
     db = None
     try:
         db = get_db()
@@ -291,8 +308,14 @@ def get_employee_by_name(name):
         cursor.close()
         return result
     except Exception as e:
-        print(f"[DB Error] {e}")
-        return None
+        # DB ตาย → fallback local cache
+        print(f"[DB Error] {e} — fallback local cache")
+        try:
+            import local_store
+            return local_store.find_employee_by_name(name)
+        except Exception as ee:
+            print(f"[LocalStore] find error: {ee}")
+            return None
     finally:
         if db:
             db.close()
@@ -1438,9 +1461,17 @@ def api_capture_photo():
 
 @app.route('/api/capture/save', methods=['POST'])
 def api_capture_save():
-    """ถ่ายภาพจากกล้องแล้วบันทึกเป็นไฟล์ (สำหรับลงทะเบียน)"""
-    cam = request.json.get('camera', 'outside') if request.is_json else request.form.get('camera', 'outside')
-    emp_code = request.json.get('emp_code', 'capture') if request.is_json else request.form.get('emp_code', 'capture')
+    """ถ่ายภาพจากกล้องแล้วบันทึกเป็นไฟล์ (สำหรับลงทะเบียน)
+       ถ้ามี first_name/last_name → queue เป็น new employee ใน local store
+       เพื่อให้ recognize ได้ทันทีแม้ DB ตาย — sync ภายหลังตอน DB กลับ
+    """
+    payload = request.json or request.form
+    cam = payload.get('camera', 'outside')
+    emp_code = payload.get('emp_code', 'capture')
+    first_name = (payload.get('first_name') or '').strip()
+    last_name  = (payload.get('last_name') or '').strip()
+    department = (payload.get('department') or '').strip()
+    position   = (payload.get('position') or '').strip()
 
     cam_key = f"camera_{cam}"
     if cam_key not in _camera_captures or not _camera_captures[cam_key].isOpened():
@@ -1492,12 +1523,31 @@ def api_capture_save():
     loaded = sfr.reload_images(config.IMAGES_PATH)
     print(f"[Capture] Saved {filename} → reloaded {loaded} faces")
 
+    # ถ้ามีข้อมูลพนักงาน → queue ลง local store (recognize ได้ทันที + sync ภายหลัง)
+    queued = False
+    if first_name or last_name:
+        try:
+            import local_store
+            local_store.queue_new_employee(
+                emp_code=safe_code,
+                first_name=first_name,
+                last_name=last_name,
+                department=department,
+                position=position,
+                face_image=filename,
+            )
+            queued = True
+            print(f"[Capture] queued new employee: {safe_code} ({first_name} {last_name})")
+        except Exception as e:
+            print(f"[Capture] queue_new_employee error: {e}")
+
     return jsonify({
         "success": True,
         "filename": web_filename,
         "face_ratio": face_ratio,
         "face_size": {"width": face_w, "height": face_h},
         "valid": True,
+        "queued_offline": queued,
         "quality_notes": ["ใบหน้าเล็ก ลองเข้าใกล้กว่านี้"] if face_ratio < 5 else [],
         "message": "ถ่ายภาพสำเร็จ" + (f" (ใบหน้า {face_ratio}%)" if face_ratio else ""),
         "image_base64": img_base64
@@ -1858,6 +1908,80 @@ if __name__ == "__main__":
             time.sleep(300)  # 5 นาที
             load_name_display_cache()
     threading.Thread(target=_name_cache_refresh_loop, daemon=True).start()
+
+    # Offline queue sync — flush pending logs + employees ทุก 60s (เมื่อ DB กลับมา)
+    def _offline_sync_loop():
+        try:
+            import local_store
+        except ImportError:
+            print("[OfflineSync] local_store module not available")
+            return
+        while system_state["running"]:
+            time.sleep(60)
+            # Flush access logs ค้าง
+            def _write_log(entry):
+                db = None
+                try:
+                    db = get_db()
+                    cur = db.cursor()
+                    cur.execute("""
+                        INSERT INTO access_logs
+                        (employee_id, direction, method, confidence, camera_id,
+                         sensor_triggered, snapshot_path, is_authorized, created_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, FROM_UNIXTIME(%s))
+                    """, (
+                        entry.get("employee_id"), entry.get("direction"),
+                        entry.get("method"), entry.get("confidence"),
+                        entry.get("camera_id"), entry.get("sensor_id"),
+                        entry.get("snapshot"), entry.get("authorized"),
+                        entry.get("ts", time.time()),
+                    ))
+                    db.commit()
+                    cur.close()
+                    return True
+                except Exception as e:
+                    return False
+                finally:
+                    if db:
+                        try: db.close()
+                        except: pass
+
+            # Flush new employees ค้าง
+            def _write_emp(entry):
+                db = None
+                try:
+                    db = get_db()
+                    cur = db.cursor()
+                    cur.execute("""
+                        INSERT INTO employees
+                        (emp_code, first_name, last_name, department, position, face_image, is_authorized)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        ON DUPLICATE KEY UPDATE
+                          first_name = VALUES(first_name),
+                          last_name  = VALUES(last_name),
+                          face_image = VALUES(face_image)
+                    """, (
+                        entry.get("emp_code"), entry.get("first_name"),
+                        entry.get("last_name"), entry.get("department", ""),
+                        entry.get("position", ""), entry.get("face_image"),
+                        entry.get("is_authorized", 1),
+                    ))
+                    new_id = cur.lastrowid
+                    db.commit()
+                    cur.close()
+                    return new_id or True
+                except Exception as e:
+                    return None
+                finally:
+                    if db:
+                        try: db.close()
+                        except: pass
+
+            n_logs = local_store.flush_access_logs(_write_log)
+            n_emps = local_store.flush_new_employees(_write_emp)
+            if n_logs or n_emps:
+                print(f"[OfflineSync] flushed {n_logs} access logs + {n_emps} employees → DB")
+    threading.Thread(target=_offline_sync_loop, name="offline-sync", daemon=True).start()
 
     # เริ่ม camera threads (ข้ามถ้า ID = -1)
     if config.CAMERA_OUTSIDE_ID >= 0:
