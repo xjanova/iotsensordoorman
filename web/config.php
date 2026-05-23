@@ -23,22 +23,18 @@ define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASS', getenv('DB_PASS') ?: '');
 define('DB_NAME', getenv('DB_NAME') ?: 'bunny_door');
 
-// Python Face Server — ดึง IP จาก DB (Pi ส่ง heartbeat มา) หรือใช้ .env fallback
+// Python Face Server — ใช้ getDB() singleton แทนสร้าง PDO ใหม่ (ลด connection ซ้ำซ้อน)
+// ลำดับ: DB heartbeat (Pi ส่งมา) → .env FACE_SERVER_URL → fallback localhost
 $_faceServerUrl = getenv('FACE_SERVER_URL') ?: 'http://localhost:5000';
 try {
-    $_tmpPdo = new PDO(
-        "mysql:host=" . (getenv('DB_HOST') ?: 'localhost') . ";port=" . intval(getenv('DB_PORT') ?: 3306) . ";dbname=" . (getenv('DB_NAME') ?: 'bunny_door') . ";charset=utf8mb4",
-        getenv('DB_USER') ?: 'root',
-        getenv('DB_PASS') ?: '',
-        [PDO::ATTR_ERRMODE => PDO::ERRMODE_SILENT]
-    );
-    $_piRow = $_tmpPdo->query("SELECT ip_address, last_heartbeat FROM system_status WHERE component = 'face_server' AND status = 'ONLINE' LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    $_piRow = getDB()
+        ->query("SELECT ip_address, last_heartbeat FROM system_status WHERE component = 'face_server' AND status = 'ONLINE' LIMIT 1")
+        ->fetch(PDO::FETCH_ASSOC);
     if ($_piRow && $_piRow['ip_address'] && (time() - strtotime($_piRow['last_heartbeat'])) < 120) {
         $_faceServerUrl = 'http://' . $_piRow['ip_address'] . ':5000';
     }
-    $_tmpPdo = null;
-} catch (Exception $e) {
-    // ใช้ .env fallback
+} catch (Throwable $e) {
+    // เงียบไว้ — ใช้ fallback (DB ล่ม)
 }
 define('FACE_SERVER_URL', $_faceServerUrl);
 
@@ -73,13 +69,27 @@ function getDB(): PDO {
 
 /**
  * JSON Response helper
+ * CORS: echo origin กลับเฉพาะเมื่ออยู่ใน allowlist (.env CORS_ORIGINS) หรือ same-host
  */
 function jsonResponse($data, int $code = 200): void {
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
-    header('Access-Control-Allow-Origin: http://localhost');
+
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if ($origin) {
+        $allowed = array_filter(array_map('trim', explode(',', getenv('CORS_ORIGINS') ?: '')));
+        if (empty($allowed)) {
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $allowed = ["http://{$host}", "https://{$host}", 'http://localhost', 'http://127.0.0.1'];
+        }
+        if (in_array($origin, $allowed, true)) {
+            header('Access-Control-Allow-Origin: ' . $origin);
+            header('Vary: Origin');
+            header('Access-Control-Allow-Credentials: true');
+        }
+    }
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type');
+    header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token, X-Pair-Token');
     echo json_encode($data, JSON_UNESCAPED_UNICODE);
     exit;
 }

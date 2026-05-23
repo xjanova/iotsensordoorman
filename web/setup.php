@@ -10,6 +10,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Check if admin already exists
+$dbError = false;
+$db = null;
 try {
     $db = getDB();
     $stmt = $db->query("SELECT COUNT(*) as c FROM admin_users");
@@ -18,11 +20,14 @@ try {
         exit;
     }
 } catch (PDOException $e) {
+    error_log("[Setup] DB connect: " . $e->getMessage());
     $dbError = true;
 }
 
 $error = '';
 $success = false;
+$username = '';
+$displayName = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
@@ -30,7 +35,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
 
-    if ($username === '' || $password === '') {
+    if ($dbError || !$db) {
+        $error = 'เชื่อมต่อฐานข้อมูลไม่ได้';
+    } elseif ($username === '' || $password === '') {
         $error = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
     } elseif (strlen($username) < 3 || strlen($username) > 50) {
         $error = 'ชื่อผู้ใช้ต้องมี 3-50 ตัวอักษร';
@@ -45,6 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hash = password_hash($password, PASSWORD_BCRYPT);
             $stmt = $db->prepare("INSERT INTO admin_users (username, password_hash, display_name) VALUES (?, ?, ?)");
             $stmt->execute([$username, $hash, $displayName ?: $username]);
+
+            // สร้าง pairing token อัตโนมัติเมื่อ setup ครั้งแรก
+            $token = bin2hex(random_bytes(16));
+            $tk = $db->prepare("INSERT INTO settings (setting_key, setting_value, description) VALUES ('pairing_token', ?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+            $tk->execute([$token, 'Shared secret สำหรับ pair Pi/ESP32 กับ Web']);
+
             $success = true;
         } catch (PDOException $e) {
             error_log("[Setup] " . $e->getMessage());

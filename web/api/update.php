@@ -3,11 +3,9 @@
  * Bunny Door System - Update API
  * เช็คเวอร์ชันและอัพเดทจาก GitHub
  */
-require_once __DIR__ . '/../config.php';
-session_start();
-if (empty($_SESSION['admin_id'])) {
-    jsonResponse(['error' => 'Unauthorized'], 401);
-}
+require_once __DIR__ . '/../includes/api_auth.php';
+
+requireLogin();
 
 header('Content-Type: application/json; charset=utf-8');
 

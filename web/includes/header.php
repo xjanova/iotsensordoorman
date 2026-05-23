@@ -36,6 +36,7 @@ $_initials = $currentAdmin
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?= htmlspecialchars(csrfToken()) ?>">
     <title><?= htmlspecialchars($pageTitle ?? APP_NAME) ?></title>
 
     <!-- Avoid flash of wrong theme: apply persisted theme/accent BEFORE body renders -->

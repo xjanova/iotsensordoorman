@@ -16,24 +16,35 @@ $cam2Online = ($sysStatus['camera_inside'] ?? '') === 'ONLINE';
 $faceServerOnline = ($sysStatus['face_server'] ?? '') === 'ONLINE';
 $esp32Online = ($sysStatus['esp32'] ?? '') === 'ONLINE';
 
-// สถิติวันนี้
-$stmt = $db->query("SELECT COUNT(DISTINCT employee_id) as c FROM access_logs WHERE direction='IN' AND DATE(created_at) = CURDATE() AND is_authorized = 1");
+// สถิติวันนี้ — นับจำนวนครั้ง (rows) ไม่ใช่จำนวนคน เพื่อให้เปรียบเทียบ in/out เป็นคู่ได้ถูกต้อง
+$stmt = $db->query("SELECT COUNT(*) as c FROM access_logs WHERE direction='IN' AND DATE(created_at) = CURDATE() AND is_authorized = 1 AND employee_id IS NOT NULL");
 $todayIn = (int) ($stmt->fetch()['c'] ?? 0);
 
-$stmt = $db->query("SELECT COUNT(DISTINCT employee_id) as c FROM access_logs WHERE direction='OUT' AND DATE(created_at) = CURDATE() AND is_authorized = 1");
+$stmt = $db->query("SELECT COUNT(*) as c FROM access_logs WHERE direction='OUT' AND DATE(created_at) = CURDATE() AND is_authorized = 1 AND employee_id IS NOT NULL");
 $todayOut = (int) ($stmt->fetch()['c'] ?? 0);
 
-$currentlyInside = max(0, $todayIn - $todayOut);
+// จำนวนคนปัจจุบันใน = นับ employee ที่ direction ล่าสุด = IN (วันนี้)
+$stmt = $db->query("
+    SELECT COUNT(*) AS c FROM (
+        SELECT employee_id,
+               SUBSTRING_INDEX(GROUP_CONCAT(direction ORDER BY created_at DESC), ',', 1) AS last_dir
+        FROM access_logs
+        WHERE DATE(created_at) = CURDATE() AND is_authorized = 1 AND employee_id IS NOT NULL
+        GROUP BY employee_id
+    ) t
+    WHERE last_dir = 'IN'
+");
+$currentlyInside = (int) ($stmt->fetch()['c'] ?? 0);
 
 $stmt = $db->query("SELECT COUNT(*) as c FROM anomaly_alerts WHERE is_resolved = 0");
 $unresolvedAlerts = (int) ($stmt->fetch()['c'] ?? 0);
 
-// เปรียบเทียบกับเมื่อวาน
-$stmt = $db->query("SELECT COUNT(DISTINCT employee_id) as c FROM access_logs WHERE direction='IN' AND DATE(created_at) = CURDATE() - INTERVAL 1 DAY AND is_authorized = 1");
+// เปรียบเทียบกับเมื่อวาน — ใช้สูตรเดียวกัน (count events)
+$stmt = $db->query("SELECT COUNT(*) as c FROM access_logs WHERE direction='IN' AND DATE(created_at) = CURDATE() - INTERVAL 1 DAY AND is_authorized = 1 AND employee_id IS NOT NULL");
 $yIn = (int) ($stmt->fetch()['c'] ?? 0);
-$stmt = $db->query("SELECT COUNT(DISTINCT employee_id) as c FROM access_logs WHERE direction='OUT' AND DATE(created_at) = CURDATE() - INTERVAL 1 DAY AND is_authorized = 1");
+$stmt = $db->query("SELECT COUNT(*) as c FROM access_logs WHERE direction='OUT' AND DATE(created_at) = CURDATE() - INTERVAL 1 DAY AND is_authorized = 1 AND employee_id IS NOT NULL");
 $yOut = (int) ($stmt->fetch()['c'] ?? 0);
-$yInside = max(0, $yIn - $yOut);
+$yInside = max(0, $yIn - $yOut);  // สำหรับ delta — เปรียบเทียบ in-out
 $stmt = $db->query("SELECT COUNT(*) as c FROM anomaly_alerts WHERE DATE(created_at) = CURDATE() - INTERVAL 1 DAY");
 $yAlerts = (int) ($stmt->fetch()['c'] ?? 0);
 

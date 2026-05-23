@@ -2,7 +2,7 @@
 /**
  * API: จัดการพนักงาน (CRUD)
  */
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -10,12 +10,12 @@ if ($method === 'OPTIONS') {
     jsonResponse(['ok' => true]);
 }
 
-// Require login for write operations
-if ($method !== 'GET') {
-    session_start();
-    if (empty($_SESSION['admin_id'])) {
-        jsonResponse(['error' => 'กรุณาเข้าสู่ระบบ'], 401);
-    }
+// ข้อมูลพนักงาน + รูปใบหน้า ถือเป็น sensitive — บังคับ login ทุก method
+// แต่ Pi (face server) ต้องเรียก GET ได้เพื่อ sync รายชื่อ → อนุญาตด้วย pair token
+if ($method === 'GET') {
+    requireLoginOrPairToken();
+} else {
+    requireLogin();
 }
 
 try {
@@ -61,8 +61,8 @@ try {
                 jsonResponse(['error' => 'รหัสพนักงานต้องเป็นตัวอักษรภาษาอังกฤษ ตัวเลข หรือ - เท่านั้น (สูงสุด 20 ตัว)'], 400);
             }
 
-            // Validate face_image filename (prevent path traversal)
-            if ($faceImage !== null && !preg_match('/^[A-Za-z0-9_\-\.]+$/', $faceImage)) {
+            // Validate face_image filename (strict: ไม่อนุญาต .. หรือไฟล์ที่ขึ้นต้นด้วย .)
+            if ($faceImage !== null && !preg_match('/^[A-Za-z0-9_\-]+\.(jpg|jpeg|png|webp)$/i', $faceImage)) {
                 jsonResponse(['error' => 'ชื่อไฟล์รูปไม่ถูกต้อง'], 400);
             }
 
@@ -89,8 +89,24 @@ try {
         case 'DELETE':
             $id = intval($_GET['id'] ?? 0);
             if ($id <= 0) jsonResponse(['error' => 'ID required'], 400);
+
+            // ดึง face_image ก่อน เพื่อลบไฟล์
+            $get = $db->prepare("SELECT face_image FROM employees WHERE id = ?");
+            $get->execute([$id]);
+            $row = $get->fetch();
+            if (!$row) jsonResponse(['error' => 'ไม่พบพนักงาน'], 404);
+
             $stmt = $db->prepare("DELETE FROM employees WHERE id = ?");
             $stmt->execute([$id]);
+
+            // ลบไฟล์รูป (ถ้ามี) — sanitize ก่อนเสมอ
+            if (!empty($row['face_image'])) {
+                $safeName = basename($row['face_image']);
+                if (preg_match('/^[A-Za-z0-9_\-]+\.(jpg|jpeg|png|webp)$/i', $safeName)) {
+                    $path = __DIR__ . '/../uploads/faces/' . $safeName;
+                    if (is_file($path)) @unlink($path);
+                }
+            }
             jsonResponse(['success' => true]);
             break;
 

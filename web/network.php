@@ -43,6 +43,56 @@
     </div>
 </div>
 
+<!-- Auto-Pair (Devices on same WiFi) -->
+<div class="card section">
+    <div class="card-head" style="padding: 0 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 14px;">
+        <div>
+            <div class="title">Auto-Pair อุปกรณ์ <span class="badge accent" id="pairEnabledBadge">เปิด</span></div>
+            <div class="sub">อุปกรณ์ที่มี pairing token ตรงและอยู่ใน WiFi เดียวกัน จะปรากฏที่นี่อัตโนมัติ</div>
+        </div>
+        <div class="actions">
+            <button type="button" onclick="refreshPairedDevices()" class="btn sm ghost"><?= ico('refresh', 12) ?> รีเฟรช</button>
+            <button type="button" onclick="togglePairing()" class="btn sm" id="btnTogglePairing">ปิดรับ pair</button>
+        </div>
+    </div>
+
+    <!-- Pairing Token -->
+    <div class="net-field">
+        <div class="net-field-icon" style="background: rgba(217,119,6,0.14); color: #d97706;"><?= ico('lock', 18) ?></div>
+        <div class="net-field-text">
+            <strong>Pairing Token <span class="tiny muted">(ใส่ใน .env ของ Pi / Preferences ของ ESP32)</span></strong>
+            <p>shared secret ระหว่าง web ↔ Pi ↔ ESP32 — กัน device แปลกปลอมบน WiFi เดียวกัน</p>
+        </div>
+        <div class="row gap-2">
+            <input type="text" id="pairToken" readonly class="input mono" style="width: 280px; text-align: center; letter-spacing: 1px;">
+            <button type="button" onclick="copyPairToken()" class="btn sm" title="คัดลอก"><?= ico('copy', 12) ?></button>
+            <button type="button" onclick="regenerateToken()" class="btn sm danger" title="สร้างใหม่"><?= ico('refresh', 12) ?> ใหม่</button>
+        </div>
+    </div>
+
+    <!-- Discovered devices list -->
+    <div style="margin-top: 16px;">
+        <div id="pairedList" class="paired-list">
+            <div class="empty" style="padding: 16px; text-align: center; color: var(--text-2);">กำลังโหลด...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+.paired-list .pair-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; background: var(--bg-2); }
+.paired-list .pair-row.pending { border-color: color-mix(in oklch, var(--warn) 35%, var(--border)); background: color-mix(in oklch, var(--warn) 5%, var(--bg-2)); }
+.paired-list .pair-row.trusted { border-color: color-mix(in oklch, var(--ok) 25%, var(--border)); }
+.paired-list .pair-row.revoked { opacity: 0.6; }
+.paired-list .role-icon { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; }
+.paired-list .role-icon.pi { background: rgba(16,185,129,0.16); color: #10b981; }
+.paired-list .role-icon.esp32 { background: rgba(217,119,6,0.16); color: #d97706; }
+.paired-list .role-icon.other { background: rgba(99,102,241,0.16); color: #6366f1; }
+.paired-list .pair-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.paired-list .pair-meta .name { font-size: 13px; font-weight: 600; }
+.paired-list .pair-meta .info { font-size: 11.5px; color: var(--text-2); font-family: var(--font-mono); }
+.paired-list .pair-actions { display: flex; gap: 6px; }
+</style>
+
 <!-- IP Configuration -->
 <div class="card section">
     <div class="card-head" style="padding: 0 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 14px;">
@@ -342,22 +392,37 @@ function togglePass() {
     inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
+// escape C-string literal — ใช้กับค่าที่ embed ใน const char*
+function escC(v) {
+    if (v == null) return '';
+    return String(v)
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t')
+        .replace(/[\x00-\x1f\x7f]/g, '');
+}
 function generateESP32Code() {
     const piIP = document.getElementById('inputPiIP').value || '192.168.1.121';
     const wifiSSID = document.getElementById('inputWifiSSID').value || 'YOUR_WIFI_SSID';
     const wifiPass = document.getElementById('inputWifiPass').value || 'YOUR_WIFI_PASSWORD';
+    // validate IP เพื่อกัน injection
+    const safePiIP = /^[0-9.]{7,15}$/.test(piIP) ? piIP : '192.168.1.121';
     const code = `/*
  * Bunny Door System - ESP32 Door Controller
  * Auto-generated: ${new Date().toLocaleString('th-TH')}
+ * หมายเหตุ: โค้ดนี้เป็นเวอร์ชัน minimal — สำหรับ auto-pair เต็มรูปแบบให้ใช้
+ *           esp32/door_controller/door_controller.ino จาก repo
  * Pin: Relay=GPIO4, LED=GPIO2, PIR_OUT=GPIO27, PIR_IN=GPIO26, Buzzer=GPIO33, BTN=GPIO13
  */
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
-const char* WIFI_SSID     = "${wifiSSID}";
-const char* WIFI_PASSWORD = "${wifiPass}";
-const char* SERVER_URL    = "http://${piIP}:5000";
+const char* WIFI_SSID     = "${escC(wifiSSID)}";
+const char* WIFI_PASSWORD = "${escC(wifiPass)}";
+const char* SERVER_URL    = "http://${safePiIP}:5000";
 
 #define PIN_PIR_OUTSIDE 27
 #define PIN_PIR_INSIDE  26
@@ -432,6 +497,126 @@ void beep(int n,int d){ for(int i=0;i<n;i++){ digitalWrite(PIN_BUZZER,HIGH); del
         showToast('สร้างโค้ดสำเร็จ!', 'success');
     });
 }
+
+// ============================================================
+// Auto-Pair management
+// ============================================================
+async function loadPairToken() {
+    const data = await fetchAPI('api/pair/token.php');
+    if (data?.token) document.getElementById('pairToken').value = data.token;
+}
+
+async function copyPairToken() {
+    const tk = document.getElementById('pairToken').value;
+    if (!tk) return;
+    try { await navigator.clipboard.writeText(tk); showToast('คัดลอก token แล้ว', 'success'); }
+    catch { showToast('คัดลอกไม่สำเร็จ', 'error'); }
+}
+
+async function regenerateToken() {
+    showConfirm('สร้าง pairing token ใหม่?',
+        'อุปกรณ์เดิม (Pi/ESP32) จะต้องอัพเดท token ก่อนถึงจะใช้งานต่อได้', async () => {
+        const res = await postAPI('api/pair/token.php', { action: 'regenerate' });
+        if (res?.success) {
+            document.getElementById('pairToken').value = res.token;
+            showToast('สร้าง token ใหม่แล้ว', 'success');
+            refreshPairedDevices();
+        } else {
+            showToast(res?.error || 'สร้าง token ไม่สำเร็จ', 'error');
+        }
+    });
+}
+
+async function togglePairing() {
+    const btn = document.getElementById('btnTogglePairing');
+    const enabled = btn.dataset.enabled === '1';
+    const newVal = enabled ? '0' : '1';
+    const res = await postAPI('api/settings.php', { pairing_enabled: newVal });
+    if (res?.success) {
+        applyPairingState(newVal === '1');
+        showToast(newVal === '1' ? 'เปิดรับ pair แล้ว' : 'ปิดรับ pair แล้ว', 'success');
+    }
+}
+
+function applyPairingState(enabled) {
+    const btn = document.getElementById('btnTogglePairing');
+    const badge = document.getElementById('pairEnabledBadge');
+    btn.dataset.enabled = enabled ? '1' : '0';
+    btn.textContent = enabled ? 'ปิดรับ pair' : 'เปิดรับ pair';
+    btn.classList.toggle('primary', !enabled);
+    badge.textContent = enabled ? 'เปิด' : 'ปิด';
+    badge.className = 'badge ' + (enabled ? 'accent' : '');
+}
+
+async function refreshPairedDevices() {
+    const list = document.getElementById('pairedList');
+    const data = await fetchAPI('api/pair/list.php');
+    if (!data?.devices) {
+        list.innerHTML = '<div class="empty" style="padding: 16px; text-align: center; color: var(--text-2);">โหลดไม่สำเร็จ</div>';
+        return;
+    }
+    if (data.devices.length === 0) {
+        list.innerHTML = '<div class="empty" style="padding: 24px; text-align: center; color: var(--text-2);">ยังไม่มีอุปกรณ์ — รอ Pi/ESP32 ส่ง broadcast (5–10 วินาที)</div>';
+        return;
+    }
+    const roleIcon = {
+        PI: <?= json_encode(ico('cpu', 18)) ?>,
+        ESP32: <?= json_encode(ico('chip', 18)) ?>,
+        OTHER: <?= json_encode(ico('plug', 18)) ?>
+    };
+    list.innerHTML = data.devices.map(d => {
+        const onlineDot = d.online ? '<span class="text-ok">● online</span>' : `<span class="text-danger">● ${d.seconds_ago}s ago</span>`;
+        const statusBadge = d.status === 'PENDING'
+            ? '<span class="badge warn">รออนุมัติ</span>'
+            : d.status === 'TRUSTED' ? '<span class="badge ok">เชื่อถือแล้ว</span>'
+            : '<span class="badge danger">ถูกปฏิเสธ</span>';
+        const actions = d.status === 'PENDING'
+            ? `<button class="btn sm primary" onclick="pairAction(${d.id}, 'approve')">อนุมัติ</button>
+               <button class="btn sm danger" onclick="pairAction(${d.id}, 'revoke')">ปฏิเสธ</button>`
+            : d.status === 'TRUSTED'
+                ? `<button class="btn sm danger" onclick="pairAction(${d.id}, 'revoke')">เพิกถอน</button>`
+                : `<button class="btn sm" onclick="pairAction(${d.id}, 'approve')">เปิดใหม่</button>
+                   <button class="btn sm ghost" onclick="pairAction(${d.id}, 'delete')">ลบ</button>`;
+        return `<div class="pair-row ${d.status.toLowerCase()}">
+            <div class="role-icon ${d.role.toLowerCase()}">${roleIcon[d.role] || roleIcon.OTHER}</div>
+            <div class="pair-meta">
+                <span class="name">${esc(d.role)} — ${esc(d.hostname || d.device_id)}</span>
+                <span class="info">${esc(d.ip_address)}${d.port ? ':' + d.port : ''} · ${esc(d.device_id)} · ${onlineDot}</span>
+            </div>
+            <div>${statusBadge}</div>
+            <div class="pair-actions">${actions}</div>
+        </div>`;
+    }).join('');
+}
+
+async function pairAction(id, action) {
+    const labels = { approve: 'อนุมัติ', revoke: 'เพิกถอน', delete: 'ลบ' };
+    if (action === 'delete' || action === 'revoke') {
+        showConfirm(labels[action] + ' device?', 'ยืนยันการ' + labels[action], async () => {
+            const res = await postAPI('api/pair/approve.php', { id, action });
+            if (res?.success) { showToast(labels[action] + 'แล้ว', 'success'); refreshPairedDevices(); }
+            else showToast(res?.error || 'ไม่สำเร็จ', 'error');
+        });
+    } else {
+        const res = await postAPI('api/pair/approve.php', { id, action });
+        if (res?.success) { showToast(labels[action] + 'แล้ว', 'success'); refreshPairedDevices(); }
+        else showToast(res?.error || 'ไม่สำเร็จ', 'error');
+    }
+}
+
+// Init pairing UI
+document.addEventListener('DOMContentLoaded', () => {
+    loadPairToken();
+    refreshPairedDevices();
+    // sync toggle button state จาก settings
+    fetchAPI('api/settings.php').then(rows => {
+        if (Array.isArray(rows)) {
+            const row = rows.find(r => r.setting_key === 'pairing_enabled');
+            applyPairingState(row?.setting_value === '1');
+        }
+    });
+    setInterval(refreshPairedDevices, 8000);
+});
 </script>
 
 <?php include 'includes/footer.php'; ?>

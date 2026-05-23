@@ -2,12 +2,9 @@
 /**
  * Proxy: ถ่ายภาพจากกล้อง Pi + บันทึกไฟล์ (แก้ CORS)
  */
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
-session_start();
-if (empty($_SESSION['admin_id'])) {
-    jsonResponse(['error' => 'กรุณาเข้าสู่ระบบ'], 401);
-}
+requireLogin();
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -63,14 +60,20 @@ if ($method === 'POST') {
 
     // ถ้าสำเร็จ: ดึง image_base64 มาบันทึกเป็นไฟล์บน Laragon
     if ($code === 200 && !empty($data['image_base64']) && !empty($data['filename'])) {
-        $uploadDir = __DIR__ . '/../uploads/faces/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+        // sanitize filename (กัน path traversal / overwrite)
+        $safeName = basename($data['filename']);
+        if (!preg_match('/^[A-Za-z0-9_\-]+\.(jpg|jpeg|png|webp)$/i', $safeName)) {
+            $safeName = 'capture_' . time() . '_' . bin2hex(random_bytes(4)) . '.jpg';
         }
-        $filepath = $uploadDir . $data['filename'];
-        file_put_contents($filepath, base64_decode($data['image_base64']));
-
-        // ลบ base64 ออกจาก response (ไม่ต้องส่งไป browser)
+        $decoded = base64_decode($data['image_base64'], true);
+        if ($decoded !== false && strlen($decoded) <= 5 * 1024 * 1024) {
+            $uploadDir = __DIR__ . '/../uploads/faces/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+            file_put_contents($uploadDir . $safeName, $decoded);
+            $data['filename'] = $safeName;
+        }
         unset($data['image_base64']);
     }
 

@@ -391,6 +391,17 @@ async function saveSettings(e) {
 // ============================================================
 // Generate Arduino Code (จากค่า settings)
 // ============================================================
+// escape C-string literal — ใช้กับค่าที่ embed ใน const char*
+function escC(v) {
+    if (v == null) return '';
+    return String(v)
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t')
+        .replace(/[\x00-\x1f\x7f]/g, '');
+}
 function generateAndCopyCode() {
     const form = document.getElementById('settingsForm');
     const fd = new FormData(form);
@@ -404,9 +415,9 @@ function generateAndCopyCode() {
 #include <HTTPClient.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
-const char* WIFI_SSID     = "${esc(s.wifi_ssid || 'YOUR_WIFI_SSID')}";
-const char* WIFI_PASSWORD = "${esc(s.wifi_password || 'YOUR_WIFI_PASSWORD')}";
-const char* SERVER_URL    = "${esc(s.server_url || 'http://192.168.1.50:5000')}";
+const char* WIFI_SSID     = "${escC(s.wifi_ssid || 'YOUR_WIFI_SSID')}";
+const char* WIFI_PASSWORD = "${escC(s.wifi_password || 'YOUR_WIFI_PASSWORD')}";
+const char* SERVER_URL    = "${escC(s.server_url || 'http://192.168.1.50:5000')}";
 
 #define PIN_PIR_OUTSIDE 27
 #define PIN_PIR_INSIDE  26

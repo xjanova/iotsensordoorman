@@ -59,9 +59,18 @@ API_PORT = 5000
 
 # ============================================================
 # PHP Web Server (Laragon)
+# ถ้าไม่ตั้งใน .env → discovery.py จะ subnet-scan หา web ให้อัตโนมัติ
 # ============================================================
-WEB_SERVER_URL = os.environ.get("WEB_SERVER_URL", "http://192.168.1.119/bunny-door")
-WEB_API_URL = f"{WEB_SERVER_URL}/api"
+WEB_SERVER_URL = os.environ.get("WEB_SERVER_URL", "")  # auto-discover ถ้าว่าง
+WEB_API_URL = f"{WEB_SERVER_URL}/api" if WEB_SERVER_URL else ""
+
+# ============================================================
+# Pairing (auto-pair บน WiFi เดียวกัน)
+# Token นี้ต้องตรงกับที่ web settings.pairing_token
+# ดูได้จากหน้า Network ของ web UI
+# ============================================================
+PAIRING_TOKEN = os.environ.get("PAIRING_TOKEN", "")
+DISCOVERY_ENABLED = os.environ.get("DISCOVERY_ENABLED", "1") == "1"
 
 # ============================================================
 # Snapshots

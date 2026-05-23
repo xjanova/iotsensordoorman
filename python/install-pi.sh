@@ -90,6 +90,7 @@ read -rp "Camera ID ตัวนอก (กด Enter = 0): " CAM_OUT
 CAM_OUT=${CAM_OUT:-0}
 read -rp "Camera ID ตัวใน (กด Enter = -1 เพื่อปิด): " CAM_IN
 CAM_IN=${CAM_IN:--1}
+read -rp "Pairing Token (จากหน้า Network ของ web UI — Enter เพื่อข้าม): " PAIRING_TOKEN
 read -rp "ชื่อ user ที่จะรัน service (กด Enter = $USER): " RUN_USER
 RUN_USER=${RUN_USER:-$USER}
 
@@ -185,7 +186,7 @@ DB_USER=root
 DB_PASSWORD=$DB_PASS
 DB_NAME=bunny_door
 
-# ESP32
+# ESP32 (ตั้งครั้งแรก — ตอน auto-pair ใช้งาน ESP32 IP จะอัพเดทอัตโนมัติ)
 ESP32_IP=$ESP32_IP
 
 # Cameras (-1 = ปิด)
@@ -195,8 +196,12 @@ CAMERA_INSIDE_ID=$CAM_IN
 # Camera mode (always / standby)
 CAMERA_MODE=always
 
-# Web Server (PC/Laragon)
+# Web Server (ปล่อยว่างเพื่อให้ discovery auto-scan หาเอง)
 WEB_SERVER_URL=http://$PC_IP/bunny-door
+
+# Auto-pair (token จากหน้า Network ของ web UI — เปิดดูแล้ว copy มาใส่)
+PAIRING_TOKEN=$PAIRING_TOKEN
+DISCOVERY_ENABLED=1
 EOF
 chmod 600 "$ENV_FILE"
 ok "สร้าง $ENV_FILE"
