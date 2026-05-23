@@ -23,7 +23,7 @@
                 <div class="net-ip" id="webIP">…</div>
                 <div class="net-status ok"><span class="led"></span>ออนไลน์ (เครื่องนี้)</div>
             </div>
-            <div class="net-edge"><div class="line"></div><div class="lbl">DB · API</div></div>
+            <div class="net-edge pending" id="edgeWebPi"><div class="line"></div><div class="lbl">DB · API</div></div>
             <div class="net-node" id="cardPi" style="--node-color: #10b981;">
                 <div class="net-icon"><?= ico('cpu', 22) ?></div>
                 <div class="net-label">Raspberry Pi</div>
@@ -31,7 +31,7 @@
                 <div class="net-ip" id="piIP">…</div>
                 <div class="net-status" id="piStatus"><span class="led"></span><span>ตรวจสอบ...</span></div>
             </div>
-            <div class="net-edge"><div class="line"></div><div class="lbl">HTTP · Heartbeat</div></div>
+            <div class="net-edge pending" id="edgePiEsp"><div class="line"></div><div class="lbl">HTTP · Heartbeat</div></div>
             <div class="net-node" id="cardESP" style="--node-color: #d97706;">
                 <div class="net-icon"><?= ico('chip', 22) ?></div>
                 <div class="net-label">ESP32</div>
@@ -338,15 +338,45 @@ async function testEsp() {
     } catch { updateEspStatus(false); showToast('เชื่อมต่อ ESP32 ไม่ได้', 'error'); }
     t.textContent = 'ทดสอบ';
 }
+// State (เก็บไว้ recompute edges)
+const _netState = { web: true, pi: null, esp: null };
+
+function _setEdge(id, state, lbl) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('live', 'dead', 'pending');
+    el.classList.add(state);
+    if (lbl) {
+        const lblEl = el.querySelector('.lbl');
+        if (lblEl) lblEl.textContent = lbl;
+    }
+}
+
+function _recomputeEdges() {
+    // web ↔ pi
+    if (_netState.pi === true) _setEdge('edgeWebPi', 'live', 'DB · API');
+    else if (_netState.pi === false) _setEdge('edgeWebPi', 'dead', 'ออฟไลน์');
+    else _setEdge('edgeWebPi', 'pending', 'ตรวจสอบ...');
+
+    // pi ↔ esp32 — ต้องการ pi online ก่อน ไม่งั้นจะคุยกันไม่ได้
+    if (_netState.pi === true && _netState.esp === true) _setEdge('edgePiEsp', 'live', 'HTTP · Heartbeat');
+    else if (_netState.esp === false) _setEdge('edgePiEsp', 'dead', 'ออฟไลน์');
+    else _setEdge('edgePiEsp', 'pending', 'ตรวจสอบ...');
+}
+
 function updatePiStatus(online) {
+    _netState.pi = online;
     const el = document.getElementById('piStatus');
     el.className = 'net-status ' + (online ? 'ok' : 'bad');
     el.innerHTML = '<span class="led"></span><span>' + (online ? 'ออนไลน์' : 'ออฟไลน์') + '</span>';
+    _recomputeEdges();
 }
 function updateEspStatus(online) {
+    _netState.esp = online;
     const el = document.getElementById('espStatus');
     el.className = 'net-status ' + (online ? 'ok' : 'bad');
     el.innerHTML = '<span class="led"></span><span>' + (online ? 'ออนไลน์' : 'ออฟไลน์') + '</span>';
+    _recomputeEdges();
 }
 
 async function saveAllIPs() {

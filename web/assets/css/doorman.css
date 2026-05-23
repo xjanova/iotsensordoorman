@@ -1163,6 +1163,7 @@ textarea.input { height: auto; padding: 8px 10px; line-height: 1.55; }
   height: 1px;
   background: repeating-linear-gradient(90deg, var(--border-strong) 0 4px, transparent 4px 8px);
   position: relative;
+  transition: background 0.3s;
 }
 .net-edge .line::after {
   content: ''; position: absolute; left: 0; top: -2px;
@@ -1172,8 +1173,52 @@ textarea.input { height: auto; padding: 8px 10px; line-height: 1.55; }
   animation: edge-flow 2.4s linear infinite;
   filter: blur(0.3px);
   box-shadow: 0 0 12px var(--accent);
+  transition: opacity 0.3s, background 0.3s, box-shadow 0.3s;
 }
 @keyframes edge-flow { from { left: -20%; } to { left: 100%; } }
+
+/* ─── Edge States (สีต้องสื่อตามจริง) ─────────────────────────── */
+
+/* live: ทั้งสองฝั่งออนไลน์ → เขียว วิ่ง */
+.net-edge.live .line {
+  background: repeating-linear-gradient(90deg, color-mix(in oklch, var(--ok) 50%, var(--border)) 0 4px, transparent 4px 8px);
+}
+.net-edge.live .line::after {
+  background: linear-gradient(90deg, transparent, var(--ok), transparent);
+  box-shadow: 0 0 14px var(--ok);
+  animation-duration: 1.6s;
+}
+.net-edge.live .lbl { color: var(--ok); }
+
+/* dead: ฝั่งใดฝั่งหนึ่งออฟไลน์ → แดง หยุดวิ่ง */
+.net-edge.dead .line {
+  background: repeating-linear-gradient(90deg, color-mix(in oklch, var(--danger) 45%, var(--border)) 0 6px, transparent 6px 14px);
+}
+.net-edge.dead .line::after {
+  animation: none;
+  background: var(--danger);
+  box-shadow: 0 0 10px var(--danger);
+  opacity: 0.85;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  border-radius: 50%;
+  height: 6px;
+  top: -2.5px;
+}
+.net-edge.dead .lbl {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* pending: ออนไลน์ฝั่งเดียว / รอ pair → เทา เคลื่อนช้า */
+.net-edge.pending .line::after {
+  background: linear-gradient(90deg, transparent, var(--text-3), transparent);
+  box-shadow: 0 0 6px var(--text-3);
+  opacity: 0.6;
+  animation-duration: 4s;
+}
+.net-edge.pending .lbl { color: var(--text-3); }
 .net-edge .lbl {
   font-size: 10px;
   color: var(--text-3);
