@@ -1780,17 +1780,21 @@ if __name__ == "__main__":
             # Re-announce loop: ส่ง POST announce ไป web ทุก 30s
             # เพื่อให้ paired_devices.last_seen สด → web เห็นว่า Pi ONLINE
             def _reannounce_loop():
+                print("[reannounce] loop started — POST /api/pair/announce.php every 30s")
+                tick = 0
                 while system_state["running"]:
                     time.sleep(30)
+                    tick += 1
                     web_url = system_state.get("web_url_discovered") or config.WEB_SERVER_URL
-                    if not web_url or not discovery_svc:
+                    if not web_url:
+                        print(f"[reannounce #{tick}] skip — no web_url yet")
                         continue
                     try:
-                        requests.post(
+                        r = requests.post(
                             web_url + "/api/pair/announce.php",
                             json={
                                 "role": "PI",
-                                "device_id": discovery_svc.device_id,
+                                "device_id": discovery_svc.device_id if discovery_svc else "unknown",
                                 "ip": get_local_ip(),
                                 "port": config.API_PORT,
                                 "hostname": socket.gethostname(),
@@ -1799,8 +1803,13 @@ if __name__ == "__main__":
                             headers=_announce_headers(),
                             timeout=5,
                         )
+                        if r.status_code != 200:
+                            print(f"[reannounce #{tick}] HTTP {r.status_code}: {r.text[:120]}")
+                        elif tick % 10 == 0:
+                            # log ทุก 10 ครั้ง (~5 นาที) เพื่อยืนยันยังทำงาน
+                            print(f"[reannounce #{tick}] OK ({web_url})")
                     except Exception as e:
-                        pass  # เงียบไว้ — heartbeat fail ไม่ต้องรก log
+                        print(f"[reannounce #{tick}] {type(e).__name__}: {e}")
             threading.Thread(target=_reannounce_loop, name="reannounce", daemon=True).start()
     else:
         print("[Discovery] disabled by DISCOVERY_ENABLED=0")
