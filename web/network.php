@@ -47,14 +47,64 @@
 <div class="card section">
     <div class="card-head" style="padding: 0 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 14px;">
         <div>
-            <div class="title">Auto-Pair อุปกรณ์ <span class="badge accent" id="pairEnabledBadge">เปิด</span></div>
-            <div class="sub">อุปกรณ์ที่มี pairing token ตรงและอยู่ใน WiFi เดียวกัน จะปรากฏที่นี่อัตโนมัติ</div>
+            <div class="title">Auto-Pair อุปกรณ์</div>
+            <div class="sub">อุปกรณ์ใน WiFi เดียวกัน จะปรากฏที่นี่อัตโนมัติ — รอ admin กดอนุมัติ</div>
         </div>
-        <div class="actions">
+        <div class="actions" style="display: flex; align-items: center; gap: 12px;">
             <button type="button" onclick="refreshPairedDevices()" class="btn sm ghost"><?= ico('refresh', 12) ?> รีเฟรช</button>
-            <button type="button" onclick="togglePairing()" class="btn sm" id="btnTogglePairing">ปิดรับ pair</button>
+            <label class="pair-toggle" title="คลิกเพื่อเปิด/ปิดรับ pair อุปกรณ์ใหม่">
+                <input type="checkbox" id="chkPairing" onchange="togglePairing()">
+                <span class="pair-toggle-track">
+                    <span class="pair-toggle-thumb"></span>
+                </span>
+                <span class="pair-toggle-label" id="pairToggleLabel">รับ pair</span>
+            </label>
         </div>
     </div>
+
+    <style>
+    .pair-toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+    .pair-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+    .pair-toggle-track {
+        position: relative;
+        width: 44px; height: 24px;
+        background: color-mix(in oklch, var(--text-3) 30%, var(--bg-2));
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+    .pair-toggle-thumb {
+        position: absolute; top: 2px; left: 2px;
+        width: 18px; height: 18px;
+        background: #fff;
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        transition: left 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .pair-toggle-label {
+        font-size: 12px; font-weight: 600;
+        color: var(--text-3);
+        min-width: 50px;
+        transition: color 0.2s;
+    }
+    /* ON state */
+    .pair-toggle input:checked + .pair-toggle-track {
+        background: var(--ok);
+        border-color: var(--ok);
+        box-shadow: 0 0 0 3px color-mix(in oklch, var(--ok) 20%, transparent);
+    }
+    .pair-toggle input:checked + .pair-toggle-track .pair-toggle-thumb {
+        left: 22px;
+    }
+    .pair-toggle input:checked ~ .pair-toggle-label {
+        color: var(--ok);
+    }
+    /* Focus ring (เข้าถึงด้วย keyboard) */
+    .pair-toggle input:focus-visible + .pair-toggle-track {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+    </style>
 
     <!-- Pairing Token -->
     <div class="net-field">
@@ -571,24 +621,25 @@ async function regenerateToken() {
 }
 
 async function togglePairing() {
-    const btn = document.getElementById('btnTogglePairing');
-    const enabled = btn.dataset.enabled === '1';
-    const newVal = enabled ? '0' : '1';
+    const chk = document.getElementById('chkPairing');
+    const newVal = chk.checked ? '1' : '0';
+    // optimistic: รอ API ตอบก่อนค่อย commit
     const res = await postAPI('api/settings.php', { pairing_enabled: newVal });
     if (res?.success) {
         applyPairingState(newVal === '1');
-        showToast(newVal === '1' ? 'เปิดรับ pair แล้ว' : 'ปิดรับ pair แล้ว', 'success');
+        showToast(newVal === '1' ? 'เปิดรับ pair แล้ว ✓' : 'ปิดรับ pair แล้ว', newVal === '1' ? 'success' : 'warning');
+    } else {
+        // revert ถ้า API ล้มเหลว
+        chk.checked = !chk.checked;
+        showToast('บันทึกไม่สำเร็จ', 'error');
     }
 }
 
 function applyPairingState(enabled) {
-    const btn = document.getElementById('btnTogglePairing');
-    const badge = document.getElementById('pairEnabledBadge');
-    btn.dataset.enabled = enabled ? '1' : '0';
-    btn.textContent = enabled ? 'ปิดรับ pair' : 'เปิดรับ pair';
-    btn.classList.toggle('primary', !enabled);
-    badge.textContent = enabled ? 'เปิด' : 'ปิด';
-    badge.className = 'badge ' + (enabled ? 'accent' : '');
+    const chk = document.getElementById('chkPairing');
+    const lbl = document.getElementById('pairToggleLabel');
+    chk.checked = !!enabled;
+    if (lbl) lbl.textContent = enabled ? 'เปิดอยู่' : 'ปิดอยู่';
 }
 
 async function refreshPairedDevices() {
