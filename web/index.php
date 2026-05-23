@@ -5,16 +5,13 @@
 // ดึงสถานะทั้งหมดจาก DB (ไม่พึ่ง face_server API)
 $db = getDB();
 
-// สถานะระบบ (เช็ค heartbeat ว่า stale ไหม — ถ้าเกิน 60 วิ ถือว่า offline)
-$sysStatus = [];
-foreach ($db->query("SELECT component, status, last_heartbeat FROM system_status")->fetchAll() as $row) {
-    $isStale = $row['last_heartbeat'] && (strtotime('now') - strtotime($row['last_heartbeat'])) > 60;
-    $sysStatus[$row['component']] = $isStale ? 'OFFLINE' : $row['status'];
-}
-$cam1Online = ($sysStatus['camera_outside'] ?? '') === 'ONLINE';
-$cam2Online = ($sysStatus['camera_inside'] ?? '') === 'ONLINE';
-$faceServerOnline = ($sysStatus['face_server'] ?? '') === 'ONLINE';
-$esp32Online = ($sysStatus['esp32'] ?? '') === 'ONLINE';
+// ── สถานะอุปกรณ์ — ใช้ paired_devices เป็นหลัก fall back system_status ──
+require_once __DIR__ . '/includes/device_status.php';
+$ds = getDeviceStatus(30);  // fresh window = 30s
+$cam1Online      = $ds['cam_outside'];
+$cam2Online      = $ds['cam_inside'];
+$faceServerOnline = $ds['pi_online'];
+$esp32Online     = $ds['esp32_online'];
 
 // สถิติวันนี้ — นับจำนวนครั้ง (rows) ไม่ใช่จำนวนคน เพื่อให้เปรียบเทียบ in/out เป็นคู่ได้ถูกต้อง
 $stmt = $db->query("SELECT COUNT(*) as c FROM access_logs WHERE direction='IN' AND DATE(created_at) = CURDATE() AND is_authorized = 1 AND employee_id IS NOT NULL");

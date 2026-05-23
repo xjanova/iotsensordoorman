@@ -30,9 +30,17 @@ try {
     $stmt = $db->query("SELECT COUNT(*) as c FROM anomaly_alerts WHERE DATE(created_at) = CURDATE()");
     $stats['today_alerts'] = $stmt->fetch()['c'];
 
-    // System status
+    // System status — รวม paired_devices (Auto-Pair) เป็น source of truth
+    require_once __DIR__ . '/../includes/device_status.php';
+    $ds = getDeviceStatus(30);
     $stmt = $db->query("SELECT component, status, last_heartbeat FROM system_status");
     $stats['system'] = $stmt->fetchAll();
+    $stats['devices'] = [
+        'pi'    => ['online' => $ds['pi_online'],    'ip' => $ds['pi_ip']],
+        'esp32' => ['online' => $ds['esp32_online'], 'ip' => $ds['esp32_ip']],
+        'cam_outside' => $ds['cam_outside'],
+        'cam_inside'  => $ds['cam_inside'],
+    ];
 
     jsonResponse($stats);
 } catch (PDOException $e) {
