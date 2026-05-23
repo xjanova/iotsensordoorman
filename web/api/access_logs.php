@@ -2,9 +2,11 @@
 /**
  * API: ประวัติการเข้า-ออก
  */
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') jsonResponse(['ok' => true]);
+
+requireLogin();
 
 // ============================================================
 // DELETE: ลบประวัติ (เลือกรายการ หรือทั้งหมด)
@@ -90,8 +92,10 @@ try {
     }
 
     if ($search) {
+        // Escape LIKE wildcards to prevent wildcard injection
+        $escSearch = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
         $where[] = "(e.first_name LIKE ? OR e.last_name LIKE ? OR e.emp_code LIKE ?)";
-        $searchTerm = '%' . $search . '%';
+        $searchTerm = '%' . $escSearch . '%';
         $params[] = $searchTerm;
         $params[] = $searchTerm;
         $params[] = $searchTerm;

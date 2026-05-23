@@ -131,7 +131,18 @@ INSERT INTO settings (setting_key, setting_value, description) VALUES
 ('process_every_x_frames', '5', 'ประมวลผลทุกกี่เฟรม'),
 ('esp32_ip', '192.168.1.100', 'IP Address ของ ESP32'),
 ('camera_outside_id', '0', 'Camera ID กล้องด้านนอก'),
-('camera_inside_id', '1', 'Camera ID กล้องด้านใน');
+('camera_inside_id', '1', 'Camera ID กล้องด้านใน'),
+-- WiFi / Network (สำหรับ generate Arduino code + pairing)
+('wifi_ssid', '', 'SSID ของ WiFi ที่ ESP32 จะเชื่อมต่อ'),
+('wifi_password', '', 'รหัสผ่าน WiFi ของ ESP32'),
+('server_url', '', 'URL ของ Raspberry Pi face server (ESP32 จะส่งข้อมูลมา)'),
+-- ESP32 Timing
+('pir_cooldown_ms', '3000', 'cooldown ของ PIR sensor (ms)'),
+('heartbeat_interval_ms', '10000', 'ระยะ heartbeat ของ ESP32 (ms)'),
+('door_lock_type', 'NO', 'ชนิด lock: NO=Normally Open, NC=Normally Closed'),
+-- Pairing
+('pairing_token', '', 'Shared secret สำหรับ pair Pi/ESP32 กับ Web (auto-generated ตอน setup)'),
+('pairing_enabled', '1', 'เปิดรับการ pair อุปกรณ์ใหม่ (1=เปิด, 0=ปิด)');
 
 -- พนักงานตัวอย่าง
 INSERT INTO employees (emp_code, first_name, last_name, department, position, face_image, is_authorized) VALUES

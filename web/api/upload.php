@@ -3,12 +3,9 @@
  * API: อัพโหลดรูปภาพพนักงาน + ตรวจจับใบหน้าอัตโนมัติ
  * รองรับ: JPG, PNG, WEBP (สูงสุด 5MB)
  */
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
-session_start();
-if (empty($_SESSION['admin_id'])) {
-    jsonResponse(['error' => 'กรุณาเข้าสู่ระบบ'], 401);
-}
+requireLogin();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(['error' => 'Method not allowed'], 405);

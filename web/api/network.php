@@ -3,15 +3,11 @@
  * Network Configuration API
  * จัดการ IP เครือข่ายของระบบ Bunny Door
  */
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-// Require login for all operations
-session_start();
-if (empty($_SESSION['admin_id'])) {
-    jsonResponse(['error' => 'Unauthorized'], 401);
-}
+requireLogin();
 
 $action = $_GET['action'] ?? '';
 
@@ -154,6 +150,10 @@ switch ($action) {
 
         if (empty($piIP) || empty($dbHost)) {
             jsonResponse(['error' => 'กรุณาระบุ IP ทั้งหมด'], 400);
+        }
+        // Validate strict — กัน shell metacharacter ใน command ที่ admin จะ copy-paste
+        if (!filter_var($piIP, FILTER_VALIDATE_IP) || !filter_var($dbHost, FILTER_VALIDATE_IP)) {
+            jsonResponse(['error' => 'IP ต้องเป็นรูปแบบที่ถูกต้อง'], 400);
         }
 
         // We can't directly edit Pi's .env, so provide the command

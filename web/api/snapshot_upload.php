@@ -4,14 +4,15 @@
  * ใช้สำหรับเก็บรูปถ่ายขณะเข้า-ออก ที่เครื่อง Laragon แทน Pi
  *
  * POST /api/snapshot_upload.php
+ *   Header: X-Pair-Token: <pairing_token>
  *   - file: ไฟล์ภาพ (JPEG)
  *   - filename: ชื่อไฟล์ที่ต้องการ (e.g. cam1_somchai_20260315_120000.jpg)
  */
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
-header('Access-Control-Allow-Origin: *');
+// ไม่ใช้ CORS * แล้ว — บังคับ shared token แทน
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, X-Pair-Token');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -21,6 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(['error' => 'Method not allowed'], 405);
 }
+
+requirePairToken();
 
 // ตรวจสอบไฟล์
 if (empty($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {

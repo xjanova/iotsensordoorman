@@ -2,19 +2,16 @@
 /**
  * API: การแจ้งเตือนความผิดปกติ
  */
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/api_auth.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'OPTIONS') jsonResponse(['ok' => true]);
 
-// Require login for write operations
-if ($method === 'POST') {
-    session_start();
-    // ไม่บังคับ login สำหรับตอนนี้ (ยังไม่มีระบบ login เต็ม)
-    // if (empty($_SESSION['admin_id'])) {
-    //     jsonResponse(['error' => 'กรุณาเข้าสู่ระบบ'], 401);
-    // }
-}
+requireLogin();
+
+// Whitelist เพื่อกัน enum invalid
+const ALERT_TYPES = ['UNKNOWN_FACE','TAILGATING','FORCED_ENTRY','SENSOR_MISMATCH','MULTI_PERSON','NO_FACE_DETECTED'];
+const ALERT_SEVERITIES = ['LOW','MEDIUM','HIGH','CRITICAL'];
 
 // ============================================================
 // STATS: นับ severity / resolved จาก DB ทั้งหมด (สำหรับ KPI cards)
@@ -91,12 +88,12 @@ try {
                 $params[] = intval($resolved);
             }
 
-            if ($type && $type !== 'all') {
+            if ($type && $type !== 'all' && in_array($type, ALERT_TYPES, true)) {
                 $where[] = "alert_type = ?";
                 $params[] = $type;
             }
 
-            if ($severity && $severity !== 'all') {
+            if ($severity && $severity !== 'all' && in_array($severity, ALERT_SEVERITIES, true)) {
                 $where[] = "severity = ?";
                 $params[] = $severity;
             }
@@ -112,8 +109,9 @@ try {
             }
 
             if ($search) {
+                $escSearch = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
                 $where[] = "description LIKE ?";
-                $params[] = '%' . $search . '%';
+                $params[] = '%' . $escSearch . '%';
             }
 
             $whereSQL = $where ? ' WHERE ' . implode(' AND ', $where) : '';
@@ -158,7 +156,7 @@ try {
                 $type = $data['type'] ?? null;
                 $sql = "UPDATE anomaly_alerts SET is_resolved = 1, resolved_at = NOW() WHERE is_resolved = 0";
                 $params = [];
-                if ($type && $type !== 'all') {
+                if ($type && $type !== 'all' && in_array($type, ALERT_TYPES, true)) {
                     $sql .= " AND alert_type = ?";
                     $params[] = $type;
                 }

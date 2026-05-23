@@ -2,7 +2,9 @@
 /**
  * Proxy: ดึงข้อมูล Pi health จาก face_server (แก้ปัญหา CORS)
  */
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/api_auth.php';
+
+requireLogin();
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache');
