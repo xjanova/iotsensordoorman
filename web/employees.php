@@ -290,6 +290,7 @@ function uploadPhoto(file) {
     const formData = new FormData();
     formData.append('photo', file);
     formData.append('emp_code', document.getElementById('formEmpCode').value || 'temp');
+    formData.append('csrf_token', CSRF_TOKEN);
 
     const xhr = new XMLHttpRequest();
     xhr.upload.addEventListener('progress', (e) => {

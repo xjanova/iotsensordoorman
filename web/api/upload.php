@@ -6,6 +6,7 @@
 require_once __DIR__ . '/../includes/api_auth.php';
 
 requireLogin();
+requireCsrf();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(['error' => 'Method not allowed'], 405);
