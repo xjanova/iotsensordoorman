@@ -69,12 +69,19 @@ $currentFile = basename($_SERVER['PHP_SELF']);
 // Skip auth check for login/setup pages
 $publicPages = ['login.php', 'setup.php'];
 
-// ── DEV bypass: ถ้าตั้ง DEV_BYPASS_LOGIN=1 ใน web/.env →
-//    auto-login เป็น admin คนแรกในระบบ (สำหรับ dev เท่านั้น!)
-$_devBypass = getenv('DEV_BYPASS_LOGIN') === '1';
+// ── DEV bypass: default ON สำหรับช่วงพัฒนา (ไม่มีระบบ login)
+//    ตั้ง DEV_BYPASS_LOGIN=0 ใน web/.env เพื่อปิด (production mode)
+$_devBypass = getenv('DEV_BYPASS_LOGIN') !== '0';  // default = bypass
 if ($_devBypass && !isLoggedIn() && !in_array($currentFile, $publicPages)) {
     try {
         $_db = getDB();
+        // ถ้ายังไม่มี admin user → สร้าง dev admin อัตโนมัติ (ไม่ต้องไปหน้า setup)
+        $_cnt = (int) $_db->query("SELECT COUNT(*) FROM admin_users")->fetchColumn();
+        if ($_cnt === 0) {
+            $_hash = password_hash('dev', PASSWORD_BCRYPT);
+            $_db->prepare("INSERT INTO admin_users (username, password_hash, display_name) VALUES (?, ?, ?)")
+                ->execute(['dev', $_hash, 'Developer']);
+        }
         $_row = $_db->query("SELECT id, username, display_name FROM admin_users ORDER BY id LIMIT 1")->fetch();
         if ($_row) {
             $_SESSION['admin_id'] = (int) $_row['id'];

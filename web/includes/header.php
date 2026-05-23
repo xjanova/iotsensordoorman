@@ -72,9 +72,9 @@ $_initials = $currentAdmin
     </style>
 </head>
 <body>
-<?php if (getenv('DEV_BYPASS_LOGIN') === '1'): ?>
+<?php if (getenv('DEV_BYPASS_LOGIN') !== '0'): ?>
 <div style="position: fixed; top: 0; left: 0; right: 0; z-index: 99999; background: #d97706; color: #fff; text-align: center; font-size: 12px; font-weight: 600; padding: 4px 12px; font-family: var(--font-mono);">
-    ⚠ DEV_BYPASS_LOGIN — auto-login เป็น <?= htmlspecialchars($currentAdmin['username'] ?? 'admin') ?> (ปิดใน production: ลบ <code>DEV_BYPASS_LOGIN</code> จาก web/.env)
+    ⚠ DEV MODE — ไม่มีระบบ login (auto-login เป็น <?= htmlspecialchars($currentAdmin['username'] ?? 'admin') ?>) · ปิดใน production: ตั้ง <code>DEV_BYPASS_LOGIN=0</code> ใน web/.env
 </div>
 <style>body { padding-top: 24px; }</style>
 <?php endif; ?>
