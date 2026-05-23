@@ -86,6 +86,28 @@ CREATE TABLE IF NOT EXISTS system_status (
 ) ENGINE=InnoDB COMMENT='สถานะอุปกรณ์ในระบบ';
 
 -- ============================================================
+-- ตาราง: อุปกรณ์ที่ pair แล้ว (Paired Devices)
+-- ใช้กับระบบ Auto-Pair บน LAN เดียวกัน
+-- ============================================================
+CREATE TABLE IF NOT EXISTS paired_devices (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    role ENUM('PI','ESP32','OTHER') NOT NULL COMMENT 'ชนิดอุปกรณ์',
+    device_id VARCHAR(64) NOT NULL COMMENT 'MAC address หรือ unique ID',
+    ip_address VARCHAR(45) NOT NULL,
+    hostname VARCHAR(100) DEFAULT NULL,
+    port INT DEFAULT NULL,
+    extra JSON DEFAULT NULL COMMENT 'firmware version, capabilities, etc.',
+    status ENUM('PENDING','TRUSTED','REVOKED') DEFAULT 'PENDING',
+    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+    approved_by INT DEFAULT NULL COMMENT 'admin_user.id ที่อนุมัติ',
+    approved_at DATETIME DEFAULT NULL,
+    UNIQUE KEY uk_device (role, device_id),
+    INDEX idx_status (status),
+    INDEX idx_last_seen (last_seen)
+) ENGINE=InnoDB COMMENT='อุปกรณ์ที่ pair กับระบบ';
+
+-- ============================================================
 -- ตาราง: ผู้ดูแลระบบ (Admin Users)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS admin_users (

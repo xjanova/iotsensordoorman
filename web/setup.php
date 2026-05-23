@@ -45,6 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hash = password_hash($password, PASSWORD_BCRYPT);
             $stmt = $db->prepare("INSERT INTO admin_users (username, password_hash, display_name) VALUES (?, ?, ?)");
             $stmt->execute([$username, $hash, $displayName ?: $username]);
+
+            // สร้าง pairing token อัตโนมัติเมื่อ setup ครั้งแรก
+            $token = bin2hex(random_bytes(16));
+            $tk = $db->prepare("INSERT INTO settings (setting_key, setting_value, description) VALUES ('pairing_token', ?, ?) ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
+            $tk->execute([$token, 'Shared secret สำหรับ pair Pi/ESP32 กับ Web']);
+
             $success = true;
         } catch (PDOException $e) {
             error_log("[Setup] " . $e->getMessage());

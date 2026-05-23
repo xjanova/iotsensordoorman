@@ -27,6 +27,7 @@
 // Constants
 // ============================================================
 const FACE_SERVER = '<?= FACE_SERVER_URL ?>';
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
 // ============================================================
 // Global utilities (legacy API — keep stable for existing pages)
@@ -37,7 +38,11 @@ async function fetchAPI(url) {
 }
 async function postAPI(url, data = {}) {
     try {
-        const r = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json', 'X-CSRF-Token': CSRF_TOKEN},
+            body: JSON.stringify(data)
+        });
         return await r.json();
     } catch (e) { console.error('API Error:', e); return null; }
 }
