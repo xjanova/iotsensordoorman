@@ -392,38 +392,89 @@ def _is_motion_active(cam_name):
         return (now - system_state.get("last_motion_inside", 0)) < grace
 
 def camera_thread(camera_id, cam_name):
-    """Thread สำหรับประมวลผลกล้องแต่ละตัว — รองรับ always/standby mode"""
+    """Thread สำหรับประมวลผลกล้องแต่ละตัว — รองรับ always/standby mode
+       มี watchdog + auto-reopen ถ้ากล้องค้าง (USB glitch, voltage drop, etc.)
+    """
     print(f"[Camera] Starting {cam_name} (ID: {camera_id}) — mode: {system_state.get('camera_mode', config.CAMERA_MODE)}")
 
-    cap = cv2.VideoCapture(camera_id, cv2.CAP_V4L2)
-    if not cap.isOpened():
-        print(f"[Camera] Failed to open {cam_name}")
+    # Outer reconnect loop — เปิดกล้องใหม่ถ้าเดี้ยง
+    while system_state["running"]:
+        cap = cv2.VideoCapture(camera_id, cv2.CAP_V4L2)
+        if not cap.isOpened():
+            print(f"[Camera] Failed to open {cam_name} — retry in 5s")
+            update_system_status(cam_name, "OFFLINE")
+            time.sleep(5)
+            continue
+
+        _camera_captures[cam_name] = cap
+
+        # ใช้ MJPEG format เพื่อลด USB bandwidth (แก้ปัญหาภาพเขียวเมื่อเปิด 2 กล้อง)
+        fourcc = cv2.VideoWriter_fourcc(*'MJPG')
+        cap.set(cv2.CAP_PROP_FOURCC, fourcc)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
+        cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
+        # Buffer = 1 — เก็บ frame ล่าสุดเท่านั้น (กัน memory accumulate + freeze)
+        try:
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        except Exception:
+            pass
+
+        # ยืนยันว่าได้ format อะไร
+        actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        actual_fourcc = int(cap.get(cv2.CAP_PROP_FOURCC))
+        fourcc_str = "".join([chr((actual_fourcc >> 8 * i) & 0xFF) for i in range(4)])
+        print(f"[Camera] {cam_name} opened: {actual_w}x{actual_h} format={fourcc_str}")
+
+        update_system_status(cam_name, "ONLINE")
+
+        # Watchdog: ถ้า > WATCHDOG_SEC ไม่มี frame ใหม่ → release cap → outer loop เปิดใหม่
+        WATCHDOG_SEC = 12
+        last_frame_ts = [time.time()]
+        watchdog_alive = [True]
+
+        def _watchdog():
+            while watchdog_alive[0] and system_state["running"]:
+                time.sleep(2)
+                if time.time() - last_frame_ts[0] > WATCHDOG_SEC:
+                    print(f"[Camera] {cam_name} HANG detected ({WATCHDOG_SEC}s no frame) — releasing")
+                    try:
+                        cap.release()
+                    except Exception:
+                        pass
+                    return
+        threading.Thread(target=_watchdog, name=f"watchdog-{cam_name}", daemon=True).start()
+
+        # Inner frame loop — exit ตอน cap ถูก release จาก watchdog หรือ cap.read fail สูง
+        consecutive_fails = 0
+        if _run_inner_camera_loop(cap, cam_name, camera_id, last_frame_ts):
+            consecutive_fails = 0
+        watchdog_alive[0] = False
+        try:
+            cap.release()
+        except Exception:
+            pass
+
+        if not system_state["running"]:
+            break
+        print(f"[Camera] {cam_name} reconnecting in 2s...")
         update_system_status(cam_name, "OFFLINE")
-        return
+        time.sleep(2)
 
-    _camera_captures[cam_name] = cap
+    print(f"[Camera] {cam_name} stopped")
 
-    # ใช้ MJPEG format เพื่อลด USB bandwidth (แก้ปัญหาภาพเขียวเมื่อเปิด 2 กล้อง)
-    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-    cap.set(cv2.CAP_PROP_FOURCC, fourcc)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
-    cap.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
 
-    # ยืนยันว่าได้ format อะไร
-    actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    actual_fourcc = int(cap.get(cv2.CAP_PROP_FOURCC))
-    fourcc_str = "".join([chr((actual_fourcc >> 8 * i) & 0xFF) for i in range(4)])
-    print(f"[Camera] {cam_name} opened: {actual_w}x{actual_h} format={fourcc_str}")
-
-    update_system_status(cam_name, "ONLINE")
-
+def _run_inner_camera_loop(cap, cam_name, camera_id, last_frame_ts):
+    """Inner camera loop — return เมื่อต้อง reopen
+       last_frame_ts: list[float] mutable (ให้ watchdog เช็คได้)
+    """
     frame_count = 0
     last_faces = []
     last_names = []
     last_confidences = []
     _was_standby = False
+    consecutive_fails = 0
 
     while system_state["running"]:
         mode = system_state.get("camera_mode", config.CAMERA_MODE)
@@ -433,6 +484,8 @@ def camera_thread(camera_id, cam_name):
             # Standby: อ่าน frame ช้าๆ แค่ให้มี snapshot ดูได้ แต่ไม่ process face
             ret, frame = cap.read()
             if ret:
+                last_frame_ts[0] = time.time()
+                consecutive_fails = 0
                 cam_state = system_state[cam_name]
                 # วาด "STANDBY" บน frame
                 display_frame = frame.copy()
@@ -462,9 +515,15 @@ def camera_thread(camera_id, cam_name):
 
         ret, frame = cap.read()
         if not ret:
+            consecutive_fails += 1
+            if consecutive_fails > 20:
+                print(f"[Camera] {cam_name} too many read fails — reopen")
+                return False
             time.sleep(0.5)
             continue
 
+        last_frame_ts[0] = time.time()
+        consecutive_fails = 0
         frame_count += 1
         cam_state = system_state[cam_name]
 
@@ -506,9 +565,8 @@ def camera_thread(camera_id, cam_name):
         # หน่วงเวลา ~5 FPS เพื่อประหยัด CPU
         time.sleep(0.2)
 
-    cap.release()
-    update_system_status(cam_name, "OFFLINE")
-    print(f"[Camera] {cam_name} stopped")
+    # ออกจาก inner loop ปกติ (service shutting down)
+    return True
 
 
 # ============================================================
@@ -1946,6 +2004,31 @@ if __name__ == "__main__":
             update_system_status("face_server", "ONLINE", ip)
             update_system_status("raspberry_pi", "ONLINE", ip)
     threading.Thread(target=_heartbeat_loop, daemon=True).start()
+
+    # Snapshot cleanup: ลบรูปเก่าเกิน MAX_SNAPSHOT_DAYS วัน (กัน disk เต็ม → service hang)
+    def _snapshot_cleanup_loop():
+        while system_state["running"]:
+            time.sleep(3600)  # ทุก 1 ชม
+            try:
+                snap_dir = config.SNAPSHOT_DIR
+                if not os.path.isdir(snap_dir):
+                    continue
+                cutoff = time.time() - (config.MAX_SNAPSHOT_DAYS * 86400)
+                removed = 0
+                for root, _, files in os.walk(snap_dir):
+                    for fn in files:
+                        fp = os.path.join(root, fn)
+                        try:
+                            if os.path.getmtime(fp) < cutoff:
+                                os.remove(fp)
+                                removed += 1
+                        except Exception:
+                            pass
+                if removed:
+                    print(f"[Cleanup] removed {removed} old snapshots (>{config.MAX_SNAPSHOT_DAYS}d)")
+            except Exception as e:
+                print(f"[Cleanup] error: {e}")
+    threading.Thread(target=_snapshot_cleanup_loop, name="cleanup", daemon=True).start()
 
     # Refresh name cache ทุก 5 นาที (กรณีเพิ่มพนักงานใหม่)
     def _name_cache_refresh_loop():

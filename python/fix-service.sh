@@ -36,8 +36,12 @@ WorkingDirectory=$PROJECT_DIR/python
 Environment=PATH=$VENV_DIR/bin:/usr/bin:/bin
 Environment=PYTHONUNBUFFERED=1
 ExecStart=$VENV_DIR/bin/python $PROJECT_DIR/python/face_server.py
-Restart=on-failure
+# Restart=always — ค้างก็ restart ไม่ว่า exit code อะไร
+Restart=always
 RestartSec=10
+# Memory limits — Pi 4GB ใช้ 1.5GB pad, เกิน 2GB จะถูก kill อัตโนมัติ
+MemoryHigh=1500M
+MemoryMax=2000M
 StandardOutput=journal
 StandardError=journal
 NoNewPrivileges=true

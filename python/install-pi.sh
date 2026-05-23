@@ -244,8 +244,10 @@ WorkingDirectory=$SCRIPT_DIR
 Environment=PATH=$VENV_DIR/bin:/usr/bin:/bin
 Environment=PYTHONUNBUFFERED=1
 ExecStart=$VENV_DIR/bin/python $SCRIPT_DIR/face_server.py
-Restart=on-failure
+Restart=always
 RestartSec=10
+MemoryHigh=1500M
+MemoryMax=2000M
 StandardOutput=journal
 StandardError=journal
 NoNewPrivileges=true
