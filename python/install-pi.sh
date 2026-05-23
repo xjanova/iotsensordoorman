@@ -214,14 +214,18 @@ if ! groups "$RUN_USER" | grep -q "\bvideo\b"; then
     sudo usermod -aG video "$RUN_USER"
     warn "เพิ่ม $RUN_USER เข้ากลุ่ม video — ต้อง reboot 1 ครั้งหลังติดตั้งเสร็จ"
 fi
-# sudoers สำหรับอ่าน WiFi password (สำหรับ /api/wifi/current → generate ESP32 firmware)
-sudo tee /etc/sudoers.d/bunny-door-wifi > /dev/null <<EOF
-# Bunny Door: ให้ service user อ่าน WiFi password ของ Pi ได้
+# sudoers สำหรับอ่าน WiFi password + restart service จาก UI
+sudo tee /etc/sudoers.d/bunny-door > /dev/null <<EOF
+# Bunny Door: NOPASSWD เฉพาะ commands ที่จำเป็น
 $RUN_USER ALL=(root) NOPASSWD: /usr/bin/nmcli -s -g 802-11-wireless-security.psk connection show *
 $RUN_USER ALL=(root) NOPASSWD: /bin/cat /etc/wpa_supplicant/wpa_supplicant.conf
 $RUN_USER ALL=(root) NOPASSWD: /usr/bin/cat /etc/wpa_supplicant/wpa_supplicant.conf
+$RUN_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart bunny-door
+$RUN_USER ALL=(root) NOPASSWD: /bin/systemctl restart bunny-door
 EOF
-sudo chmod 0440 /etc/sudoers.d/bunny-door-wifi
+sudo chmod 0440 /etc/sudoers.d/bunny-door
+# ลบไฟล์เก่าถ้ามี (เพราะเปลี่ยนชื่อจาก bunny-door-wifi → bunny-door)
+sudo rm -f /etc/sudoers.d/bunny-door-wifi
 ok "โฟลเดอร์ + sudoers พร้อม"
 
 # ── Step 8: systemd service ─────────────────────────────────

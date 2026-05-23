@@ -901,6 +901,21 @@ def api_stats():
 # ============================================================
 # System Health API (CPU, RAM, Temperature ของ Raspberry Pi)
 # ============================================================
+@app.route('/api/system/restart', methods=['POST'])
+def api_system_restart():
+    """Restart face_server (ใช้ systemd) — Pi user ต้องมี sudoers NOPASSWD"""
+    import subprocess
+    def _delayed_restart():
+        time.sleep(0.7)  # รอ Flask ส่ง response กลับก่อน
+        try:
+            subprocess.Popen(['sudo', '-n', '/usr/bin/systemctl', 'restart', 'bunny-door'])
+        except Exception as e:
+            print(f"[Restart] error: {e}")
+            os._exit(1)  # fallback — systemd จะ restart เอง (Restart=on-failure)
+    threading.Thread(target=_delayed_restart, daemon=True).start()
+    return jsonify({"success": True, "message": "restarting in ~1s..."})
+
+
 @app.route('/api/wifi/current')
 def api_wifi_current():
     """อ่าน WiFi credentials ที่ Pi กำลังเชื่อมอยู่

@@ -244,8 +244,11 @@ function s($key, $default = '') {
             <div id="cameraGrid" class="grid cols-3" style="gap: 14px;"></div>
 
             <div id="cameraAssignBtn" class="hidden" style="margin-top: 16px;">
-                <button type="button" onclick="assignCameras()" class="btn success"><?= ico('check', 14) ?> บันทึกการกำหนดกล้อง</button>
-                <p class="tiny text-warn" style="margin-top: 8px;">หลังบันทึก ต้อง restart face_server บน Pi เพื่อใช้กล้องใหม่</p>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" onclick="assignCameras()" class="btn success"><?= ico('check', 14) ?> บันทึก & Restart Pi</button>
+                    <button type="button" onclick="restartPiService(true)" class="btn ghost sm"><?= ico('refresh', 12) ?> Restart Pi เฉยๆ</button>
+                </div>
+                <p class="tiny muted" style="margin-top: 8px;">หลังบันทึก ระบบจะ restart face_server บน Pi อัตโนมัติ (~5 วินาที)</p>
             </div>
         </div>
 
@@ -681,9 +684,28 @@ async function assignCameras() {
     try {
         const resp = await fetch(FACE_SERVER + '/api/cameras/assign', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ outside: outsideId, inside: insideId }) });
         const data = await resp.json();
-        if (data.success) showToast('บันทึกการกำหนดกล้องสำเร็จ — กรุณา restart face_server บน Pi', 'success');
-        else showToast(data.error || 'เกิดข้อผิดพลาด', 'error');
+        if (data.success) {
+            showToast('บันทึกการกำหนดกล้องสำเร็จ — กำลัง restart Pi...', 'success');
+            // restart Pi อัตโนมัติเพื่อให้กล้องใหม่มีผล
+            setTimeout(() => restartPiService(false), 500);
+        } else {
+            showToast(data.error || 'เกิดข้อผิดพลาด', 'error');
+        }
     } catch (e) { showToast('บันทึกไม่ได้: ' + e.message, 'error'); }
+}
+
+async function restartPiService(confirmFirst) {
+    if (confirmFirst && !confirm('Restart face_server บน Pi?\nกล้อง + face recognition จะหยุดประมาณ 5 วินาที')) return;
+    try {
+        const r = await postAPI('api/system/restart.php', {});
+        if (r?.success) {
+            showToast('สั่ง restart แล้ว — Pi จะกลับมาออนไลน์ใน ~5-10 วินาที', 'success');
+        } else {
+            showToast(r?.error || 'Restart Pi ไม่ได้', 'error');
+        }
+    } catch (e) {
+        showToast('Restart Pi ไม่ได้: ' + e.message, 'error');
+    }
 }
 
 // ============================================================

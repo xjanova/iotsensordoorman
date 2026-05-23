@@ -74,15 +74,18 @@ EOF
 chmod 600 "$ENV_FILE"
 ok "เขียน .env ใหม่ (camera_out=$CAM_OUT camera_in=$CAM_IN mode=$CAM_MODE)"
 
-hdr "[3] ตั้ง sudoers ให้ service อ่าน WiFi credentials ได้"
-sudo tee /etc/sudoers.d/bunny-door-wifi > /dev/null <<EOF
-# Bunny Door: ให้ service user อ่าน WiFi password ของ Pi ได้
+hdr "[3] ตั้ง sudoers (WiFi password + service restart)"
+sudo tee /etc/sudoers.d/bunny-door > /dev/null <<EOF
+# Bunny Door: NOPASSWD เฉพาะ commands ที่จำเป็น
 ${USER:-pi} ALL=(root) NOPASSWD: /usr/bin/nmcli -s -g 802-11-wireless-security.psk connection show *
 ${USER:-pi} ALL=(root) NOPASSWD: /bin/cat /etc/wpa_supplicant/wpa_supplicant.conf
 ${USER:-pi} ALL=(root) NOPASSWD: /usr/bin/cat /etc/wpa_supplicant/wpa_supplicant.conf
+${USER:-pi} ALL=(root) NOPASSWD: /usr/bin/systemctl restart bunny-door
+${USER:-pi} ALL=(root) NOPASSWD: /bin/systemctl restart bunny-door
 EOF
-sudo chmod 0440 /etc/sudoers.d/bunny-door-wifi
-ok "sudoers พร้อม — Pi อ่าน WiFi password ได้แล้ว"
+sudo chmod 0440 /etc/sudoers.d/bunny-door
+sudo rm -f /etc/sudoers.d/bunny-door-wifi  # ลบไฟล์เก่า
+ok "sudoers พร้อม — Pi อ่าน WiFi + restart service ได้แล้ว"
 
 hdr "[4] Restart service"
 sudo systemctl restart bunny-door
