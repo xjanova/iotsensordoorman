@@ -121,20 +121,30 @@ def _ping_web(url: str, timeout: float = 1.5) -> dict | None:
     return None
 
 
+def _probe_port(host: str, port: int = 80, timeout: float = 0.4) -> str | None:
+    """TCP connect probe — เร็วกว่า HTTP มาก เพื่อกรอง host ที่ alive"""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return host
+    except (OSError, socket.timeout):
+        return None
+
+
 def discover_web_url(local_ip: str, base_paths: list[str] | None = None) -> str | None:
-    """Subnet scan หา web server บน /24
+    """หา web server บน /24 — 2-stage scan
+       Stage 1: TCP probe port 80 ทุก host (รวดเร็ว ~1-2s)
+       Stage 2: HTTP ping เฉพาะ host ที่มี port 80 เปิดอยู่ × แต่ละ base_path
+
        คืน base URL เช่น http://192.168.1.10/bunny-door/web
-       base_paths: ลำดับ path ที่ลอง — ลอง deep path ก่อน (กัน collision ที่ root)
     """
     if base_paths is None:
-        # ลอง deep paths ก่อน — เผื่อ user clone full repo ที่มี web/ subfolder
         base_paths = [
             "/bunny-door/web",       # full repo clone (พบบ่อยสุด)
-            "/iotsensordoorman/web", # github default folder name
+            "/iotsensordoorman/web",
             "/bunny-door",           # web-only clone
             "/iotsensordoorman",
             "/web",
-            "",                       # web ที่ document root
+            "",                       # document root
         ]
 
     try:
@@ -142,27 +152,39 @@ def discover_web_url(local_ip: str, base_paths: list[str] | None = None) -> str 
     except ValueError:
         return None
 
-    candidates: list[str] = []
-    for host in net.hosts():
-        for path in base_paths:
-            candidates.append(f"http://{host}{path}")
+    hosts = [str(h) for h in net.hosts()]
+    _log.info(f"[discover-web] stage 1: TCP probe :80 on {len(hosts)} hosts...")
 
-    _log.info(f"[discover-web] scanning {len(candidates)} candidates on subnet {net}")
+    # Stage 1: TCP probe — กรอง host alive บน port 80
+    alive: list[str] = []
+    with ThreadPoolExecutor(max_workers=80) as ex:
+        for result in ex.map(_probe_port, hosts):
+            if result:
+                alive.append(result)
 
-    found: str | None = None
-    with ThreadPoolExecutor(max_workers=50) as ex:
-        futures = {ex.submit(_ping_web, url): url for url in candidates}
-        for fut in as_completed(futures):
-            if found:
-                continue
-            data = fut.result()
-            if data:
-                found = futures[fut]
-                _log.info(f"[discover-web] FOUND: {found}")
-                # ไม่ break ทันที — ปล่อย thread ที่เหลือเสร็จเอง (จะถูก cancel ตอน executor exit)
-                break
+    if not alive:
+        _log.warning("[discover-web] no host on port 80 in subnet")
+        return None
 
-    return found
+    _log.info(f"[discover-web] stage 2: HTTP ping {len(alive)} alive hosts × {len(base_paths)} paths")
+
+    # Stage 2: HTTP ping host × path เฉพาะที่ alive
+    for path in base_paths:
+        with ThreadPoolExecutor(max_workers=min(20, len(alive))) as ex:
+            futures = {ex.submit(_ping_web, f"http://{h}{path}", 2.0): h for h in alive}
+            for fut in as_completed(futures):
+                try:
+                    data = fut.result()
+                except Exception:
+                    data = None
+                if data:
+                    found = f"http://{futures[fut]}{path}"
+                    _log.info(f"[discover-web] FOUND: {found}")
+                    ex.shutdown(wait=False, cancel_futures=True)
+                    return found
+
+    _log.warning(f"[discover-web] {len(alive)} hosts alive แต่ไม่มี ping.php ตอบ")
+    return None
 
 
 # ============================================================
