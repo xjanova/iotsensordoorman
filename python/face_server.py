@@ -204,14 +204,34 @@ os.makedirs(config.IMAGES_PATH, exist_ok=True)
 # ============================================================
 # Database Helper
 # ============================================================
+def _resolve_db_host():
+    """หา DB host แบบ dynamic:
+       1) ถ้า discovery เจอ web URL แล้ว → ใช้ host ของ web (เพราะ web+DB อยู่เครื่องเดียวกัน = Laragon)
+       2) ไม่งั้น fall back ไป config.DB_HOST จาก .env
+    """
+    try:
+        url = system_state.get("web_url_discovered") if "system_state" in globals() else None
+    except Exception:
+        url = None
+    if url:
+        try:
+            from urllib.parse import urlparse
+            host = urlparse(url).hostname
+            if host:
+                return host
+        except Exception:
+            pass
+    return config.DB_HOST
+
 def get_db():
     return mysql.connector.connect(
-        host=config.DB_HOST,
+        host=_resolve_db_host(),
         port=config.DB_PORT,
         user=config.DB_USER,
         password=config.DB_PASSWORD,
         database=config.DB_NAME,
-        charset="utf8mb4"
+        charset="utf8mb4",
+        connection_timeout=3,   # short timeout — ไม่ให้ block startup
     )
 
 
@@ -1519,9 +1539,12 @@ if __name__ == "__main__":
     _pi_ip = get_local_ip()
     print(f"  Pi IP: {_pi_ip}")
 
-    # อัปเดตสถานะ + IP
-    update_system_status("face_server", "ONLINE", _pi_ip)
-    update_system_status("raspberry_pi", "ONLINE", _pi_ip)
+    # อัปเดตสถานะ + IP — ทำใน background ไม่ block startup
+    # (ถ้า DB ยังเชื่อมไม่ได้ก็ไม่ทำให้ Flask + discovery หยุด)
+    def _initial_db_sync():
+        update_system_status("face_server", "ONLINE", _pi_ip)
+        update_system_status("raspberry_pi", "ONLINE", _pi_ip)
+    threading.Thread(target=_initial_db_sync, daemon=True).start()
 
     # ============================================================
     # Auto-Pair Discovery
@@ -1608,8 +1631,19 @@ if __name__ == "__main__":
         else:
             print("[Discovery] disabled by DISCOVERY_ENABLED=0")
 
-    # โหลด name display cache จาก DB
-    load_name_display_cache()
+    # โหลด name display cache จาก DB — ทำใน background + retry
+    # (ถ้า DB ยังไม่พร้อม discovery ก็ทำงานก่อน เมื่อ web เจอแล้ว
+    #  get_db() จะใช้ host ใหม่อัตโนมัติ — ดู _resolve_db_host)
+    def _name_cache_initial_load():
+        for attempt in range(60):  # ลองสูงสุด ~5 นาที (60 × 5s)
+            try:
+                load_name_display_cache()
+                if _name_cache_loaded:
+                    return
+            except Exception as e:
+                print(f"[NameCache] initial load attempt {attempt+1} failed: {e}")
+            time.sleep(5)
+    threading.Thread(target=_name_cache_initial_load, daemon=True).start()
 
     # Heartbeat loop: ส่ง IP + สถานะ ไป DB ทุก 30 วินาที
     def _heartbeat_loop():
