@@ -86,6 +86,20 @@ CREATE TABLE IF NOT EXISTS system_status (
 ) ENGINE=InnoDB COMMENT='สถานะอุปกรณ์ในระบบ';
 
 -- ============================================================
+-- ตาราง: นับครั้งล็อกอินผิด (Login Attempts)
+-- ใช้สำหรับ rate-limit แบบผูก IP + username (กัน bypass ผ่านการล้าง cookie)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS login_attempts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    ip_address VARCHAR(45) NOT NULL,
+    username VARCHAR(50) DEFAULT NULL,
+    success TINYINT(1) DEFAULT 0,
+    attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ip_time (ip_address, attempted_at),
+    INDEX idx_user_time (username, attempted_at)
+) ENGINE=InnoDB COMMENT='ประวัติการพยายาม login';
+
+-- ============================================================
 -- ตาราง: อุปกรณ์ที่ pair แล้ว (Paired Devices)
 -- ใช้กับระบบ Auto-Pair บน LAN เดียวกัน
 -- ============================================================

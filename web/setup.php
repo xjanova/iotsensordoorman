@@ -5,9 +5,17 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/icons.php';
 
+ini_set('session.cookie_httponly', '1');
+ini_set('session.cookie_samesite', 'Strict');
+ini_set('session.use_strict_mode', '1');
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrfToken = $_SESSION['csrf_token'];
 
 // Check if admin already exists
 $dbError = false;
@@ -34,8 +42,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $displayName = trim($_POST['display_name'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
+    $token = $_POST['csrf_token'] ?? '';
 
-    if ($dbError || !$db) {
+    if (!hash_equals($csrfToken, $token)) {
+        $error = 'Session หมดอายุ กรุณาโหลดหน้าใหม่';
+    } elseif ($dbError || !$db) {
         $error = 'เชื่อมต่อฐานข้อมูลไม่ได้';
     } elseif ($username === '' || $password === '') {
         $error = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
@@ -150,6 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="POST" class="auth-form">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
             <label>
                 <span>ชื่อผู้ใช้ (Username) <span class="text-danger">*</span></span>
                 <div class="auth-field">

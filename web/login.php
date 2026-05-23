@@ -5,9 +5,19 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/icons.php';
 
+// Session security (เหมือน auth.php)
+ini_set('session.cookie_httponly', '1');
+ini_set('session.cookie_samesite', 'Strict');
+ini_set('session.use_strict_mode', '1');
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+// CSRF token
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrfToken = $_SESSION['csrf_token'];
 
 // If no admin exists, redirect to setup
 $dbError = false;
@@ -31,53 +41,77 @@ if (!empty($_SESSION['admin_id'])) {
 }
 
 $error = '';
+$username = '';
 
-// Rate limiting
+// Rate limit config — DB-based (ไม่ใช่ session ซึ่งล้าง cookie แล้ว bypass ได้)
 $maxAttempts = 5;
 $lockoutMinutes = 15;
+$clientIp = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+
+function countRecentFailures(PDO $db, string $ip, ?string $username, int $minutes): int {
+    $sql = "SELECT COUNT(*) FROM login_attempts
+            WHERE success = 0
+              AND attempted_at >= (NOW() - INTERVAL ? MINUTE)
+              AND (ip_address = ?" . ($username ? " OR username = ?" : "") . ")";
+    $stmt = $db->prepare($sql);
+    $params = [$minutes, $ip];
+    if ($username) $params[] = $username;
+    $stmt->execute($params);
+    return (int) $stmt->fetchColumn();
+}
+
+function logAttempt(PDO $db, string $ip, ?string $username, bool $success): void {
+    $stmt = $db->prepare("INSERT INTO login_attempts (ip_address, username, success) VALUES (?, ?, ?)");
+    $stmt->execute([$ip, $username, $success ? 1 : 0]);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $attempts = $_SESSION['login_attempts'] ?? 0;
-    $lastAttempt = $_SESSION['last_login_attempt'] ?? 0;
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $token = $_POST['csrf_token'] ?? '';
 
-    if ($attempts >= $maxAttempts && (time() - $lastAttempt) < ($lockoutMinutes * 60)) {
-        $remaining = ceil(($lockoutMinutes * 60 - (time() - $lastAttempt)) / 60);
-        $error = "ล็อกชั่วคราว กรุณารอ {$remaining} นาที";
+    // CSRF check
+    if (!hash_equals($csrfToken, $token)) {
+        $error = 'Session หมดอายุ กรุณาโหลดหน้าใหม่';
+    } elseif ($dbError || !$db) {
+        $error = 'เชื่อมต่อฐานข้อมูลไม่ได้ — ตรวจสอบ .env';
+    } elseif ($username === '' || $password === '') {
+        $error = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
     } else {
-        if ((time() - $lastAttempt) >= ($lockoutMinutes * 60)) {
-            $_SESSION['login_attempts'] = 0;
-        }
-
-        $username = trim($_POST['username'] ?? '');
-        $password = $_POST['password'] ?? '';
-
-        if ($dbError || !$db) {
-            $error = 'เชื่อมต่อฐานข้อมูลไม่ได้ — ตรวจสอบ .env';
-        } elseif ($username === '' || $password === '') {
-            $error = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
-        } else {
-            try {
+        try {
+            // Rate limit: นับ failure ใน {lockoutMinutes} นาทีล่าสุด ทั้ง IP และ username
+            $failures = countRecentFailures($db, $clientIp, $username, $lockoutMinutes);
+            if ($failures >= $maxAttempts) {
+                $error = "ล็อกชั่วคราว — ลองใหม่ใน {$lockoutMinutes} นาที";
+                logAttempt($db, $clientIp, $username, false);
+            } else {
                 $stmt = $db->prepare("SELECT * FROM admin_users WHERE username = ?");
                 $stmt->execute([$username]);
                 $admin = $stmt->fetch();
 
                 if ($admin && password_verify($password, $admin['password_hash'])) {
+                    logAttempt($db, $clientIp, $username, true);
                     session_regenerate_id(true);
                     $_SESSION['admin_id'] = $admin['id'];
                     $_SESSION['admin_username'] = $admin['username'];
                     $_SESSION['admin_name'] = $admin['display_name'] ?: $admin['username'];
-                    $_SESSION['login_attempts'] = 0;
+                    // CSRF token ใหม่หลัง login (ป้องกัน session fixation)
+                    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                     header('Location: index.php');
                     exit;
                 } else {
-                    $_SESSION['login_attempts'] = ($_SESSION['login_attempts'] ?? 0) + 1;
-                    $_SESSION['last_login_attempt'] = time();
+                    logAttempt($db, $clientIp, $username, false);
                     $error = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
                 }
-            } catch (PDOException $e) {
-                error_log("[Login] " . $e->getMessage());
-                $error = 'เกิดข้อผิดพลาดของฐานข้อมูล';
             }
+
+            // เก็บข้อมูลแค่ 30 วันล่าสุด (housekeeping เบาๆ — sample 1/100)
+            if (mt_rand(1, 100) === 1) {
+                $db->exec("DELETE FROM login_attempts WHERE attempted_at < NOW() - INTERVAL 30 DAY");
+            }
+        } catch (PDOException $e) {
+            error_log("[Login] " . $e->getMessage());
+            $error = 'เกิดข้อผิดพลาดของฐานข้อมูล';
         }
     }
 }
@@ -125,11 +159,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="POST" class="auth-form">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
             <label>
                 <span>ชื่อผู้ใช้</span>
                 <div class="auth-field">
                     <?= ico('users', 14) ?>
-                    <input type="text" name="username" value="<?= htmlspecialchars($username ?? '') ?>" required autofocus class="input" placeholder="Username" autocomplete="username">
+                    <input type="text" name="username" value="<?= htmlspecialchars($username) ?>" required autofocus class="input" placeholder="Username" autocomplete="username">
                 </div>
             </label>
             <label>

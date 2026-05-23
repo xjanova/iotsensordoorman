@@ -453,8 +453,7 @@ function deleteEmployee(id) {
         'ลบพนักงาน',
         `ต้องการลบ "${emp ? emp.first_name + ' ' + emp.last_name : 'พนักงาน'}" หรือไม่?`,
         async () => {
-            const res = await fetch('api/employees.php?id=' + id, { method: 'DELETE' });
-            const result = await res.json();
+            const result = await deleteAPI('api/employees.php?id=' + id);
             if (result?.success) { showToast('ลบพนักงานสำเร็จ', 'success'); loadEmployees(); }
             else { showToast(result?.error || 'เกิดข้อผิดพลาด', 'error'); }
         }
@@ -510,8 +509,8 @@ async function capturePhoto() {
     result.style.display = 'none';
     try {
         const empCode = document.getElementById('formEmpCode').value || 'capture';
-        const resp = await fetch('api/capture.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ camera: _captureCamera, emp_code: empCode }) });
-        const data = await resp.json();
+        const data = await postAPI('api/capture.php', { camera: _captureCamera, emp_code: empCode });
+        if (!data) throw new Error('network');
         if (data.success && data.filename) {
             document.getElementById('formFaceImage').value = data.filename;
             currentUploadedFile = data.filename;

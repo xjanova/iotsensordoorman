@@ -8,6 +8,8 @@ require_once __DIR__ . '/../includes/api_auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 requireLogin();
+// POST actions → require CSRF
+if ($_SERVER['REQUEST_METHOD'] === 'POST') requireCsrf();
 
 $action = $_GET['action'] ?? '';
 

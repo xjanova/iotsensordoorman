@@ -46,6 +46,15 @@ async function postAPI(url, data = {}) {
         return await r.json();
     } catch (e) { console.error('API Error:', e); return null; }
 }
+async function deleteAPI(url) {
+    try {
+        const r = await fetch(url, {
+            method: 'DELETE',
+            headers: {'X-CSRF-Token': CSRF_TOKEN},
+        });
+        return await r.json();
+    } catch (e) { console.error('API Error:', e); return null; }
+}
 function esc(str) { if (str == null) return ''; const d = document.createElement('div'); d.textContent = String(str); return d.innerHTML; }
 function formatDateTime(iso) { if (!iso) return '-'; const d = new Date(iso); return d.toLocaleDateString('th-TH') + ' ' + d.toLocaleTimeString('th-TH'); }
 function formatTime(iso) { if (!iso) return '-'; return new Date(iso).toLocaleTimeString('th-TH'); }
