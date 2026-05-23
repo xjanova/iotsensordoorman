@@ -367,17 +367,20 @@ class DiscoveryService:
         """หา web URL ทุกครั้งที่ยังไม่มี หรือเช็คเป็นระยะ"""
         while not self._stop_event.is_set():
             url = self.get_web_url()
-            if url and _ping_web(url, timeout=2.0):
-                # ใช้งานได้ — รอนานหน่อย
+            if url and _ping_web(url, timeout=5.0):
+                # ใช้งานได้ — รอนานหน่อย (5 นาที)
                 self._stop_event.wait(WEB_RESCAN_INTERVAL)
                 continue
 
             # ลอง discover ใหม่
             local_ip = get_local_ip()
             found = discover_web_url(local_ip)
-            if found:
+            if found and found != url:
                 self.set_web_url(found)
                 _log.info(f"[discovery] web URL set: {found}")
+            elif found == url:
+                # URL เดิม — แค่รอ rescan รอบหน้า (ping cache อาจ fail ชั่วคราว)
+                self._stop_event.wait(WEB_RESCAN_INTERVAL)
             else:
                 _log.warning("[discovery] web server not found — retry in 30s")
                 self._stop_event.wait(30)

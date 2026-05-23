@@ -958,7 +958,13 @@ def api_wifi_current():
 @app.route('/api/system/health')
 def api_system_health():
     """ส่งข้อมูล CPU/RAM/Temperature ของ Raspberry Pi"""
-    import psutil
+    try:
+        import psutil
+    except ImportError:
+        return jsonify({
+            "error": "psutil not installed",
+            "hint": "pip install psutil",
+        }), 503
 
     # CPU usage (%) — non-blocking, ใช้ค่าเฉลี่ยจาก call ก่อนหน้า
     cpu_percent = psutil.cpu_percent(interval=None)
@@ -1728,11 +1734,17 @@ if __name__ == "__main__":
             discovery_svc.registry.on_update(_on_device_discovered)
 
             # ผูก discovery web URL กลับมาที่ system_state เมื่อเจอ
+            # IDEMPOTENT — trigger announce + credentials เฉพาะตอน URL เปลี่ยน (กันลูป)
             _orig_set_web_url = discovery_svc.set_web_url
             def _set_web_url_and_sync(url):
+                prev = system_state.get("web_url_discovered")
                 _orig_set_web_url(url)
                 system_state["web_url_discovered"] = url
-                # announce Pi ตัวเองทันที (เพราะเพิ่งรู้จัก web)
+                if prev == url:
+                    # URL เดิม — ไม่ต้อง re-announce + re-fetch credentials
+                    # (re-announce ทำใน _reannounce_loop ทุก 30s อยู่แล้ว)
+                    return
+                # announce Pi ตัวเองทันที (เพราะเพิ่งรู้จัก web หรือ URL เปลี่ยน)
                 try:
                     requests.post(
                         url + "/api/pair/announce.php",
