@@ -178,7 +178,9 @@ INSERT INTO settings (setting_key, setting_value, description) VALUES
 ('door_lock_type', 'NO', 'ชนิด lock: NO=Normally Open, NC=Normally Closed'),
 -- Pairing
 ('pairing_token', '', 'Shared secret สำหรับ pair Pi/ESP32 กับ Web (auto-generated ตอน setup)'),
-('pairing_enabled', '1', 'เปิดรับการ pair อุปกรณ์ใหม่ (1=เปิด, 0=ปิด)');
+('pairing_enabled', '1', 'เปิดรับการ pair อุปกรณ์ใหม่ (1=เปิด, 0=ปิด)'),
+('auto_pairing_enabled', '1', 'Zero-config: รับ pair อุปกรณ์ใน LAN เดียวกันโดยไม่ต้องใช้ token (1=เปิด — ทุกอุปกรณ์ start เป็น PENDING ให้ admin approve)'),
+('db_share_enabled', '1', 'อนุญาตให้ Pi ที่ TRUSTED ดึง DB credentials ผ่าน /api/pair/credentials.php (1=เปิด)');
 
 -- พนักงานตัวอย่าง
 INSERT INTO employees (emp_code, first_name, last_name, department, position, face_image, is_authorized) VALUES

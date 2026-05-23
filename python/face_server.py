@@ -1547,9 +1547,12 @@ if __name__ == "__main__":
     threading.Thread(target=_initial_db_sync, daemon=True).start()
 
     # ============================================================
-    # Auto-Pair Discovery
+    # Auto-Pair Discovery (Zero-Config)
+    # ทำงานแม้ไม่มี PAIRING_TOKEN — web จะรับเป็น PENDING ให้ admin approve
+    # หลัง approve แล้ว Pi จะดึง DB creds + token จาก /api/pair/credentials.php
     # ============================================================
-    if config.DISCOVERY_ENABLED and config.PAIRING_TOKEN:
+    discovery_svc = None
+    if config.DISCOVERY_ENABLED:
         try:
             import discovery
         except ImportError as e:
@@ -1557,16 +1560,17 @@ if __name__ == "__main__":
             discovery = None
 
         if discovery:
+            def _announce_headers():
+                return {"X-Pair-Token": config.PAIRING_TOKEN} if config.PAIRING_TOKEN else {}
+
             def _on_device_discovered(info, is_new):
                 """callback เมื่อ Pi ฟัง broadcast เจอ device ใหม่ หรือ IP เปลี่ยน"""
                 role = info["role"]
                 ip = info["ip"]
                 device_id = info["device_id"]
                 if role == "ESP32":
-                    # update local cache เพื่อให้ _esp32_url() ใช้
                     system_state["esp32_ip"] = ip
                     print(f"[Pair] ESP32 discovered: {device_id} @ {ip} (new={is_new})")
-                # ส่ง announce ไป web (ทั้ง ESP32 ที่เจอ และ Pi ตัวเอง)
                 web_url = system_state.get("web_url_discovered") or config.WEB_SERVER_URL
                 if not web_url:
                     return
@@ -1581,11 +1585,82 @@ if __name__ == "__main__":
                             "hostname": info.get("hostname"),
                             "extra": {"via": "pi-discovery"},
                         },
-                        headers={"X-Pair-Token": config.PAIRING_TOKEN},
+                        headers=_announce_headers(),
                         timeout=5,
                     )
                 except Exception as e:
                     print(f"[Pair] announce failed: {e}")
+
+            def _fetch_credentials(web_url, device_id):
+                """หลัง paired แล้ว — ดึง DB creds + token จาก web
+                   ลองทุก 10s จนกว่า status จะเป็น TRUSTED แล้วเลิก"""
+                while system_state["running"]:
+                    try:
+                        r = requests.get(
+                            web_url + "/api/pair/credentials.php",
+                            params={"role": "PI", "device_id": device_id},
+                            timeout=5,
+                        )
+                        if r.status_code == 200:
+                            data = r.json()
+                            if data.get("ok"):
+                                db = data.get("db", {})
+                                # update config + .env ให้ใช้ครั้งต่อไป
+                                config.DB_HOST     = db.get("host") or config.DB_HOST
+                                config.DB_PORT     = db.get("port") or config.DB_PORT
+                                config.DB_USER     = db.get("user") or config.DB_USER
+                                config.DB_PASSWORD = db.get("password", config.DB_PASSWORD)
+                                config.DB_NAME     = db.get("name") or config.DB_NAME
+                                if data.get("pairing_token"):
+                                    config.PAIRING_TOKEN = data["pairing_token"]
+                                if data.get("esp32_ip"):
+                                    system_state["esp32_ip"] = data["esp32_ip"]
+                                _save_env_from_config()
+                                print(f"[Pair] credentials received → DB host={config.DB_HOST}")
+                                return
+                            else:
+                                # ยัง PENDING อยู่ — รอ admin approve
+                                pass
+                    except Exception as e:
+                        print(f"[Pair] credentials fetch error: {e}")
+                    time.sleep(10)
+
+            def _save_env_from_config():
+                """เซฟค่าใหม่ลง .env (เพื่อให้ครั้งต่อไปไม่ต้องรอ pair ใหม่)"""
+                try:
+                    env_path = os.path.join(os.path.dirname(__file__), ".env")
+                    lines = []
+                    if os.path.exists(env_path):
+                        with open(env_path) as f:
+                            lines = f.readlines()
+                    updates = {
+                        "DB_HOST": config.DB_HOST,
+                        "DB_PORT": str(config.DB_PORT),
+                        "DB_USER": config.DB_USER,
+                        "DB_PASSWORD": config.DB_PASSWORD,
+                        "DB_NAME": config.DB_NAME,
+                        "PAIRING_TOKEN": config.PAIRING_TOKEN,
+                    }
+                    keys_seen = set()
+                    new_lines = []
+                    for line in lines:
+                        s = line.strip()
+                        if "=" in s and not s.startswith("#"):
+                            k = s.split("=", 1)[0].strip()
+                            if k in updates:
+                                new_lines.append(f"{k}={updates[k]}\n")
+                                keys_seen.add(k)
+                                continue
+                        new_lines.append(line)
+                    for k, v in updates.items():
+                        if k not in keys_seen:
+                            new_lines.append(f"{k}={v}\n")
+                    with open(env_path, "w") as f:
+                        f.writelines(new_lines)
+                    os.chmod(env_path, 0o600)
+                    print("[Pair] .env updated with new credentials")
+                except Exception as e:
+                    print(f"[Pair] cannot save .env: {e}")
 
             discovery_svc = discovery.DiscoveryService(
                 role="PI",
@@ -1612,24 +1687,28 @@ if __name__ == "__main__":
                             "hostname": socket.gethostname(),
                             "extra": {"version": "face_server"},
                         },
-                        headers={"X-Pair-Token": config.PAIRING_TOKEN},
+                        headers=_announce_headers(),
                         timeout=5,
                     )
+                    print(f"[Pair] self-announce → {url}")
                 except Exception as e:
                     print(f"[Pair] self-announce failed: {e}")
+                # ดึง credentials หลัง pair (รอ admin approve)
+                threading.Thread(
+                    target=_fetch_credentials,
+                    args=(url, discovery_svc.device_id),
+                    daemon=True
+                ).start()
             discovery_svc.set_web_url = _set_web_url_and_sync
 
-            # ตั้ง initial state ถ้ามี config.WEB_SERVER_URL
             if config.WEB_SERVER_URL:
                 system_state["web_url_discovered"] = config.WEB_SERVER_URL
 
             discovery_svc.start()
-            print(f"[Discovery] started — pairing on UDP {discovery.DISCOVERY_PORT}")
+            print(f"[Discovery] started — UDP {discovery.DISCOVERY_PORT} "
+                  f"(zero-config: {'on' if not config.PAIRING_TOKEN else 'token-locked'})")
     else:
-        if not config.PAIRING_TOKEN:
-            print("[Discovery] disabled — set PAIRING_TOKEN ใน .env เพื่อเปิด auto-pair")
-        else:
-            print("[Discovery] disabled by DISCOVERY_ENABLED=0")
+        print("[Discovery] disabled by DISCOVERY_ENABLED=0")
 
     # โหลด name display cache จาก DB — ทำใน background + retry
     # (ถ้า DB ยังไม่พร้อม discovery ก็ทำงานก่อน เมื่อ web เจอแล้ว

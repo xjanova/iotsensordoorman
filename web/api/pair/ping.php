@@ -6,12 +6,16 @@
  */
 require_once __DIR__ . '/../../config.php';
 
-// pairing_enabled flag ดูจาก settings
+// pairing flags
 $pairingOn = false;
+$autoOn = false;
 try {
     $db = getDB();
-    $row = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'pairing_enabled' LIMIT 1")->fetch();
-    $pairingOn = $row && $row['setting_value'] === '1';
+    $rows = $db->query("SELECT setting_key, setting_value FROM settings WHERE setting_key IN ('pairing_enabled','auto_pairing_enabled')")->fetchAll();
+    foreach ($rows as $r) {
+        if ($r['setting_key'] === 'pairing_enabled')      $pairingOn = $r['setting_value'] === '1';
+        if ($r['setting_key'] === 'auto_pairing_enabled') $autoOn    = $r['setting_value'] === '1';
+    }
 } catch (Throwable $e) {
     // เงียบไว้ — ถ้า DB ล่ม ก็ตอบว่าไม่พร้อม pair
 }
@@ -21,7 +25,9 @@ jsonResponse([
     'service' => 'bunny-door-web',
     'version' => APP_VERSION,
     'pairing_enabled' => $pairingOn,
+    'auto_pairing_enabled' => $autoOn,
     'endpoints' => [
-        'announce' => 'api/pair/announce.php',
+        'announce'    => 'api/pair/announce.php',
+        'credentials' => 'api/pair/credentials.php',
     ],
 ]);

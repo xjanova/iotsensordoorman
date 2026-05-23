@@ -23,7 +23,25 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(['error' => 'POST required'], 405);
 }
 
-requirePairToken();
+// Zero-Config Auto-Pair:
+//   - ถ้ามี X-Pair-Token → verify ตามปกติ (secure mode)
+//   - ถ้าไม่มี token แต่ auto_pairing_enabled=1 → ปล่อยผ่าน
+//     (device จะถูกสร้างเป็น PENDING ให้ admin approve เอง)
+$hasToken = !empty($_SERVER['HTTP_X_PAIR_TOKEN']);
+if ($hasToken) {
+    requirePairToken();
+} else {
+    try {
+        $db0 = getDB();
+        $row = $db0->query("SELECT setting_value FROM settings WHERE setting_key = 'auto_pairing_enabled' LIMIT 1")->fetch();
+        $autoOn = $row && $row['setting_value'] === '1';
+    } catch (Throwable $e) {
+        $autoOn = false;
+    }
+    if (!$autoOn) {
+        jsonResponse(['error' => 'pairing token required (auto_pairing disabled)'], 401);
+    }
+}
 
 $input = json_decode(file_get_contents('php://input'), true);
 if (!is_array($input)) {

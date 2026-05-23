@@ -287,8 +287,9 @@ class DiscoveryService:
             # ละทิ้ง broadcast จากตัวเอง
             if pkt["role"] == self.role and pkt["device_id"] == self.device_id:
                 continue
-            # ตรวจ token
-            if pkt["token"] != self.token:
+            # ตรวจ token — ถ้า "ทั้งคู่" มี token ตั้งไว้ แต่ไม่ตรง → ข้าม
+            # ถ้าตัวเองหรือ packet มี token ว่าง → ยอมรับ (zero-config mode)
+            if self.token and pkt["token"] and pkt["token"] != self.token:
                 _log.debug(f"[listen] token mismatch from {addr[0]} role={pkt['role']}")
                 continue
             # ใช้ source IP จาก socket (น่าเชื่อกว่า field ใน packet ในกรณี NAT)

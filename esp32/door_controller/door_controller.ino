@@ -283,7 +283,7 @@ void connectWiFi() {
 // ============================================================
 void discoveryBroadcast() {
     if (WiFi.status() != WL_CONNECTED) return;
-    if (runtimePairToken.length() == 0) return;  // ไม่มี token = ไม่ broadcast
+    // Zero-config: broadcast แม้ไม่มี token (web จะรับเป็น PENDING)
 
     IPAddress local = WiFi.localIP();
     IPAddress mask  = WiFi.subnetMask();
@@ -336,8 +336,9 @@ void discoveryListen() {
     String port     = parts[5];
     String token    = parts[6];
 
-    // ตรวจ token
-    if (runtimePairToken.length() == 0 || token != runtimePairToken) return;
+    // ตรวจ token — ถ้าทั้งคู่มี token แต่ไม่ตรง → ข้าม
+    // ถ้าฝั่งใดฝั่งหนึ่งว่าง = zero-config mode → ยอมรับ
+    if (runtimePairToken.length() > 0 && token.length() > 0 && token != runtimePairToken) return;
     // ละทิ้ง broadcast จากตัวเอง
     if (role == "ESP32" && devId == myDeviceId) return;
 
