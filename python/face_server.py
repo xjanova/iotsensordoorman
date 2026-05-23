@@ -168,18 +168,27 @@ def get_display_name(filename_name):
 # Thai font สำหรับวาดข้อความบน frame
 _thai_font = None
 def get_thai_font(size=18):
-    """โหลด Thai font (ลอง Noto Sans Thai ก่อน, fallback ไป DejaVu/default)"""
+    """โหลด Thai font — ลอง paths ที่รู้จัก → glob หา TLWG ใดก็ได้ → DejaVu"""
     global _thai_font
     if _thai_font and _thai_font.size == size:
         return _thai_font
     font_paths = [
+        # Noto Sans Thai
         "/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf",
         "/usr/share/fonts/truetype/noto/NotoSansThai-Bold.ttf",
         "/usr/share/fonts/opentype/noto/NotoSansThai-Regular.ttf",
-        "/usr/share/fonts/truetype/thai/TlwgMono.ttf",
-        "/usr/share/fonts/truetype/thai/Norasi.ttf",
+        # TLWG (Debian/Raspberry Pi OS standard)
+        "/usr/share/fonts/truetype/tlwg/Loma.ttf",
+        "/usr/share/fonts/truetype/tlwg/Loma-Bold.ttf",
+        "/usr/share/fonts/truetype/tlwg/Garuda.ttf",
+        "/usr/share/fonts/truetype/tlwg/Kinnari.ttf",
+        "/usr/share/fonts/truetype/tlwg/Sawasdee.ttf",
         "/usr/share/fonts/truetype/tlwg/TlwgMono.ttf",
         "/usr/share/fonts/truetype/tlwg/Norasi.ttf",
+        # Legacy paths
+        "/usr/share/fonts/truetype/thai/TlwgMono.ttf",
+        "/usr/share/fonts/truetype/thai/Norasi.ttf",
+        # DejaVu fallback (latin only — ไทยจะเป็น □)
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     ]
     for fp in font_paths:
@@ -187,8 +196,20 @@ def get_thai_font(size=18):
             _thai_font = ImageFont.truetype(fp, size)
             print(f"[Font] ใช้ฟอนต์: {fp}")
             return _thai_font
+    # Glob fallback — ลองหา .ttf ใน tlwg หรือ thai folder
+    import glob as _glob
+    for pattern in [
+        "/usr/share/fonts/truetype/tlwg/*.ttf",
+        "/usr/share/fonts/truetype/thai/*.ttf",
+        "/usr/share/fonts/truetype/noto/*Thai*.ttf",
+    ]:
+        for fp in _glob.glob(pattern):
+            if os.path.exists(fp):
+                _thai_font = ImageFont.truetype(fp, size)
+                print(f"[Font] glob fallback: {fp}")
+                return _thai_font
     _thai_font = ImageFont.load_default()
-    print("[Font] ใช้ฟอนต์ default (ไม่รองรับภาษาไทย)")
+    print("[Font] ⚠ ไม่เจอ Thai font — ติดตั้ง: sudo apt install fonts-thai-tlwg")
     return _thai_font
 
 def draw_thai_text(frame, text, position, color_bgr, font_size=18):

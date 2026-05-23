@@ -119,8 +119,9 @@ sudo apt install -y \
     libgtk-3-dev libxvidcore-dev libx264-dev \
     libhdf5-dev libhdf5-serial-dev \
     mariadb-client \
+    fonts-thai-tlwg fonts-noto-cjk fonts-noto-color-emoji \
     curl >> "$LOG_FILE" 2>&1
-ok "Dependencies ติดตั้งเรียบร้อย"
+ok "Dependencies ติดตั้งเรียบร้อย (รวม Thai fonts)"
 
 # ── Step 2: Expand swap ─────────────────────────────────────
 step "ขยาย Swap เป็น 2GB (สำหรับ compile dlib)"
