@@ -289,9 +289,12 @@ def get_db():
         database=config.DB_NAME,
         charset="utf8mb4",
         connection_timeout=3,   # short timeout — ไม่ให้ block startup
-        ssl_disabled=True,      # ปิด SSL — Laragon MariaDB ใหม่เปิด TLS default
+        ssl_disabled=True,      # ปิด SSL — Laragon MySQL/MariaDB เปิด TLS default
                                 # แต่ใช้ self-signed cert ที่ Pi verify ไม่ผ่าน
                                 # ปลอดภัยพอใน LAN เดียวกัน
+        get_server_public_key=True,  # MySQL 8 caching_sha2_password ผ่าน non-SSL ต้องขอ RSA public key
+                                     # ไม่งั้น error 2061 "Authentication requires secure connection"
+                                     # (รหัสว่างเคยผ่าน แต่รหัสไม่ว่างต้องมี secure channel/RSA)
     )
 
 
