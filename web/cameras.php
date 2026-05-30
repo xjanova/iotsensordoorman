@@ -234,8 +234,8 @@ async function fetchCamConfig() {
     try {
         const data = await fetchAPI(FACE_SERVER + '/api/status');
         if (!data) throw new Error();
-        updateCamUI(1, 'outside', data.camera_outside);
-        updateCamUI(2, 'inside', data.camera_inside);
+        updateCamUI(1, 'outside', data.camera_outside, data.camera_mode);
+        updateCamUI(2, 'inside', data.camera_inside, data.camera_mode);
         updateCamStatus(data);
     } catch {
         setCamError(1, 'Face Server ออฟไลน์');
@@ -243,7 +243,7 @@ async function fetchCamConfig() {
     }
 }
 
-function updateCamUI(num, side, cfg) {
+function updateCamUI(num, side, cfg, camMode) {
     const titleEl = document.getElementById('cam' + num + 'Title');
     const subEl = document.getElementById('cam' + num + 'Sub');
     const badgeEl = document.getElementById('cam' + num + 'Badge');
@@ -259,7 +259,7 @@ function updateCamUI(num, side, cfg) {
         badgeEl.textContent = 'UNASSIGNED'; badgeEl.className = 'badge warn';
         imgEl.style.display = 'none'; phEl.style.display = '';
         phEl.textContent = 'NO CAMERA ASSIGNED';
-        recChip.classList.remove('ok');
+        recChip.classList.remove('ok', 'standby');
         recText.textContent = 'OFFLINE';
         if (side === 'outside') _camOutEnabled = false; else _camInEnabled = false;
         return;
@@ -270,14 +270,22 @@ function updateCamUI(num, side, cfg) {
 
     if (cfg.active && cfg.has_frame) {
         badgeEl.textContent = 'LIVE'; badgeEl.className = 'badge ok';
-        recChip.classList.remove('ok'); // RED rec indicator (blinking)
-        recText.textContent = 'REC';
+        // standby + ไม่มี motion (ไม่เจอหน้า) = ไม่ได้ recording จริง → STANDBY (จุดเทา ไม่กระพริบ)
+        // ไม่งั้น (always mode หรือ standby+เจอหน้า) → REC (จุดแดงกระพริบ)
+        if (camMode === 'standby' && !cfg.motion) {
+            recChip.classList.remove('ok');
+            recChip.classList.add('standby');
+            recText.textContent = 'STANDBY';
+        } else {
+            recChip.classList.remove('ok', 'standby');
+            recText.textContent = 'REC';
+        }
         if (side === 'outside') _camOutEnabled = true; else _camInEnabled = true;
     } else {
         badgeEl.textContent = 'OFFLINE'; badgeEl.className = 'badge danger';
         imgEl.style.display = 'none'; phEl.style.display = '';
         phEl.textContent = 'CAMERA OFFLINE';
-        recChip.classList.remove('ok');
+        recChip.classList.remove('ok', 'standby');
         recText.textContent = 'OFFLINE';
         if (side === 'outside') _camOutEnabled = false; else _camInEnabled = false;
     }

@@ -710,6 +710,7 @@ textarea.input { height: auto; padding: 8px 10px; line-height: 1.55; }
 @keyframes blink { 50% { opacity: 0.25; } }
 .cam-chip.ok .rec { background: var(--ok); animation: none; }
 .cam-chip.warn .rec { background: var(--warn); animation: none; }
+.cam-chip.standby .rec { background: var(--text-2); animation: none; }  /* standby = จุดเทานิ่ง (ไม่ recording) */
 
 .face-box {
   position: absolute;
