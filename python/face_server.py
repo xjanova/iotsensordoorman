@@ -153,6 +153,7 @@ def load_name_display_cache():
         for k, v in new_cache.items():
             print(f"  {k} → {v}")
     except Exception as e:
+        system_state["db_alive"] = False  # บอก recovery loop ว่า DB หลุด → ให้ดึง credentials ใหม่
         print(f"[NameCache Error] {e} — ใช้ cache เดิมต่อ ({len(_name_display_cache)} รายการ)")
     finally:
         if db:
@@ -568,13 +569,19 @@ def _run_inner_camera_loop(cap, cam_name, camera_id, last_frame_ts):
         display_names = []
         if last_faces:
             display_frame = frame.copy()
+            fh = display_frame.shape[0]
             for (top, right, bottom, left), name, conf in zip(last_faces, last_names, last_confidences):
                 color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
                 cv2.rectangle(display_frame, (left, top), (right, bottom), color, 2)
                 disp_name = get_display_name(name)
                 display_names.append(disp_name)
                 label = f"{disp_name} ({conf}%)" if conf > 0 else "ไม่รู้จัก"
-                display_frame = draw_thai_text(display_frame, label, (left, top - 22), color, font_size=16)
+                # วางป้ายชื่อให้อยู่ในเฟรมเสมอ: ปกติเหนือกรอบ, ถ้าชิดขอบบนเกินไป → วางใต้กรอบแทน
+                label_x = max(2, left)
+                label_y = top - 22
+                if label_y < 2:
+                    label_y = min(bottom + 4, fh - 20)
+                display_frame = draw_thai_text(display_frame, label, (label_x, label_y), color, font_size=16)
 
         # Encode เป็น JPEG เก็บไว้
         _, jpeg_buf = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 65])
@@ -1865,38 +1872,46 @@ if __name__ == "__main__":
                 except Exception as e:
                     print(f"[Pair] announce failed: {e}")
 
+            def _apply_credentials_once(web_url, device_id):
+                """ดึง DB creds จาก web 1 ครั้ง — คืน True ถ้าได้ (TRUSTED + db_share เปิด),
+                   False ถ้ายัง PENDING / เข้าไม่ได้ / ผิดพลาด"""
+                try:
+                    r = requests.get(
+                        web_url + "/api/pair/credentials.php",
+                        params={"role": "PI", "device_id": device_id},
+                        timeout=5,
+                    )
+                    if r.status_code == 200:
+                        data = r.json()
+                        if data.get("ok"):
+                            db = data.get("db", {})
+                            # update config + .env ให้ใช้ครั้งต่อไป
+                            config.DB_HOST     = db.get("host") or config.DB_HOST
+                            config.DB_PORT     = db.get("port") or config.DB_PORT
+                            config.DB_USER     = db.get("user") or config.DB_USER
+                            config.DB_PASSWORD = db.get("password", config.DB_PASSWORD)
+                            config.DB_NAME     = db.get("name") or config.DB_NAME
+                            if data.get("pairing_token"):
+                                config.PAIRING_TOKEN = data["pairing_token"]
+                            if data.get("esp32_ip"):
+                                system_state["esp32_ip"] = data["esp32_ip"]
+                            _save_env_from_config()
+                            print(f"[Pair] credentials received → DB host={config.DB_HOST}")
+                            return True
+                        # else: ยัง PENDING อยู่ — รอ admin approve
+                    elif r.status_code == 403:
+                        # db_share ปิด หรือ device ยังไม่ TRUSTED — log ให้ debug ง่าย
+                        print(f"[Pair] credentials 403: {r.text[:120]}")
+                except Exception as e:
+                    print(f"[Pair] credentials fetch error: {e}")
+                return False
+
             def _fetch_credentials(web_url, device_id):
                 """หลัง paired แล้ว — ดึง DB creds + token จาก web
                    ลองทุก 10s จนกว่า status จะเป็น TRUSTED แล้วเลิก"""
                 while system_state["running"]:
-                    try:
-                        r = requests.get(
-                            web_url + "/api/pair/credentials.php",
-                            params={"role": "PI", "device_id": device_id},
-                            timeout=5,
-                        )
-                        if r.status_code == 200:
-                            data = r.json()
-                            if data.get("ok"):
-                                db = data.get("db", {})
-                                # update config + .env ให้ใช้ครั้งต่อไป
-                                config.DB_HOST     = db.get("host") or config.DB_HOST
-                                config.DB_PORT     = db.get("port") or config.DB_PORT
-                                config.DB_USER     = db.get("user") or config.DB_USER
-                                config.DB_PASSWORD = db.get("password", config.DB_PASSWORD)
-                                config.DB_NAME     = db.get("name") or config.DB_NAME
-                                if data.get("pairing_token"):
-                                    config.PAIRING_TOKEN = data["pairing_token"]
-                                if data.get("esp32_ip"):
-                                    system_state["esp32_ip"] = data["esp32_ip"]
-                                _save_env_from_config()
-                                print(f"[Pair] credentials received → DB host={config.DB_HOST}")
-                                return
-                            else:
-                                # ยัง PENDING อยู่ — รอ admin approve
-                                pass
-                    except Exception as e:
-                        print(f"[Pair] credentials fetch error: {e}")
+                    if _apply_credentials_once(web_url, device_id):
+                        return
                     time.sleep(10)
 
             def _save_env_from_config():
@@ -1987,6 +2002,32 @@ if __name__ == "__main__":
             discovery_svc.start()
             print(f"[Discovery] started — UDP {discovery.DISCOVERY_PORT} "
                   f"(zero-config: {'on' if not config.PAIRING_TOKEN else 'token-locked'})")
+
+            # Self-heal: ถ้า DB auth หลุดต่อเนื่อง (เช่น admin เปลี่ยนรหัส MySQL บน PC)
+            # Pi จะดึง credentials ใหม่จาก web เอง (credentials.php ส่งรหัสล่าสุด)
+            # → ไม่ต้อง SSH ไปแก้ python/.env มือทุกครั้งที่เปลี่ยนรหัส DB
+            # เงื่อนไข: settings.db_share_enabled=1 และ Pi เป็น TRUSTED ใน paired_devices
+            def _db_credential_recovery_loop():
+                downs = 0
+                while system_state["running"]:
+                    time.sleep(30)
+                    if system_state.get("db_alive", True):
+                        downs = 0
+                        continue
+                    downs += 1
+                    if downs < 2:          # ต้องหลุดติดกัน ~60s ก่อน กัน false-positive ชั่วคราว
+                        continue
+                    url = system_state.get("web_url_discovered")
+                    if url and _apply_credentials_once(url, discovery_svc.device_id):
+                        print("[Pair] DB auth หลุด → ดึง credentials ใหม่สำเร็จ → reload name cache")
+                        try:
+                            load_name_display_cache()
+                            system_state["db_alive"] = True
+                        except Exception:
+                            pass
+                    downs = 0
+            threading.Thread(target=_db_credential_recovery_loop,
+                             name="cred-recovery", daemon=True).start()
 
             # Re-announce loop: ส่ง POST announce ไป web ทุก 30s
             # เพื่อให้ paired_devices.last_seen สด → web เห็นว่า Pi ONLINE
