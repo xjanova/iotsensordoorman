@@ -280,8 +280,24 @@ def _resolve_db_host():
             pass
     return config.DB_HOST
 
+# จำวิธีต่อ DB ที่ใช้ได้ (กันลองซ้ำทุกครั้ง) — index ใน _DB_STRATEGIES
+_db_ok_strategy = None
+
+# MySQL 8 default = caching_sha2_password: ส่งรหัส "ไม่ว่าง" ต้องผ่าน secure channel
+# (RSA public key หรือ TLS) — รหัสว่างเคยผ่านได้เพราะไม่ต้อง exchange
+# connector แต่ละเวอร์ชันรองรับ arg ไม่เท่ากัน → ลองหลายวิธีให้ทำงานได้ทุกเครื่อง
+_DB_STRATEGIES = [
+    # 0) ขอ RSA public key บน non-SSL (mysql-connector-python >= 8.0.11)
+    {"ssl_disabled": True, "get_server_public_key": True},
+    # 1) TLS แบบไม่ verify cert (self-signed) — caching_sha2 วิ่งใน encrypted channel
+    {"ssl_disabled": False, "ssl_verify_cert": False},
+    # 2) plain — ใช้ได้กับ mysql_native_password หรือรหัสว่าง
+    {"ssl_disabled": True},
+]
+
 def get_db():
-    return mysql.connector.connect(
+    global _db_ok_strategy
+    base = dict(
         host=_resolve_db_host(),
         port=config.DB_PORT,
         user=config.DB_USER,
@@ -289,13 +305,32 @@ def get_db():
         database=config.DB_NAME,
         charset="utf8mb4",
         connection_timeout=3,   # short timeout — ไม่ให้ block startup
-        ssl_disabled=True,      # ปิด SSL — Laragon MySQL/MariaDB เปิด TLS default
-                                # แต่ใช้ self-signed cert ที่ Pi verify ไม่ผ่าน
-                                # ปลอดภัยพอใน LAN เดียวกัน
-        get_server_public_key=True,  # MySQL 8 caching_sha2_password ผ่าน non-SSL ต้องขอ RSA public key
-                                     # ไม่งั้น error 2061 "Authentication requires secure connection"
-                                     # (รหัสว่างเคยผ่าน แต่รหัสไม่ว่างต้องมี secure channel/RSA)
     )
+    # ลองวิธีที่เคยสำเร็จก่อน แล้วค่อยไล่ที่เหลือ
+    order = list(range(len(_DB_STRATEGIES)))
+    if _db_ok_strategy is not None:
+        order = [_db_ok_strategy] + [i for i in order if i != _db_ok_strategy]
+
+    last_err = None
+    for i in order:
+        try:
+            conn = mysql.connector.connect(**base, **_DB_STRATEGIES[i])
+            if _db_ok_strategy != i:
+                _name = {0: "RSA-key/non-SSL", 1: "TLS-noverify", 2: "plain"}.get(i, str(i))
+                print(f"[DB] ต่อ MySQL สำเร็จด้วยวิธี #{i} ({_name})")
+                _db_ok_strategy = i
+            return conn
+        except (TypeError, AttributeError, ValueError):
+            # connector ไม่รู้จัก arg นี้ (เวอร์ชันเก่า) → ลองวิธีถัดไป
+            continue
+        except mysql.connector.Error as e:
+            # auth/connection ล้มเหลว → ลองวิธีถัดไป
+            last_err = e
+            continue
+    _db_ok_strategy = None  # reset — รอบหน้าลองใหม่ทุกวิธี
+    if last_err:
+        raise last_err
+    raise RuntimeError("get_db: ทุกวิธีต่อ DB ล้มเหลว (RSA/TLS/plain)")
 
 
 def log_access(employee_id, direction, method, confidence, camera_id, sensor_id, snapshot, authorized):
