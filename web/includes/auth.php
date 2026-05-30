@@ -69,9 +69,9 @@ $currentFile = basename($_SERVER['PHP_SELF']);
 // Skip auth check for login/setup pages
 $publicPages = ['login.php', 'setup.php'];
 
-// ── DEV bypass: default ON สำหรับช่วงพัฒนา (ไม่มีระบบ login)
-//    ตั้ง DEV_BYPASS_LOGIN=0 ใน web/.env เพื่อปิด (production mode)
-$_devBypass = getenv('DEV_BYPASS_LOGIN') !== '0';  // default = bypass
+// ── DEV bypass: default OFF — ใช้ระบบ login ปกติ
+//    ตั้ง DEV_BYPASS_LOGIN=1 ใน web/.env เพื่อเปิด auto-login ช่วงพัฒนาเท่านั้น
+$_devBypass = getenv('DEV_BYPASS_LOGIN') === '1';  // default = login ปกติ
 if ($_devBypass && !isLoggedIn() && !in_array($currentFile, $publicPages)) {
     try {
         $_db = getDB();

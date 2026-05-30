@@ -18,9 +18,9 @@ if (session_status() === PHP_SESSION_NONE) {
  * ตรวจ session admin — ใช้สำหรับ endpoint ที่ admin เรียกผ่าน browser
  */
 function requireLogin(): void {
-    // DEV bypass: default ON — auto-login เป็น admin คนแรก
-    //   ตั้ง DEV_BYPASS_LOGIN=0 ใน web/.env เพื่อปิด (production)
-    if (empty($_SESSION['admin_id']) && getenv('DEV_BYPASS_LOGIN') !== '0') {
+    // DEV bypass: default OFF — ใช้ระบบ login ปกติ
+    //   ตั้ง DEV_BYPASS_LOGIN=1 ใน web/.env เพื่อเปิด auto-login ช่วงพัฒนาเท่านั้น
+    if (empty($_SESSION['admin_id']) && getenv('DEV_BYPASS_LOGIN') === '1') {
         try {
             $db = getDB();
             $row = $db->query("SELECT id, username, display_name FROM admin_users ORDER BY id LIMIT 1")->fetch();
