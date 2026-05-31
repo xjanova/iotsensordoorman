@@ -43,6 +43,16 @@ MIN_UNLOCK_CONFIDENCE = float(os.environ.get("MIN_UNLOCK_CONFIDENCE", "55"))
                                        # SECURITY GATE: ความมั่นใจ (%) ขั้นต่ำที่จะ "ปลดล็อกประตู"
                                        # match แต่ conf < ค่านี้ → ปฏิเสธ + log (ไม่ปลดล็อก) กันคนแปลกหน้าถูกจำผิด
                                        # ปรับจาก log จริง: ดู conf ของพนักงานจริง vs คนแปลกหน้า แล้วตั้งคั่นกลาง
+
+# Liveness / Anti-spoofing (กันเอารูป/จอมาส่องหลอก) — ตรวจการกระพริบตา (EAR)
+REQUIRE_LIVENESS = os.environ.get("REQUIRE_LIVENESS", "0") == "1"
+                                       # default OFF — เปิด (=1) แล้วต้องกระพริบตาก่อนถึงปลดล็อก
+                                       # ⚠ ทดสอบ+จูนก่อนเปิดใช้จริง (กันพนักงานจริงโดนปฏิเสธ)
+LIVENESS_EAR_THRESHOLD = float(os.environ.get("LIVENESS_EAR_THRESHOLD", "0.21"))
+                                       # EAR ต่ำกว่านี้ = ตาปิด (ปกติตาเปิด ~0.3, ปิด ~0.1) จูนจาก log
+LIVENESS_WINDOW_SEC = float(os.environ.get("LIVENESS_WINDOW_SEC", "5"))
+                                       # ต้องเห็นกระพริบตาภายในกี่วินาทีก่อนปลดล็อก
+
 FRAME_RESIZING = 0.5                   # ย่อเป็น 50% → ตรวจจับที่ 320x240 (เดิม 25% = 80x60 เล็กเกินไป!)
 PROCESS_EVERY_X_FRAMES = 8            # ประมวลผลทุก 8 เฟรม (~1.6 วินาที) เร็วขึ้นกว่าเดิม
 FACE_MODEL = "hog"                     # "hog" = เร็ว ใช้ CPU (เหมาะกับ Pi)

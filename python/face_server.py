@@ -602,6 +602,10 @@ def _run_inner_camera_loop(cap, cam_name, camera_id, last_frame_ts):
                     cam_name=cam_name
                 )
 
+        # Liveness: ตรวจการกระพริบตาทุกเฟรม (เมื่อเปิด REQUIRE_LIVENESS) เพื่อจับ blink ให้ทัน
+        if config.REQUIRE_LIVENESS and last_faces:
+            _update_liveness(frame, cam_name, last_faces)
+
         # วาดกรอบใบหน้า (เฉพาะเมื่อมี) — ใช้ชื่อจริงจาก DB
         display_frame = frame
         display_names = []
@@ -628,8 +632,8 @@ def _run_inner_camera_loop(cap, cam_name, camera_id, last_frame_ts):
             cam_state["jpeg"] = jpeg_buf.tobytes()
             cam_state["faces"] = face_display
 
-        # หน่วงเวลา ~5 FPS เพื่อประหยัด CPU
-        time.sleep(0.2)
+        # หน่วงเวลา — ปกติ ~5 FPS, แต่ตอนเช็ค liveness เร่งเป็น ~12 FPS ให้จับ blink ทัน
+        time.sleep(0.08 if (config.REQUIRE_LIVENESS and last_faces) else 0.2)
 
     # ออกจาก inner loop ปกติ (service shutting down)
     return True
@@ -643,6 +647,45 @@ _last_action_time = {}  # {"person_name_cam": timestamp}
 _last_direction = {}    # {"person_name": {"dir": "IN"/"OUT", "time": timestamp}}
 DEBOUNCE_SECONDS = 10
 CROSS_CAM_GRACE_SECONDS = 30  # ต้องรอ 30 วิ ก่อน log ทิศทางตรงข้าม (กันซ้ำ IN/OUT)
+
+
+def _eye_aspect_ratio(eye):
+    """EAR — Eye Aspect Ratio จาก 6 จุด landmark รอบตา (ค่าต่ำ = ตาปิด)"""
+    p = [np.array(pt, dtype=float) for pt in eye]
+    v1 = np.linalg.norm(p[1] - p[5])
+    v2 = np.linalg.norm(p[2] - p[4])
+    h  = np.linalg.norm(p[0] - p[3])
+    return (v1 + v2) / (2.0 * h) if h > 0 else 0.0
+
+
+def _update_liveness(frame, cam_name, faces):
+    """ตรวจการกระพริบตา (EAR) บนใบหน้าที่ใหญ่สุด → เก็บเวลาที่กระพริบล่าสุดใน system_state
+       เรียกทุกเฟรมเมื่อ REQUIRE_LIVENESS เปิด เพื่อจับจังหวะ blink ให้ทัน (anti-photo-spoof)"""
+    if not faces:
+        return
+    st = system_state[cam_name]
+    try:
+        # ใบหน้าใหญ่สุด (คนที่ยืนใกล้กล้องสุด)
+        top, right, bottom, left = max(faces, key=lambda f: (f[2] - f[0]) * (f[1] - f[3]))
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        lms = face_recognition.face_landmarks(rgb, [(top, right, bottom, left)])
+        if not lms:
+            return
+        le, re = lms[0].get("left_eye"), lms[0].get("right_eye")
+        if not le or not re:
+            return
+        ear = (_eye_aspect_ratio(le) + _eye_aspect_ratio(re)) / 2.0
+        # state machine: ตาปิด (EAR ต่ำ) ติดกัน → พอลืมตา = นับ 1 กระพริบ
+        if ear < config.LIVENESS_EAR_THRESHOLD:
+            st["blink_closed_frames"] = st.get("blink_closed_frames", 0) + 1
+        else:
+            if st.get("blink_closed_frames", 0) >= 1:
+                st["last_blink_ts"] = time.time()
+                print(f"[Liveness] {cam_name} blink ✓ (EAR={ear:.2f})")
+            st["blink_closed_frames"] = 0
+    except Exception as e:
+        print(f"[Liveness] error: {e}")
+
 
 def process_detected_faces(frame, faces, names, confidences, camera_id, cam_name):
     """ประมวลผลใบหน้าที่ตรวจพบ (มี debounce + cross-camera direction logic)"""
@@ -685,13 +728,26 @@ def process_detected_faces(frame, faces, names, confidences, camera_id, cam_name
             if conf < config.MIN_UNLOCK_CONFIDENCE:
                 snapshot = save_snapshot(frame, "lowconf", camera_id)
                 log_anomaly(
-                    "LOW_CONFIDENCE", "MEDIUM",
+                    "UNKNOWN_FACE", "MEDIUM",   # ใช้ enum ที่มี — รายละเอียดอยู่ใน description
                     f"จำได้เป็น {name} แต่มั่นใจแค่ {conf}% (< {config.MIN_UNLOCK_CONFIDENCE}%) — ปฏิเสธ ไม่ปลดล็อก",
                     camera_id, snapshot
                 )
                 log_access(employee["id"], direction, "FACE", conf, camera_id, None, snapshot, 0)
                 print(f"[Access] DENIED {name} — confidence {conf}% < {config.MIN_UNLOCK_CONFIDENCE}%")
                 continue
+            # ── LIVENESS GATE: ต้องเห็นการกระพริบตาเร็วๆ นี้ (กันเอารูป/จอมาส่อง) ──
+            if config.REQUIRE_LIVENESS:
+                last_blink = system_state[cam_name].get("last_blink_ts", 0)
+                if (now - last_blink) > config.LIVENESS_WINDOW_SEC:
+                    snapshot = save_snapshot(frame, "noblink", camera_id)
+                    log_anomaly(
+                        "UNKNOWN_FACE", "HIGH",   # ใช้ enum ที่มี — รายละเอียดอยู่ใน description
+                        f"จำได้เป็น {name} ({conf}%) แต่ไม่พบการกระพริบตา — อาจเป็นรูป/จอ ปฏิเสธ",
+                        camera_id, snapshot
+                    )
+                    log_access(employee["id"], direction, "FACE", conf, camera_id, None, snapshot, 0)
+                    print(f"[Access] DENIED {name} — no blink (liveness) within {config.LIVENESS_WINDOW_SEC}s")
+                    continue
             snapshot = save_snapshot(frame, name, camera_id)
             # Online-Only mode: ห้ามปลดล็อกถ้าได้ข้อมูลจาก cache (DB ตาย)
             unlock_mode = system_state.get("unlock_mode", "offline")
