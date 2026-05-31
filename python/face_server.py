@@ -680,6 +680,18 @@ def process_detected_faces(frame, faces, names, confidences, camera_id, cam_name
         # ค้นหาพนักงานในฐานข้อมูล + ดู source (db/cache)
         employee, src = get_employee_by_name(name, return_source=True)
         if employee and employee["is_authorized"]:
+            # ── SECURITY GATE: ปลดล็อกเฉพาะเมื่อมั่นใจพอ ──────────────────
+            # กันคนแปลกหน้าถูกจำผิดเป็นพนักงาน (false match) ด้วย confidence ต่ำ
+            if conf < config.MIN_UNLOCK_CONFIDENCE:
+                snapshot = save_snapshot(frame, "lowconf", camera_id)
+                log_anomaly(
+                    "LOW_CONFIDENCE", "MEDIUM",
+                    f"จำได้เป็น {name} แต่มั่นใจแค่ {conf}% (< {config.MIN_UNLOCK_CONFIDENCE}%) — ปฏิเสธ ไม่ปลดล็อก",
+                    camera_id, snapshot
+                )
+                log_access(employee["id"], direction, "FACE", conf, camera_id, None, snapshot, 0)
+                print(f"[Access] DENIED {name} — confidence {conf}% < {config.MIN_UNLOCK_CONFIDENCE}%")
+                continue
             snapshot = save_snapshot(frame, name, camera_id)
             # Online-Only mode: ห้ามปลดล็อกถ้าได้ข้อมูลจาก cache (DB ตาย)
             unlock_mode = system_state.get("unlock_mode", "offline")
